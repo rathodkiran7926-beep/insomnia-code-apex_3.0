@@ -1,0 +1,50 @@
+.app-shell .topbar {
+  height: 80px !important;
+  padding: 0 28px !important;
+  gap: 24px;
+  background: linear-gradient(105deg, var(--surface) 20%, var(--primary-soft) 100%) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--primary) 20%, var(--surface)) !important;
+  box-shadow: 0 3px 16px color-mix(in srgb, var(--primary) 5%, transparent) !important;
+}
+.app-shell .sidebar > .brand { height: 80px !important; background: linear-gradient(110deg, var(--primary-soft), var(--surface)); }
+.workspace-header-context { flex: 1; min-width: 0; }
+.workspace-location { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; }
+.app-shell .topbar .breadcrumb-repo {
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+  font-size: 11px !important;
+  gap: 6px;
+  white-space: nowrap;
+}
+.app-shell .topbar .breadcrumb-page { max-width: 100%; font-size: 16px !important; font-weight: 700 !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-shell .topbar > .global-search {
+  width: clamp(200px, 24vw, 400px);
+  min-width: 0 !important;
+  height: 44px !important;
+  border-radius: 13px !important;
+  padding: 0 14px !important;
+  gap: 10px;
+  border-color: color-mix(in srgb, var(--primary) 22%, var(--surface)) !important;
+  box-shadow: 0 3px 8px color-mix(in srgb, var(--primary) 6%, transparent) !important;
+}
+.app-shell .topbar > .global-search > span { display: inline; }
+.app-shell .topbar > .global-search > kbd { display: inline-flex; margin-left: auto; }
+.app-shell .topbar-actions { gap: 12px; flex-shrink: 0; }
+.app-shell .topbar-actions .icon-button { width: 34px; height: 34px; border-radius: 11px; }
+.app-shell .topbar-actions .icon-button:hover { background: var(--surface); color: var(--primary); }
+.app-shell .topbar-actions .user-avatar { width: 36px; height: 36px; background: var(--primary); color: var(--surface); border: 3px solid var(--surface); box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 25%, transparent); }
+@media (max-width: 1279px) {
+  .app-shell .topbar { gap: 16px; padding-inline: 20px !important; }
+  .app-shell .topbar .workspace-demo-badge { display: none; }
+}
+@media (max-width: 767px) {
+  .app-shell .topbar { height: 72px !important; padding-inline: 16px !important; gap: 12px; }
+  .app-shell .topbar > .global-search { width: 40px; height: 40px !important; flex: 0 0 40px; padding: 0 !important; justify-content: center; }
+  .app-shell .topbar > .global-search > span,
+  .app-shell .topbar > .global-search > kbd { display: none; }
+  .app-shell .topbar .breadcrumb-page { font-size: 13px !important; }
+  .app-shell .topbar .breadcrumb-repo { font-size: 10px !important; }
+  .app-shell .topbar-actions { gap: 6px; }
+  .app-shell .workspace-header-context { gap: 10px; }
+}

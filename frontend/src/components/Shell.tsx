@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
+import '../styles/workspace-header.css';
 import {
   ArrowRight,
   Bell,
   BookOpen,
   ChevronDown,
-  ChevronRight,
   CircleHelp,
   Code2,
   Command,
@@ -183,21 +183,20 @@ export function Shell() {
       </aside>
       <div className="main-shell">
         <header className="topbar">
-          <div className="row gap-12">
+          <div className="row gap-12 workspace-header-context">
             <IconButton
               icon={Menu}
               label="Open navigation"
               className="mobile-menu"
               onClick={() => setMobileOpen(true)}
             />
-            <span className="breadcrumb-repo">acme / relay-api</span>
-            <ChevronRight size={13} className="muted" />
-            <span className="breadcrumb-page">{current}</span>
+            <div className="workspace-location">
+              <button className="breadcrumb-repo" onClick={() => go('/repository')} aria-label="Open acme / relay-api repository">
+                <GitBranch size={13} /> acme / relay-api <ChevronDown size={12} />
+              </button>
+              <span className="breadcrumb-page">{current}</span>
+            </div>
           </div>
-          <div className="topbar-actions">
-            <Badge tone="amber">
-              <span className="tiny-dot" /> Demo workspace
-            </Badge>
             <button
               className="global-search"
               aria-label="Search workspace"
@@ -210,6 +209,10 @@ export function Shell() {
                 <Command size={10} /> K
               </kbd>
             </button>
+          <div className="topbar-actions">
+            <Badge tone="violet" className="workspace-demo-badge">
+              <span className="tiny-dot" /> Demo workspace
+            </Badge>
             <span className="topbar-divider" />
             <IconButton
               icon={CircleHelp}
