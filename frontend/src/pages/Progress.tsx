@@ -13,7 +13,16 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Badge, Button, DemoNote, Modal, PageHeading, PanelHeading } from '../components/UI';
+import { useScrollReveal } from '../animations/gsapHooks';
+import {
+  Badge,
+  Button,
+  DemoNote,
+  Modal,
+  PageHeading,
+  PanelHeading,
+  TiltCard,
+} from '../components/UI';
 import { journeys } from '../data/fixtures';
 import { getJourneySteps } from '../domain/model';
 import { useWorkspace } from '../state/WorkspaceContext';
@@ -22,6 +31,9 @@ export default function Progress() {
   const { state, startJourney, reset, notify } = useWorkspace();
   const go = useNavigate();
   const [resetOpen, setResetOpen] = useState(false);
+  const metricsRef = useScrollReveal<HTMLDivElement>({ stagger: 0.1 });
+  const layoutRef = useScrollReveal<HTMLDivElement>({ stagger: 0.12 });
+
   const attempts = Object.entries(state.predictions)
     .map(([key, prediction]) => {
       const [id, scenario, snapshot, stepId] = key.split(':');
@@ -36,6 +48,7 @@ export default function Progress() {
     .filter((x) => x.check);
   const correct = attempts.filter((x) => x.prediction.first === x.check?.correct).length;
   const completed = journeys.filter((j) => state.completed.includes(j.id));
+
   function exportData() {
     const { predictions, completed, review, profile, goal, practiceResult, hints } = state;
     const blob = new Blob(
@@ -67,6 +80,7 @@ export default function Progress() {
     URL.revokeObjectURL(url);
     notify('Local learning activity exported.');
   }
+
   return (
     <>
       <PageHeading
@@ -74,12 +88,12 @@ export default function Progress() {
         title="Understanding is built, one connection at a time."
         description="A record of what you explored, what you explained, and what deserves another look."
         actions={
-          <Button icon={Download} onClick={exportData}>
+          <Button icon={Download} magnetic onClick={exportData}>
             Export learning activity
           </Button>
         }
       />
-      <div className="progress-summary-grid">
+      <div ref={metricsRef} className="progress-summary-grid">
         {[
           {
             icon: Compass,
@@ -112,21 +126,21 @@ export default function Progress() {
             tone: 'amber',
           },
         ].map(({ icon: Icon, title, value, note, tone }) => (
-          <section className="panel progress-stat" key={title}>
+          <TiltCard className="panel progress-stat" key={title} maxTilt={5}>
             <span className={`stat-icon ${tone}`}>
               <Icon size={19} />
             </span>
             <span className="stat-title">{title}</span>
             <strong>{value}</strong>
             <p>{note}</p>
-          </section>
+          </TiltCard>
         ))}
       </div>
-      <div className="progress-layout">
+      <div ref={layoutRef} className="progress-layout">
         <div className="stack-20">
-          <section className="panel">
+          <TiltCard className="panel" maxTilt={3}>
             <PanelHeading icon={BookOpen} title="What you can now connect">
-              <Badge>Activity and assessment are separate</Badge>
+              <Badge tone="violet">Activity and assessment are separate</Badge>
             </PanelHeading>
             <div className="concept-list">
               {journeys.map((j) => (
@@ -182,8 +196,8 @@ export default function Progress() {
                 </div>
               ))}
             </div>
-          </section>
-          <section className="panel">
+          </TiltCard>
+          <TiltCard className="panel" maxTilt={3}>
             <PanelHeading icon={LocateFixed} title="Prediction evidence" />
             {attempts.length ? (
               <div className="assessment-list">
@@ -220,6 +234,7 @@ export default function Progress() {
                 </p>
                 <Button
                   icon={Compass}
+                  magnetic
                   onClick={() => {
                     startJourney('signup');
                     go('/workspace');
@@ -229,8 +244,8 @@ export default function Progress() {
                 </Button>
               </div>
             )}
-          </section>
-          <section className="panel measurement-note">
+          </TiltCard>
+          <TiltCard className="panel measurement-note" maxTilt={3}>
             <LocateFixed size={22} />
             <div>
               <h3>Some things still need real assessment.</h3>
@@ -240,10 +255,10 @@ export default function Progress() {
                 from this demo activity.
               </p>
             </div>
-          </section>
+          </TiltCard>
         </div>
         <aside className="stack-20">
-          <section className="next-activity">
+          <TiltCard className="next-activity" maxTilt={4}>
             <span className="tiny-label">A USEFUL NEXT STEP</span>
             <Compass size={27} strokeWidth={1.4} />
             <h2>
@@ -263,6 +278,7 @@ export default function Progress() {
             <Button
               variant="primary"
               icon={ArrowRight}
+              magnetic
               onClick={() => {
                 if (state.review.length) go('/changes');
                 else if (completed.length) go('/practice');
@@ -274,15 +290,15 @@ export default function Progress() {
             >
               Continue from here
             </Button>
-          </section>
-          <section className="panel data-controls">
+          </TiltCard>
+          <TiltCard className="panel data-controls" maxTilt={4}>
             <h3>Your activity, in your browser.</h3>
             <p>Minimal learning data is stored locally. Export it at any time or start fresh.</p>
             <Button variant="ghost" icon={RotateCcw} onClick={() => setResetOpen(true)}>
               Reset local learning data
             </Button>
             <DemoNote>No peer-study results are fabricated</DemoNote>
-          </section>
+          </TiltCard>
         </aside>
       </div>
       <Modal

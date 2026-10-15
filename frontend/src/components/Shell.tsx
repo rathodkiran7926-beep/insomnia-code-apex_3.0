@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ArrowRight,
   Bell,
@@ -12,6 +12,7 @@ import {
   FlaskConical,
   GitBranch,
   GitPullRequest,
+  Globe2,
   LayoutGrid,
   Menu,
   MessageSquareText,
@@ -28,8 +29,9 @@ import { useWorkspace } from '../state/WorkspaceContext';
 import { Badge, Button, IconButton, Modal, ProgressBar } from './UI';
 
 const navigation = [
-  { path: '/repository', label: 'Repository', icon: Code2 },
+  { path: '/', label: 'Overview & Home', icon: Globe2 },
   { path: '/workspace', label: 'Mentor workspace', icon: LayoutGrid },
+  { path: '/repository', label: 'Repository', icon: Code2 },
   { path: '/journeys', label: 'Code journeys', icon: Compass, count: '2' },
   { path: '/learn', label: 'My learning path', icon: BookOpen },
   { path: '/practice', label: 'Practice', icon: FlaskConical },
@@ -55,6 +57,7 @@ export function Shell() {
   const routeProgress =
     (learningRoute.filter((x) => state.completed.includes(x.id)).length / learningRoute.length) *
     100;
+
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
@@ -68,11 +71,16 @@ export function Shell() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
+
   useEffect(() => {
     setMobileOpen(false);
     patch({ playing: false });
-    window.scrollTo(0, 0);
+    window.scrollTo({
+      top: 0,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
   }, [location.pathname]);
+
   const searchItems = [
     ...navigation.map((x) => ({
       label: x.label,
@@ -101,19 +109,24 @@ export function Shell() {
   ]
     .filter((x) => `${x.label} ${x.description}`.toLowerCase().includes(query.toLowerCase()))
     .slice(0, 9);
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <NavLink to="/workspace" className="brand" aria-label="Codebase Mentor home">
+        <NavLink to="/" className="brand" aria-label="Codebase Mentor home">
           <span className="brand-symbol">
-            <Code2 size={23} />
+            <Code2 size={20} strokeWidth={2.2} />
           </span>
           <span>
             Codebase<span className="brand-light">Mentor</span>
           </span>
           <Badge tone="violet">beta</Badge>
         </NavLink>
-        <button className="workspace-switcher" onClick={() => go('/repository')}>
+        <button
+          className="workspace-switcher"
+          onClick={() => go('/repository')}
+          title="Switch repository or inspect workspace"
+        >
           <span className="repo-avatar">
             r<span>↗</span>
           </span>
@@ -143,7 +156,7 @@ export function Shell() {
             to="/knowledge"
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
           >
-            <MessageSquareText size={17} />
+            <MessageSquareText size={17} strokeWidth={1.7} />
             <span>Knowledge & decisions</span>
             {state.decision === 'open' && <span className="small-dot" />}
           </NavLink>
@@ -151,20 +164,20 @@ export function Shell() {
         <div className="sidebar-bottom">
           <div className="next-step-card">
             <div className="row between">
-              <span className="tiny-label">A LITTLE PROGRESS, EVERY DAY</span>
-              <Sparkles size={14} />
+              <span className="tiny-label">DAILY PROGRESS</span>
+              <Sparkles size={13} className="text-primary" />
             </div>
             <strong>Your first contribution starts here.</strong>
             <ProgressBar value={routeProgress} />
             <button onClick={() => go('/learn')}>
-              Continue your learning path <ArrowRight size={13} />
+              Continue learning path <ArrowRight size={13} />
             </button>
           </div>
           <button className="sidebar-setting" onClick={() => setSettingsOpen(true)}>
-            <Settings2 size={16} /> Preferences <span>⌘ ,</span>
+            <Settings2 size={15} /> Preferences <span>⌘ ,</span>
           </button>
           <div className="sidebar-footer">
-            <span className="status-dot" /> All work stays in your browser <span>v0.1</span>
+            <span className="status-dot" /> All work stays in browser <span>v0.1</span>
           </div>
         </div>
       </aside>
@@ -177,7 +190,7 @@ export function Shell() {
               className="mobile-menu"
               onClick={() => setMobileOpen(true)}
             />
-            <span className="breadcrumb-repo">relay-api</span>
+            <span className="breadcrumb-repo">acme / relay-api</span>
             <ChevronRight size={13} className="muted" />
             <span className="breadcrumb-page">{current}</span>
           </div>
@@ -191,7 +204,7 @@ export function Shell() {
               aria-keyshortcuts="Control+K Meta+K"
               onClick={() => setSearchOpen(true)}
             >
-              <Search size={15} />
+              <Search size={14} />
               <span>Search anything...</span>
               <kbd>
                 <Command size={10} /> K

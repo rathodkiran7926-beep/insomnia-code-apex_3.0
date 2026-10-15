@@ -6,6 +6,7 @@ import '@fontsource/geist/latin-600.css';
 import '@fontsource/geist/latin-700.css';
 import '@fontsource/geist-mono/latin-400.css';
 import './styles.css';
+import './styles/symboolic-theme.css';
 import App from './App';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

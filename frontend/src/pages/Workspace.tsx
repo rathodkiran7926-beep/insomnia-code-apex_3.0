@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useScrollReveal } from '../animations/gsapHooks';
 import { Atlas } from '../components/Atlas';
 import { CodeViewer } from '../components/CodeViewer';
 import { JourneyPlayer } from '../components/JourneyPlayer';
@@ -25,23 +26,34 @@ export default function Workspace() {
   const { state, startJourney, setSnapshot, patch } = useWorkspace();
   const [mentorVisible, setMentorVisible] = useState(true);
   const go = useNavigate();
+  const gridRef = useScrollReveal<HTMLDivElement>({ delay: 0.1 });
+
   return (
     <div className={`workspace-page ${state.journeyId ? 'journey-mode' : ''}`}>
       <PageHeading
-        eyebrow="YOUR CODEBASE, CONNECTED"
+        eyebrow={state.journeyId ? 'ACTIVE JOURNEY · FOLLOW THE REQUEST' : 'YOUR CODEBASE, CONNECTED'}
         title={
           state.journeyId
             ? 'Follow the request. Find the deciding code.'
             : 'The big picture. The details. Connected.'
         }
-        description="Explore the architecture, follow the code, and build understanding that lasts."
+        description={
+          state.journeyId
+            ? 'Step through the request path, inspect source lines, and verify branch predictions in real time.'
+            : 'Explore the architecture, follow the code, and build understanding that lasts.'
+        }
         actions={
           <>
             <Button icon={Compass} onClick={() => go('/journeys')}>
               Browse journeys
             </Button>
-            <Button variant="primary" icon={Sparkles} onClick={() => startJourney('signup')}>
-              Follow a request
+            <Button
+              variant="primary"
+              icon={Sparkles}
+              magnetic
+              onClick={() => startJourney('signup')}
+            >
+              {state.journeyId ? 'Restart signup' : 'Follow a request'}
               <ArrowRight size={15} />
             </Button>
           </>
@@ -107,7 +119,10 @@ export default function Workspace() {
         <DemoNote>Prepared sample · no live analysis</DemoNote>
       </div>
       {state.journeyId && <JourneyPlayer mode={mentorVisible ? 'controls' : 'full'} />}
-      <div className={`workspace-grid ${!mentorVisible ? 'mentor-hidden' : 'mentor-shown'}`}>
+      <div
+        ref={gridRef}
+        className={`workspace-grid ${!mentorVisible ? 'mentor-hidden' : 'mentor-shown'}`}
+      >
         <div className="workspace-primary">
           <Atlas />
           <CodeViewer />

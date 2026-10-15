@@ -1,27 +1,38 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { ArrowUpRight, Check, Code2, X, type LucideIcon } from 'lucide-react';
-import { useRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { useRef, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCardTilt, useHeroAnimation, useMagnetic } from '../animations/gsapHooks';
 import type { Snapshot, SourceRef } from '../data/types';
 import { useWorkspace } from '../state/WorkspaceContext';
+import { BlueprintPattern } from './BlueprintPattern';
 
 export function Button({
   children,
   icon: Icon,
   variant = 'secondary',
   className = '',
+  magnetic = false,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   icon?: LucideIcon;
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  magnetic?: boolean;
 }) {
+  const magneticRef = useMagnetic<HTMLButtonElement>(magnetic ? 0.22 : 0);
+
   return (
-    <button className={`button button-${variant} ${className}`} {...props}>
+    <button
+      ref={magnetic ? magneticRef : undefined}
+      className={`button button-${variant} ${className}`}
+      {...props}
+    >
       {Icon && <Icon size={15} strokeWidth={1.8} />}
       {children}
     </button>
   );
 }
+
 export function IconButton({
   icon: Icon,
   label,
@@ -34,37 +45,66 @@ export function IconButton({
     </button>
   );
 }
+
 export function Badge({
   children,
   tone = 'neutral',
+  className = '',
 }: {
   children: ReactNode;
   tone?: 'neutral' | 'violet' | 'green' | 'amber' | 'red' | 'blue';
+  className?: string;
 }) {
-  return <span className={`badge badge-${tone}`}>{children}</span>;
+  return <span className={`badge badge-${tone} ${className}`}>{children}</span>;
 }
+
+export function TiltCard({
+  children,
+  className = '',
+  maxTilt = 6,
+  ...props
+}: HTMLAttributes<HTMLDivElement> & {
+  children: ReactNode;
+  className?: string;
+  maxTilt?: number;
+}) {
+  const tiltRef = useCardTilt<HTMLDivElement>(maxTilt);
+
+  return (
+    <div ref={tiltRef} className={`tilt-card ${className}`} {...props}>
+      {children}
+    </div>
+  );
+}
+
 export function PageHeading({
   eyebrow,
   title,
   description,
   actions,
+  showBlueprint = true,
 }: {
   eyebrow: string;
   title: string;
   description: string;
   actions?: ReactNode;
+  showBlueprint?: boolean;
 }) {
+  const heroRef = useHeroAnimation<HTMLDivElement>();
+
   return (
-    <div className="page-heading">
-      <div>
-        <div className="eyebrow">{eyebrow}</div>
-        <h1>{title}</h1>
-        <p>{description}</p>
+    <div ref={heroRef} className="page-heading relative overflow-hidden">
+      {showBlueprint && <BlueprintPattern position="right" opacity={0.06} />}
+      <div className="relative z-10">
+        <div className="eyebrow hero-eyebrow">{eyebrow}</div>
+        <h1 className="hero-title">{title}</h1>
+        <p className="hero-desc">{description}</p>
       </div>
-      {actions && <div className="heading-actions">{actions}</div>}
+      {actions && <div className="heading-actions hero-actions relative z-10">{actions}</div>}
     </div>
   );
 }
+
 export function PanelHeading({
   icon: Icon,
   title,
@@ -84,6 +124,7 @@ export function PanelHeading({
     </div>
   );
 }
+
 export function Modal({
   open,
   onOpenChange,
@@ -130,6 +171,7 @@ export function Modal({
     </DialogPrimitive.Root>
   );
 }
+
 export function SourceLink({
   source,
   children,
@@ -168,6 +210,7 @@ export function SourceLink({
     </button>
   );
 }
+
 export function ChecklistItem({ checked, children }: { checked: boolean; children: ReactNode }) {
   return (
     <div className={`checklist-item ${checked ? 'checked' : ''}`}>
@@ -176,6 +219,7 @@ export function ChecklistItem({ checked, children }: { checked: boolean; childre
     </div>
   );
 }
+
 export function DemoNote({ children }: { children?: ReactNode }) {
   return (
     <div className="demo-note">
@@ -184,6 +228,7 @@ export function DemoNote({ children }: { children?: ReactNode }) {
     </div>
   );
 }
+
 export function ProgressBar({ value }: { value: number }) {
   return (
     <div

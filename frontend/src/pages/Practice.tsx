@@ -15,6 +15,7 @@ import {
   WandSparkles,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useScrollReveal } from '../animations/gsapHooks';
 import { CodeViewer } from '../components/CodeViewer';
 import {
   Badge,
@@ -23,6 +24,7 @@ import {
   PageHeading,
   PanelHeading,
   SourceLink,
+  TiltCard,
 } from '../components/UI';
 import { hints, initialPractice, solutionPractice } from '../data/fixtures';
 import { demoService } from '../services/demoService';
@@ -39,12 +41,15 @@ export default function Practice() {
   const passing = state.practiceResult === 'solution';
   const unsupported = state.practiceResult === 'unsupported';
   const mounted = useRef(true);
+  const layoutRef = useScrollReveal<HTMLDivElement>({ stagger: 0.1 });
+
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
     };
   }, []);
+
   async function run() {
     const submittedCode = state.practiceCode;
     setRunning(true);
@@ -55,6 +60,7 @@ export default function Practice() {
       if (mounted.current) setRunning(false);
     }
   }
+
   return (
     <>
       <PageHeading
@@ -74,8 +80,8 @@ export default function Practice() {
           </Button>
         }
       />
-      <div className="practice-layout">
-        <aside className="panel practice-brief">
+      <div ref={layoutRef} className="practice-layout">
+        <TiltCard className="panel practice-brief" maxTilt={4}>
           <div className="row between">
             <Badge tone="green">Starter exercise</Badge>
             <span className="muted row gap-4">
@@ -129,9 +135,9 @@ export default function Practice() {
               Curated demo exercise. This is not an upstream issue or a maintainer-approved task.
             </span>
           </div>
-        </aside>
+        </TiltCard>
         <div className="practice-center">
-          <section className="panel exercise-editor">
+          <TiltCard className="panel exercise-editor" maxTilt={3}>
             <div className="code-topbar">
               <div className="code-tabs">
                 <button
@@ -191,8 +197,8 @@ export default function Practice() {
             ) : (
               <CodeViewer source={{ path: 'src/middleware/validate.ts', start: 4, end: 16 }} />
             )}
-          </section>
-          <section className="panel test-panel">
+          </TiltCard>
+          <TiltCard className="panel test-panel" maxTilt={3}>
             <PanelHeading icon={FlaskConical} title="Prepared check outcomes">
               {running ? (
                 <Badge tone="violet">Preparing…</Badge>
@@ -205,7 +211,13 @@ export default function Practice() {
               )}
             </PanelHeading>
             <div className="test-actions">
-              <Button variant="primary" icon={Play} disabled={running} onClick={() => void run()}>
+              <Button
+                variant="primary"
+                icon={Play}
+                disabled={running}
+                magnetic
+                onClick={() => void run()}
+              >
                 {running ? 'Preparing results…' : 'Run demo checks'}
               </Button>
               <span>Simulated outcomes · no code is executed</span>
@@ -252,9 +264,9 @@ export default function Practice() {
               Prepared examples illustrate acceptance criteria. They are not sandbox verification or
               evidence of actual test execution.
             </div>
-          </section>
+          </TiltCard>
           {passing && (
-            <section className="panel reflection-panel">
+            <TiltCard className="panel reflection-panel" maxTilt={3}>
               <PanelHeading icon={CheckCircle2} title="Explain your contribution" />
               <div className="panel-body stack-12">
                 <p>
@@ -273,6 +285,7 @@ export default function Practice() {
                 <Button
                   disabled={!reflection.trim()}
                   icon={saved ? Check : ArrowRight}
+                  magnetic
                   onClick={() => setSaved(true)}
                 >
                   {saved ? 'Reflection noted for this session' : 'Note reflection'}
@@ -281,11 +294,11 @@ export default function Practice() {
                   Self-reflection is not automatically graded or counted as demonstrated mastery.
                 </small>
               </div>
-            </section>
+            </TiltCard>
           )}
         </div>
         <aside className="practice-hints stack-20">
-          <section className="panel">
+          <TiltCard className="panel" maxTilt={4}>
             <PanelHeading icon={Lightbulb} title="A nudge, when you need it" />
             <div className="panel-body stack-12">
               <p className="muted">Start with the problem. Reveal one hint at a time.</p>
@@ -311,8 +324,8 @@ export default function Practice() {
                 <Badge tone="violet">All 3 hints revealed</Badge>
               )}
             </div>
-          </section>
-          <section className="practice-insight">
+          </TiltCard>
+          <TiltCard className="practice-insight" maxTilt={4}>
             <span className="insight-icon">
               <BookOpen size={21} />
             </span>
@@ -334,7 +347,7 @@ export default function Practice() {
               Follow the invalid-input path
               <ArrowRight size={13} />
             </button>
-          </section>
+          </TiltCard>
         </aside>
       </div>
     </>

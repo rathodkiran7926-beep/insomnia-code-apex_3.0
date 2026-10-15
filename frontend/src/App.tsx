@@ -2,8 +2,9 @@ import { Suspense, lazy } from 'react';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Shell } from './components/Shell';
 import { WorkspaceProvider } from './state/WorkspaceContext';
-const Workspace = lazy(() => import('./pages/Workspace'));
 
+const Home = lazy(() => import('./pages/Home'));
+const Workspace = lazy(() => import('./pages/Workspace'));
 const Repository = lazy(() => import('./pages/Repository'));
 const Journeys = lazy(() => import('./pages/Journeys'));
 const Learn = lazy(() => import('./pages/Learn'));
@@ -30,13 +31,17 @@ export default function App() {
           fallback={
             <div className="app-loading">
               <span className="loading-spinner" />
-              Opening your workspace…
+              Opening Codebase Mentor…
             </div>
           }
         >
           <Routes>
+            {/* Dedicated full-width Symboolic-inspired Home Screen */}
+            <Route path="/" element={<Home />} />
+            <Route path="/home" element={<Home />} />
+
+            {/* Application Workspace Shell */}
             <Route element={<Shell />}>
-              <Route index element={<Navigate to="/workspace" replace />} />
               <Route path="workspace" element={<Workspace />} />
               <Route path="repository" element={<Repository />} />
               <Route path="journeys" element={<Journeys />} />
@@ -45,7 +50,7 @@ export default function App() {
               <Route path="changes" element={<Changes />} />
               <Route path="knowledge" element={<Knowledge />} />
               <Route path="progress" element={<Progress />} />
-              <Route path="*" element={<Navigate to="/workspace" replace />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>
         </Suspense>

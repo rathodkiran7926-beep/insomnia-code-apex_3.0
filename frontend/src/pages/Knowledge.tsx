@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import {
   ArrowRight,
   BookOpen,
@@ -13,9 +13,19 @@ import {
   ShieldCheck,
   UserRound,
 } from 'lucide-react';
-import { Badge, Button, DemoNote, PageHeading, PanelHeading, SourceLink } from '../components/UI';
-import { useWorkspace } from '../state/WorkspaceContext';
+import { useScrollReveal } from '../animations/gsapHooks';
+import { BlueprintPattern } from '../components/BlueprintPattern';
+import {
+  Badge,
+  Button,
+  DemoNote,
+  PageHeading,
+  PanelHeading,
+  SourceLink,
+  TiltCard,
+} from '../components/UI';
 import { versions } from '../data/fixtures';
+import { useWorkspace } from '../state/WorkspaceContext';
 
 const labels = {
   open: 'Open question',
@@ -26,6 +36,7 @@ const labels = {
   needs_review: 'Needs review',
   superseded: 'Superseded',
 } as const;
+
 export default function Knowledge() {
   const { state, patch, decisionAction, notify } = useWorkspace();
   const [selected, setSelected] = useState('gap');
@@ -36,6 +47,9 @@ export default function Knowledge() {
     filter === 'all' ||
     (filter === 'questions' && !['published', 'superseded'].includes(status)) ||
     (filter === 'published' && status === 'published');
+
+  const layoutRef = useScrollReveal<HTMLDivElement>({ stagger: 0.1 });
+
   return (
     <>
       <PageHeading
@@ -44,15 +58,16 @@ export default function Knowledge() {
         description="Capture source-linked rationale, review it explicitly, and keep it current as the code changes."
         actions={<Badge tone="amber">Local maintainer workflow</Badge>}
       />
-      <div className="knowledge-banner">
-        <span className="knowledge-banner-icon">
+      <div className="knowledge-banner relative overflow-hidden">
+        <BlueprintPattern position="right" opacity={0.06} />
+        <span className="knowledge-banner-icon relative z-10">
           <MessageSquareText size={24} />
         </span>
-        <div>
+        <div className="relative z-10">
           <h2>Turn a good question into shared understanding.</h2>
           <p>Code facts and human rationale have different origins. This space keeps both clear.</p>
         </div>
-        <span className="knowledge-provenance">
+        <span className="knowledge-provenance relative z-10">
           <UserRound size={15} />
           Human-reviewed knowledge
         </span>
@@ -75,15 +90,16 @@ export default function Knowledge() {
         </div>
         <DemoNote>No external messages are sent</DemoNote>
       </div>
-      <div className="knowledge-layout">
+      <div ref={layoutRef} className="knowledge-layout">
         <aside className="knowledge-inbox">
           <div className="inbox-label">
             <Inbox size={14} />
             <span>YOUR TEAM’S CONTEXT</span>
           </div>
           {visible && (
-            <button
+            <TiltCard
               className={`knowledge-card ${selected === 'gap' ? 'selected' : ''}`}
+              maxTilt={4}
               onClick={() => setSelected('gap')}
             >
               <div className="row between">
@@ -106,14 +122,15 @@ export default function Knowledge() {
                 <GitBranch size={12} />
                 user.service.ts · 7e2a9c1
               </small>
-            </button>
+            </TiltCard>
           )}
           {filter !== 'questions' && (
-            <button
+            <TiltCard
               className={`knowledge-card ${selected === 'guide' ? 'selected' : ''}`}
+              maxTilt={4}
               onClick={() => setSelected('guide')}
             >
-              <Badge>Reading guide</Badge>
+              <Badge tone="violet">Reading guide</Badge>
               <h3>What counts as approved knowledge?</h3>
               <p>
                 Understand the difference between a code fact, interpretation, and a published
@@ -123,7 +140,7 @@ export default function Knowledge() {
                 <ShieldCheck size={12} />
                 Evidence and provenance
               </small>
-            </button>
+            </TiltCard>
           )}
           {!visible && filter === 'published' && (
             <div className="empty-state compact">
@@ -136,7 +153,7 @@ export default function Knowledge() {
             </div>
           )}
         </aside>
-        <section className="panel knowledge-detail">
+        <TiltCard className="panel knowledge-detail" maxTilt={2}>
           {selected === 'guide' ? (
             <>
               <PanelHeading icon={ShieldCheck} title="Keep the origin of knowledge visible" />
@@ -172,6 +189,7 @@ export default function Knowledge() {
                 ))}
                 <Button
                   icon={ArrowRight}
+                  magnetic
                   onClick={() => {
                     setSelected('gap');
                     setFilter('all');
@@ -306,6 +324,7 @@ export default function Knowledge() {
                       variant="primary"
                       icon={FilePenLine}
                       disabled={!state.rationale.trim()}
+                      magnetic
                       onClick={() => decisionAction('draft')}
                     >
                       Save draft
@@ -315,6 +334,7 @@ export default function Knowledge() {
                       variant="primary"
                       icon={Send}
                       disabled={!state.rationale.trim()}
+                      magnetic
                       onClick={() => decisionAction('review')}
                     >
                       Submit for local review
@@ -327,6 +347,7 @@ export default function Knowledge() {
                       <Button
                         variant="primary"
                         icon={ShieldCheck}
+                        magnetic
                         onClick={() => decisionAction('approve')}
                       >
                         Approve as demo maintainer
@@ -336,6 +357,7 @@ export default function Knowledge() {
                     <Button
                       variant="primary"
                       icon={BookOpen}
+                      magnetic
                       onClick={() => {
                         decisionAction('publish');
                         notify(
@@ -367,7 +389,7 @@ export default function Knowledge() {
               </div>
             </>
           )}
-        </section>
+        </TiltCard>
       </div>
     </>
   );

@@ -19,8 +19,17 @@ import {
   Waypoints,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useScrollReveal } from '../animations/gsapHooks';
 import { CodeDiff } from '../components/CodeDiff';
-import { Badge, Button, DemoNote, PageHeading, PanelHeading, SourceLink } from '../components/UI';
+import {
+  Badge,
+  Button,
+  DemoNote,
+  PageHeading,
+  PanelHeading,
+  SourceLink,
+  TiltCard,
+} from '../components/UI';
 import { files, pullRequests, versions } from '../data/fixtures';
 import { useWorkspace } from '../state/WorkspaceContext';
 
@@ -72,11 +81,15 @@ export default function Changes() {
   const step = changedSteps[selectedStep];
   const path = testOnly ? 'tests/password-rule.test.ts' : selectedFile;
   const testPatch = `describe('password strength proposal', () => {\n  it('rejects a letters-only password', () => {\n    const result = signupSchema.safeParse({\n      email: 'new@relay.example',\n      name: 'New developer',\n      password: 'abcdefgh',\n    });\n    expect(result.success).toBe(false);\n  });\n});`;
+
+  const layoutRef = useScrollReveal<HTMLDivElement>({ stagger: 0.1 });
+
   function relearn() {
     setSnapshot('head');
     startJourney('login');
     go('/workspace');
   }
+
   return (
     <>
       <PageHeading
@@ -94,7 +107,7 @@ export default function Changes() {
           </Button>
         }
       />
-      <section className="panel pr-summary">
+      <TiltCard className="panel pr-summary" maxTilt={3}>
         <span className="pr-symbol">
           <GitPullRequest size={24} />
         </span>
@@ -125,7 +138,7 @@ export default function Changes() {
           <ArrowRight size={13} />
           <span>{testOnly ? 'test-proposal-39' : versions.head.commit}</span>
         </div>
-      </section>
+      </TiltCard>
       <div className="changes-tabs">
         <div className="workspace-tabs">
           {[
@@ -142,7 +155,7 @@ export default function Changes() {
               >
                 <I size={15} />
                 {String(label)}
-                {id === 'files' && <Badge>{testOnly ? 1 : 3}</Badge>}
+                {id === 'files' && <Badge tone="violet">{testOnly ? 1 : 3}</Badge>}
               </button>
             );
           })}
@@ -160,9 +173,9 @@ export default function Changes() {
           <Button onClick={() => setTab('files')}>View proposed test</Button>
         </section>
       ) : tab === 'journey' ? (
-        <div className="change-layout">
+        <div ref={layoutRef} className="change-layout">
           <div className="stack-20">
-            <section className="panel journey-comparison">
+            <TiltCard className="panel journey-comparison" maxTilt={3}>
               <PanelHeading icon={GitCompareArrows} title="Same feature. A new account lifecycle.">
                 <Badge tone="amber">3 changed steps</Badge>
               </PanelHeading>
@@ -204,8 +217,8 @@ export default function Changes() {
                 Source comparison shows a possible path. Neither version has been executed by this
                 frontend.
               </div>
-            </section>
-            <section className="panel">
+            </TiltCard>
+            <TiltCard className="panel" maxTilt={3}>
               <PanelHeading icon={FileCode2} title={step.title}>
                 <Badge tone="violet">{step.kind}</Badge>
               </PanelHeading>
@@ -228,18 +241,18 @@ export default function Changes() {
                   Inspect this source in the workspace
                 </Button>
               </div>
-            </section>
+            </TiltCard>
           </div>
           <ImpactPanel onRelearn={relearn} reviewCount={state.review.length} />
         </div>
       ) : tab === 'files' ? (
-        <div className="change-layout">
-          <section className="panel files-diff-panel">
+        <div ref={layoutRef} className="change-layout">
+          <TiltCard className="panel files-diff-panel" maxTilt={3}>
             <PanelHeading
               icon={FileCode2}
               title={testOnly ? 'Proposed test patch' : 'Source changes'}
             >
-              <Badge>{testOnly ? '1 file' : '3 files'}</Badge>
+              <Badge tone="violet">{testOnly ? '1 file' : '3 files'}</Badge>
             </PanelHeading>
             <div className="changed-file-tabs">
               {(testOnly ? [{ path, additions: 10, deletions: 0 }] : pr.files).map((file) => (
@@ -264,12 +277,12 @@ export default function Changes() {
                 ? 'Independent synthetic proposal test-proposal-39. This check is intentionally red against the original schema; it has not been run.'
                 : 'Base and head are immutable prepared demo snapshots. Green additions and red removals describe source changes.'}
             </div>
-          </section>
+          </TiltCard>
           <ImpactPanel onRelearn={relearn} reviewCount={state.review.length} testOnly={testOnly} />
         </div>
       ) : (
-        <div className="setup-layout">
-          <section className="panel">
+        <div ref={layoutRef} className="setup-layout">
+          <TiltCard className="panel" maxTilt={3}>
             <PanelHeading icon={Terminal} title="A new integration. Two configuration entries.">
               <Badge tone="amber">Static discovery</Badge>
             </PanelHeading>
@@ -307,11 +320,11 @@ export default function Changes() {
                 </div>
               </div>
             </div>
-          </section>
-          <section className="panel setup-instructions">
+          </TiltCard>
+          <TiltCard className="panel setup-instructions" maxTilt={3}>
             <PanelHeading icon={BookOpen} title="Proposed setup instructions" />
             <div className="panel-body stack-16">
-              <Badge>Documentation suggestion</Badge>
+              <Badge tone="violet">Documentation suggestion</Badge>
               <h3>Local verification workflow</h3>
               <ol>
                 <li>Use the project’s supported Node runtime.</li>
@@ -335,7 +348,7 @@ export default function Changes() {
                 A review records your activity. It does not verify the setup.
               </small>
             </div>
-          </section>
+          </TiltCard>
         </div>
       )}
     </>
@@ -354,7 +367,7 @@ function ImpactPanel({
   const go = useNavigate();
   return (
     <aside className="stack-20">
-      <section className="panel impact-panel">
+      <TiltCard className="panel impact-panel" maxTilt={3}>
         <PanelHeading icon={Layers3} title="What this change touches" />
         <div className="panel-body stack-16">
           <div>
@@ -396,9 +409,9 @@ function ImpactPanel({
             <Badge tone="amber">Inference · not an observed regression</Badge>
           </div>
         </div>
-      </section>
+      </TiltCard>
       {!testOnly && (
-        <section className="relearn-card">
+        <TiltCard className="relearn-card" maxTilt={4}>
           <div className="row gap-8">
             <Sparkles size={18} />
             <span className="tiny-label">A SMALL UPDATE TO YOUR MENTAL MODEL</span>
@@ -411,7 +424,7 @@ function ImpactPanel({
           {reviewCount > 0 && (
             <Badge tone="amber">{reviewCount} studied concepts need review</Badge>
           )}
-          <Button variant="primary" icon={BookOpen} onClick={onRelearn}>
+          <Button variant="primary" icon={BookOpen} magnetic onClick={onRelearn}>
             Start the relearning journey
             <ArrowRight size={14} />
           </Button>
@@ -419,9 +432,9 @@ function ImpactPanel({
             View learning path
             <ChevronRight size={13} />
           </button>
-        </section>
+        </TiltCard>
       )}
-      <section className="panel impact-evidence">
+      <TiltCard className="panel impact-evidence" maxTilt={3}>
         <ShieldCheck size={18} className="green-text" />
         <h3>Evidence, with its limits.</h3>
         <p>
@@ -434,7 +447,7 @@ function ImpactPanel({
             navigate
           />
         )}
-      </section>
+      </TiltCard>
     </aside>
   );
 }

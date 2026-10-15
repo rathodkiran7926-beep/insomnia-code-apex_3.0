@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   Check,
@@ -17,6 +17,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useScrollReveal } from '../animations/gsapHooks';
 import {
   Badge,
   Button,
@@ -26,6 +27,7 @@ import {
   PageHeading,
   PanelHeading,
   ProgressBar,
+  TiltCard,
 } from '../components/UI';
 import { files, versions } from '../data/fixtures';
 import type { Snapshot } from '../data/types';
@@ -38,6 +40,7 @@ const indexingSteps = [
   'Link architecture and journeys',
   'Prepare your learning workspace',
 ];
+
 export default function Repository() {
   const { state, patch, setSnapshot } = useWorkspace();
   const go = useNavigate();
@@ -49,6 +52,8 @@ export default function Repository() {
   const [search, setSearch] = useState('');
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const mounted = useRef(true);
+  const gridRef = useScrollReveal<HTMLDivElement>({ stagger: 0.12 });
+
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -56,6 +61,7 @@ export default function Repository() {
       if (timer.current) clearInterval(timer.current);
     };
   }, []);
+
   async function connect() {
     if (connecting) return;
     setError('');
@@ -80,7 +86,9 @@ export default function Repository() {
       setConnecting(false);
     }
   }
+
   const ready = state.connected && !connecting;
+
   return (
     <>
       <PageHeading
@@ -89,11 +97,11 @@ export default function Repository() {
         description="Connect a repository and turn unfamiliar code into something you can navigate."
         actions={<Badge tone="amber">Simulated connection</Badge>}
       />
-      <div className="repository-grid">
+      <div ref={gridRef} className="repository-grid">
         <div className="stack-20">
-          <section className="panel connect-panel">
+          <TiltCard className="panel connect-panel" maxTilt={4}>
             <PanelHeading icon={Github} title="Connect your repository">
-              <Badge>GitHub demo</Badge>
+              <Badge tone="violet">GitHub demo</Badge>
             </PanelHeading>
             <div className="panel-body stack-20">
               <div className="row between">
@@ -129,6 +137,7 @@ export default function Repository() {
                       className={connecting ? 'loading-button' : ''}
                       disabled={connecting || !name.trim()}
                       type="submit"
+                      magnetic
                     >
                       {connecting ? 'Connecting' : 'Connect'}
                     </Button>
@@ -176,8 +185,8 @@ export default function Repository() {
                 The sample is synthetic. No GitHub authentication or live indexing occurs.
               </DemoNote>
             </div>
-          </section>
-          <section className="panel">
+          </TiltCard>
+          <TiltCard className="panel" maxTilt={4}>
             <PanelHeading icon={Network} title="Your repository at a glance">
               <Badge tone="green">{ready ? 'Ready to explore' : 'Prepared sample'}</Badge>
             </PanelHeading>
@@ -214,7 +223,7 @@ export default function Repository() {
                 <Badge>Zod</Badge>
               </div>
             </div>
-          </section>
+          </TiltCard>
         </div>
         <div className="stack-20">
           <section className="panel">
@@ -265,6 +274,7 @@ export default function Repository() {
                 variant="primary"
                 icon={ArrowRight}
                 disabled={!ready}
+                magnetic
                 onClick={() => go('/workspace')}
               >
                 Open mentor workspace

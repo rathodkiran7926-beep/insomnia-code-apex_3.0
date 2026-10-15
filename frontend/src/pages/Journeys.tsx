@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import {
   ArrowRight,
   CheckCircle2,
@@ -14,7 +14,8 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Badge, Button, DemoNote, PageHeading } from '../components/UI';
+import { useScrollReveal } from '../animations/gsapHooks';
+import { Badge, Button, DemoNote, PageHeading, TiltCard } from '../components/UI';
 import { journeys } from '../data/fixtures';
 import { useWorkspace } from '../state/WorkspaceContext';
 
@@ -23,6 +24,8 @@ export default function Journeys() {
   const go = useNavigate();
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const cardGridRef = useScrollReveal<HTMLDivElement>({ stagger: 0.14 });
+
   const visible = journeys.filter(
     (j) =>
       `${j.title} ${j.tags.join(' ')}`.toLowerCase().includes(search.toLowerCase()) &&
@@ -30,6 +33,7 @@ export default function Journeys() {
         (filter === 'complete' && state.completed.includes(j.id)) ||
         (filter === 'new' && !state.completed.includes(j.id))),
   );
+
   function launch(
     id: 'signup' | 'login',
     scenario: 'success' | 'duplicate' | 'invalid' = 'success',
@@ -37,32 +41,20 @@ export default function Journeys() {
     startJourney(id, scenario);
     go('/workspace');
   }
+
   return (
     <>
       <PageHeading
-        eyebrow="CODE JOURNEYS"
+        eyebrow="CODE JOURNEYS · FROM REQUEST TO UNDERSTANDING"
         title="Don’t just read the code. Follow it."
-        description="Walk through a feature, find the deciding conditions, and connect every step to its source."
+        description="Walk through a feature, find the deciding conditions, and connect every step to its source. Each journey keeps the architecture, source code, and explanation in sync."
         actions={
-          <Button variant="primary" icon={Compass} onClick={() => launch('signup')}>
+          <Button variant="primary" icon={Compass} magnetic onClick={() => launch('signup')}>
             Start a journey
             <ArrowRight size={15} />
           </Button>
         }
       />
-      <div className="journey-library-intro">
-        <div className="journey-intro-icon">
-          <Route size={29} strokeWidth={1.3} />
-        </div>
-        <div>
-          <span className="tiny-label">FROM REQUEST TO UNDERSTANDING</span>
-          <h2>One request. A whole system of connections.</h2>
-          <p>
-            Each journey keeps the architecture, source, and explanation in sync. You set the pace.
-          </p>
-        </div>
-        <Badge tone="violet">Source-linked walkthroughs</Badge>
-      </div>
       <div className="list-toolbar">
         <div className="filter-tabs">
           {[
@@ -90,9 +82,9 @@ export default function Journeys() {
           />
         </label>
       </div>
-      <div className="journey-card-grid">
+      <div ref={cardGridRef} className="journey-card-grid">
         {visible.map((journey) => (
-          <article className="panel journey-card" key={journey.id}>
+          <TiltCard className="panel journey-card" key={journey.id} maxTilt={6}>
             <div className={`journey-card-map map-${journey.id}`}>
               <div className="mini-map-line" />
               <span className="mini-node">
@@ -138,7 +130,12 @@ export default function Journeys() {
                 <span>2 scenarios{journey.id === 'signup' ? ' + invalid input' : ''}</span>
               </div>
               <div className="journey-card-actions">
-                <Button variant="primary" icon={Play} onClick={() => launch(journey.id)}>
+                <Button
+                  variant="primary"
+                  icon={Play}
+                  magnetic
+                  onClick={() => launch(journey.id)}
+                >
                   {state.completed.includes(journey.id) ? 'Revisit journey' : 'Start journey'}
                   <ArrowRight size={14} />
                 </Button>
@@ -153,7 +150,7 @@ export default function Journeys() {
                 </button>
               </div>
             </div>
-          </article>
+          </TiltCard>
         ))}
       </div>
       {!visible.length && (

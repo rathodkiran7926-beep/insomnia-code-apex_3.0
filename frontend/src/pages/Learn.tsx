@@ -14,7 +14,8 @@ import {
   UserRound,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Badge, Button, ChecklistItem, PageHeading, ProgressBar } from '../components/UI';
+import { useScrollReveal } from '../animations/gsapHooks';
+import { Badge, Button, ChecklistItem, PageHeading, ProgressBar, TiltCard } from '../components/UI';
 import type { Goal, Lesson, Profile } from '../data/types';
 import { getRoute } from '../domain/model';
 import { useWorkspace } from '../state/WorkspaceContext';
@@ -22,12 +23,16 @@ import { useWorkspace } from '../state/WorkspaceContext';
 export default function Learn() {
   const { state, patch, startJourney, selectNode, complete, setSnapshot } = useWorkspace();
   const go = useNavigate();
+  const setupRef = useScrollReveal<HTMLDivElement>({ stagger: 0.1 });
+  const gridRef = useScrollReveal<HTMLDivElement>({ stagger: 0.12 });
+
   const route = getRoute(
     state.personalized ? state.profile : 'beginner',
     state.personalized ? state.goal : 'contribute',
   );
   const completed = route.filter((x) => state.completed.includes(x.id));
   const current = route.find((x) => !state.completed.includes(x.id)) ?? route[0];
+
   function open(lesson: Lesson) {
     if (lesson.journey) {
       startJourney(lesson.journey, 'success', lesson.id);
@@ -45,6 +50,7 @@ export default function Learn() {
       go('/workspace');
     }
   }
+
   const goals: { id: Goal; label: string; icon: typeof Target; description: string }[] = [
     {
       id: 'contribute',
@@ -65,6 +71,7 @@ export default function Learn() {
       description: 'Turn behavior into useful checks.',
     },
   ];
+
   return (
     <>
       <PageHeading
@@ -72,13 +79,18 @@ export default function Learn() {
         title="A route that starts where you are."
         description="Understand the right things, in the right order, with a contribution to work toward."
         actions={
-          <Button variant="primary" icon={ArrowRight} onClick={() => open(current)}>
+          <Button
+            variant="primary"
+            icon={ArrowRight}
+            magnetic
+            onClick={() => open(current)}
+          >
             Continue learning
           </Button>
         }
       />
-      <div className="learning-setup">
-        <section className="panel profile-panel">
+      <div ref={setupRef} className="learning-setup">
+        <TiltCard className="panel profile-panel" maxTilt={4}>
           <div className="row between">
             <span className="tiny-label">YOUR STARTING POINT</span>
             <UserRound size={16} className="muted" />
@@ -107,8 +119,8 @@ export default function Learn() {
               {state.profile === 'beginner' ? 'Learning backend' : 'Backend experience'}
             </Badge>
           </div>
-        </section>
-        <section className="panel goal-panel">
+        </TiltCard>
+        <TiltCard className="panel goal-panel" maxTilt={4}>
           <div className="row between">
             <div>
               <span className="tiny-label">A LITTLE DIRECTION GOES A LONG WAY</span>
@@ -142,9 +154,9 @@ export default function Learn() {
                 ? 'We’ve included middleware fundamentals before the feature journey.'
                 : 'Your backend experience lets you skip the middleware introduction.'}
           </p>
-        </section>
+        </TiltCard>
       </div>
-      <div className="learning-grid">
+      <div ref={gridRef} className="learning-grid">
         <section className="panel learning-route">
           <div className="panel-heading">
             <div>
@@ -198,7 +210,7 @@ export default function Learn() {
           </div>
         </section>
         <div className="stack-20">
-          <section className="panel route-overview">
+          <TiltCard className="panel route-overview" maxTilt={4}>
             <span className="tiny-label">YOUR PATH AT A GLANCE</span>
             <div className="route-progress-number">
               {completed.length}
@@ -221,8 +233,8 @@ export default function Learn() {
               Lesson completion records activity. Check answers provide separate understanding
               evidence.
             </small>
-          </section>
-          <section className="learning-update-card">
+          </TiltCard>
+          <TiltCard className="learning-update-card" maxTilt={4}>
             <div className="row gap-8">
               <GitPullRequest size={17} />
               <span className="tiny-label">YOUR LEARNING STAYS CURRENT</span>
@@ -242,7 +254,7 @@ export default function Learn() {
               Explore the verification lesson
               <ArrowRight size={14} />
             </button>
-          </section>
+          </TiltCard>
         </div>
       </div>
     </>
