@@ -10,11 +10,8 @@ import {
   Code2,
   Compass,
   FlaskConical,
-  HelpCircle,
   Layers3,
   MessageSquareText,
-  Mic,
-  Paperclip,
   Sparkles,
 } from 'lucide-react';
 import { useHeroAnimation, useScrollReveal } from '../animations/gsapHooks';
@@ -23,56 +20,9 @@ import { PixelDeco } from '../components/PixelDeco';
 import { NumbersPixelBorder } from '../components/NumbersPixelBorder';
 import { FeatureArtwork } from '../components/FeatureArtwork';
 import { VoiceAgentDemo } from '../components/VoiceAgentDemo';
+import { PlatformTerminal } from '../components/PlatformTerminal';
 import { Badge, Button, TiltCard } from '../components/UI';
 import { useWorkspace } from '../state/WorkspaceContext';
-
-interface QuestionSample {
-  query: string;
-  category: string;
-  component: string;
-  sourceFile: string;
-  sourceLines: string;
-  explanation: string;
-}
-
-const sampleQuestions: QuestionSample[] = [
-  {
-    query: 'How does a signup request become an account in storage?',
-    category: 'Request Flow',
-    component: 'User Service',
-    sourceFile: 'src/services/user.service.ts',
-    sourceLines: 'L16-L23',
-    explanation:
-      'The signup request enters auth.routes.ts, passes validateSignup() schema validation, checks for email duplicates in user.service.ts, hashes the password, and writes an unverified user record via userRepository.create().',
-  },
-  {
-    query: 'Where does input validation happen before business logic?',
-    category: 'Validation',
-    component: 'Input Validation Middleware',
-    sourceFile: 'src/middleware/validate.ts',
-    sourceLines: 'L4-L8',
-    explanation:
-      'Zod schemas in validate.ts intercept incoming JSON before route handlers run. If payload fails validation, it returns a 400 Bad Request immediately without touching database storage.',
-  },
-  {
-    query: 'What changed in PR #42 with email verification?',
-    category: 'Drift & Changes',
-    component: 'Verification Service',
-    sourceFile: 'src/services/verification.service.ts',
-    sourceLines: 'L5-L12',
-    explanation:
-      'PR #42 introduces emailVerified: false on account creation, awaits verification.send(user), and adds an unauthorized guard to login before issuing JWT session tokens.',
-  },
-  {
-    query: 'Why is the user service separated from the repository?',
-    category: 'Architecture Decision',
-    component: 'Repository Boundary',
-    sourceFile: 'src/repositories/user.repository.ts',
-    sourceLines: 'L3-L10',
-    explanation:
-      'Account business rules (hashing, conflict checks) reside in UserService, while database persistence queries live in UserRepository. This isolates database adapters and enables clean unit testing.',
-  },
-];
 
 const faqs = [
   {
@@ -111,7 +61,6 @@ export default function Home() {
   const faqRef = useScrollReveal<HTMLDivElement>({ stagger: 0.08 });
 
   const [activeFaq, setActiveFaq] = useState<number | null>(0);
-  const [customInput, setCustomInput] = useState('');
   const [isHeaderCompact, setIsHeaderCompact] = useState(() => window.scrollY > 64);
 
   useEffect(() => {
@@ -119,15 +68,6 @@ export default function Home() {
     updateHeader();
     window.addEventListener('scroll', updateHeader, { passive: true });
     return () => window.removeEventListener('scroll', updateHeader);
-  }, []);
-
-  // Typewriter placeholder effect
-  const [placeholderIndex, setPlaceholderIndex] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setPlaceholderIndex((prev) => (prev + 1) % sampleQuestions.length);
-    }, 4000);
-    return () => clearInterval(timer);
   }, []);
 
   function handleLaunchWorkspace() {
@@ -195,84 +135,7 @@ export default function Home() {
             and interactive inquiries. In a few seconds you will trace any runtime flow from route to database.
           </p>
 
-          {/* Symboolic Chat Console Card */}
-          <div className="c-bright-chat-wrap">
-            <form
-              className="c-bright-chat"
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleLaunchWorkspace();
-              }}
-            >
-              <div className="c-bright-chat__badge">
-                <span>REAL-TIME INQUIRY</span>
-              </div>
-
-              <div className="c-bright-chat__field">
-                <textarea
-                  id="bright-chat-input"
-                  name="message"
-                  className="c-bright-chat__input"
-                  rows={2}
-                  value={customInput}
-                  onChange={(e) => setCustomInput(e.target.value)}
-                  placeholder=""
-                  aria-label="Inquire about architecture or request flows"
-                />
-                {!customInput && (
-                  <div className="c-bright-chat__typewriter" aria-hidden="true">
-                    <span className="typewriter-prefix">Ask anything: </span>
-                    <span className="typewriter-text">"{sampleQuestions[placeholderIndex].query}"</span>
-                    <span className="c-bright-chat__caret" />
-                  </div>
-                )}
-              </div>
-
-              <div className="c-bright-chat__bar">
-                <div className="c-bright-chat__cluster">
-                  <button
-                    type="button"
-                    className="c-bright-chat__tool-icon"
-                    title="Attach reference source file"
-                    onClick={handleLaunchWorkspace}
-                  >
-                    <Paperclip size={17} />
-                  </button>
-                  <button
-                    type="button"
-                    className="c-bright-chat__tool-icon"
-                    title="Trace architecture workflow"
-                    onClick={() => {
-                      alert('Describe any backend endpoint or service logic to trace its runtime execution path and deciding lines of code.');
-                    }}
-                  >
-                    <HelpCircle size={17} />
-                  </button>
-                </div>
-
-                <div className="c-bright-chat__actions">
-                  <button
-                    type="button"
-                    className="c-bright-chat__mic-btn"
-                    title="Explore with AI Voice Guide"
-                    onClick={() => {
-                      const voiceEl = document.getElementById('voice');
-                      if (voiceEl) voiceEl.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                  >
-                    <Mic size={17} />
-                  </button>
-                  <button
-                    type="submit"
-                    className="c-bright-chat__arrow-btn"
-                    title="Inspect Architecture"
-                  >
-                    <ArrowUpRight size={19} />
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
+          <PlatformTerminal onExplore={handleLaunchWorkspace} />
         </div>
       </section>
 
