@@ -76,7 +76,7 @@ const lessons: Record<string, Lesson> = {
   practice: {
     id: 'practice',
     title: 'Make your first small contribution',
-    description: 'Add a password rule and inspect the prepared test outcomes.',
+    description: 'Add a password rule and verify it with local schema assertions.',
     duration: '12 min',
   },
   'edge-tests': {
@@ -88,7 +88,7 @@ const lessons: Record<string, Lesson> = {
   verification: {
     id: 'verification',
     title: 'Relearn the new account lifecycle',
-    description: 'Explore the verification step introduced by PR #42.',
+    description: 'Explore the verification step introduced by PR #402.',
     duration: '4 min',
   },
 };
@@ -111,6 +111,12 @@ export function conceptsNeedingReview(
   target: Snapshot,
 ) {
   return changed.filter((id) => Boolean(studied[id]?.length) && !studied[id].includes(target));
+}
+
+export function relearningTarget(studied: Record<string, Snapshot[]>): 'signup' | 'login' {
+  return conceptsNeedingReview(studied, ['signup', 'login'], 'head')[0] === 'login'
+    ? 'login'
+    : 'signup';
 }
 
 export function reachableStep(
@@ -160,6 +166,9 @@ export function getJourneySteps(
           ...step,
           explanation:
             'The repository creates an unverified account. The service then requests a verification message and returns a pending status.',
+          technical:
+            'users.create() receives emailVerified: false. The service awaits verification.send(user), then returns id, email, and status: pending. Database effects and provider delivery remain unverified.',
+          source: { path: 'src/services/user.service.ts', start: 16, end: 24 },
         };
       return step;
     });
@@ -194,7 +203,7 @@ export function getJourneySteps(
           ],
           correct: 'no',
           explanation:
-            'The new emailVerified guard throws before token signing. This is the additional condition introduced by PR #42.',
+            'The new emailVerified guard throws before token signing. This is the additional condition introduced by PR #402.',
         },
       });
   }

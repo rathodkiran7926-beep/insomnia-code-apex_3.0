@@ -44,8 +44,14 @@ export function CodeViewer({
   useEffect(() => {
     setTab('source');
     setCollapsed(false);
-    if (scroll.current) scroll.current.scrollTop = 0;
   }, [ref.path, ref.start, ref.end, version, state.sourceFocusKey]);
+  useEffect(() => {
+    const container = scroll.current;
+    const highlighted = container?.querySelector('.code-line.highlighted');
+    if (!container || !highlighted || tab !== 'source' || collapsed) return;
+    container.scrollTop +=
+      highlighted.getBoundingClientRect().top - container.getBoundingClientRect().top - 12;
+  }, [ref.path, ref.start, ref.end, version, state.sourceFocusKey, all, collapsed, tab]);
   async function copy() {
     try {
       await navigator.clipboard.writeText(resolved?.selected ?? '');
@@ -73,7 +79,7 @@ export function CodeViewer({
           <p>
             {state.selectedNode === 'client'
               ? 'No client source is included in this sample. Select a source-linked component to inspect its implementation.'
-              : 'The email integration is introduced by PR #42. Switch to its head snapshot to inspect the prepared source.'}
+              : 'The email integration is introduced by PR #402. Switch to its head snapshot to inspect the prepared source.'}
           </p>
           <Badge>No source claim for this selection</Badge>
         </div>

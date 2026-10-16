@@ -577,7 +577,7 @@ export const journeys: Journey[] = [
 export const pullRequests: PullRequest[] = [
   {
     id: 'verification',
-    number: 42,
+    number: 402,
     title: 'Require email verification for new accounts',
     branch: 'feat/email-verification',
     description:

@@ -12,6 +12,7 @@ const Practice = lazy(() => import('./pages/Practice'));
 const Changes = lazy(() => import('./pages/Changes'));
 const Knowledge = lazy(() => import('./pages/Knowledge'));
 const Progress = lazy(() => import('./pages/Progress'));
+const AgentContext = lazy(() => import('./pages/AgentContext'));
 
 export default function App() {
   return (
@@ -50,6 +51,7 @@ export default function App() {
               <Route path="changes" element={<Changes />} />
               <Route path="knowledge" element={<Knowledge />} />
               <Route path="progress" element={<Progress />} />
+              <Route path="agent-context" element={<AgentContext />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

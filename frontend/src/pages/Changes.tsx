@@ -4,7 +4,6 @@ import {
   ArrowUpRight,
   BookOpen,
   Check,
-  ChevronRight,
   CircleAlert,
   Code2,
   FileCode2,
@@ -14,13 +13,14 @@ import {
   Mail,
   RefreshCw,
   ShieldCheck,
-  Sparkles,
   Terminal,
   Waypoints,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useScrollReveal } from '../animations/gsapHooks';
 import { CodeDiff } from '../components/CodeDiff';
+import { RelearningCard } from '../components/RelearningCard';
+import { setupDelta } from '../domain/agentContext';
 import {
   Badge,
   Button,
@@ -69,7 +69,7 @@ const changedSteps = [
 ];
 
 export default function Changes() {
-  const { state, setSnapshot, startJourney, openSource, notify } = useWorkspace();
+  const { setSnapshot, openSource, notify } = useWorkspace();
   const go = useNavigate();
   const [prId, setPrId] = useState('verification');
   const [tab, setTab] = useState('journey');
@@ -84,12 +84,6 @@ export default function Changes() {
 
   const layoutRef = useScrollReveal<HTMLDivElement>({ stagger: 0.1 });
 
-  function relearn() {
-    setSnapshot('head');
-    startJourney('login');
-    go('/workspace');
-  }
-
   return (
     <>
       <PageHeading
@@ -97,14 +91,28 @@ export default function Changes() {
         title="Code evolves. Your understanding follows."
         description="See the source change, follow its impact, and revisit only the lessons that need it."
         actions={
-          <Button
-            icon={RefreshCw}
-            onClick={() =>
-              notify('Prepared comparison refreshed. No live repository analysis was run.')
-            }
-          >
-            Refresh demo comparison
-          </Button>
+          <div className="row gap-8 context-actions">
+            {!testOnly && (
+              <Button
+                variant="primary"
+                icon={ArrowRight}
+                onClick={() => {
+                  setSnapshot('head');
+                  go('/agent-context');
+                }}
+              >
+                Export PR #402 context
+              </Button>
+            )}
+            <Button
+              icon={RefreshCw}
+              onClick={() =>
+                notify('Prepared comparison refreshed. No live repository analysis was run.')
+              }
+            >
+              Refresh demo comparison
+            </Button>
+          </div>
         }
       />
       <TiltCard className="panel pr-summary" maxTilt={3}>
@@ -123,7 +131,7 @@ export default function Changes() {
               setTab(e.target.value === 'validation' ? 'files' : 'journey');
             }}
           >
-            <option value="verification">#42 Require email verification for new accounts</option>
+            <option value="verification">#402 Require email verification for new accounts</option>
             <option value="validation">#39 Add password-rule regression test (proposal)</option>
           </select>
           <p>
@@ -243,7 +251,7 @@ export default function Changes() {
               </div>
             </TiltCard>
           </div>
-          <ImpactPanel onRelearn={relearn} reviewCount={state.review.length} />
+          <ImpactPanel />
         </div>
       ) : tab === 'files' ? (
         <div ref={layoutRef} className="change-layout">
@@ -278,7 +286,7 @@ export default function Changes() {
                 : 'Base and head are immutable prepared demo snapshots. Green additions and red removals describe source changes.'}
             </div>
           </TiltCard>
-          <ImpactPanel onRelearn={relearn} reviewCount={state.review.length} testOnly={testOnly} />
+          <ImpactPanel testOnly={testOnly} />
         </div>
       ) : (
         <div ref={layoutRef} className="setup-layout">
@@ -287,6 +295,23 @@ export default function Changes() {
               <Badge tone="amber">Static discovery</Badge>
             </PanelHeading>
             <div className="panel-body stack-20">
+              <div className="setup-finding" role="alert">
+                <CircleAlert size={19} />
+                <div>
+                  <h3>Setup Drift Guard: {setupDelta().length} new environment variables</h3>
+                  <p>
+                    {setupDelta().map((name) => (
+                      <code key={name} style={{ marginRight: 12 }}>
+                        {name}
+                      </code>
+                    ))}
+                  </p>
+                  <small>
+                    Detected from the selected PR’s environment template diff. Local configuration
+                    has not been inspected.
+                  </small>
+                </div>
+              </div>
               <p>
                 Email verification introduces a mail-provider configuration boundary. The sample
                 environment template now names the local provider and sender.
@@ -355,16 +380,7 @@ export default function Changes() {
   );
 }
 
-function ImpactPanel({
-  onRelearn,
-  reviewCount,
-  testOnly = false,
-}: {
-  onRelearn: () => void;
-  reviewCount: number;
-  testOnly?: boolean;
-}) {
-  const go = useNavigate();
+function ImpactPanel({ testOnly = false }: { testOnly?: boolean }) {
   return (
     <aside className="stack-20">
       <TiltCard className="panel impact-panel" maxTilt={3}>
@@ -410,30 +426,7 @@ function ImpactPanel({
           </div>
         </div>
       </TiltCard>
-      {!testOnly && (
-        <TiltCard className="relearn-card" maxTilt={4}>
-          <div className="row gap-8">
-            <Sparkles size={18} />
-            <span className="tiny-label">A SMALL UPDATE TO YOUR MENTAL MODEL</span>
-          </div>
-          <h3>Correct password. One more condition.</h3>
-          <p>
-            Login now requires a verified email. Revisit the deciding condition and check your
-            understanding.
-          </p>
-          {reviewCount > 0 && (
-            <Badge tone="amber">{reviewCount} studied concepts need review</Badge>
-          )}
-          <Button variant="primary" icon={BookOpen} magnetic onClick={onRelearn}>
-            Start the relearning journey
-            <ArrowRight size={14} />
-          </Button>
-          <button className="text-link" onClick={() => go('/learn')}>
-            View learning path
-            <ChevronRight size={13} />
-          </button>
-        </TiltCard>
-      )}
+      {!testOnly && <RelearningCard />}
       <TiltCard className="panel impact-evidence" maxTilt={3}>
         <ShieldCheck size={18} className="green-text" />
         <h3>Evidence, with its limits.</h3>

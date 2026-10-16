@@ -243,7 +243,7 @@ export default function Knowledge() {
                   <div className="warning-callout">
                     <CircleAlert size={18} />
                     <div>
-                      <strong>The linked behavior changed in PR #42.</strong>
+                      <strong>The linked behavior changed in PR #402.</strong>
                       <p>
                         The previous explanation is preserved, but is no longer presented as current
                         approved knowledge. Review it against email verification before publishing a

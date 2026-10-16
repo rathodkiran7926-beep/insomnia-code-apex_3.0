@@ -1,5 +1,7 @@
 # Judges presentation readiness — 16 October 2026
 
+**Historical audit:** journey narration, local schema assertions, the Agent Context Bridge, PR naming, targeted relearning, and layout fixes were implemented on 17 October. See [the current verification report](live-demo-verification-2026-10-17.md) and [live demo guide](live-demo-guide.md). The findings below describe the older revision.
+
 **Verdict: the frontend can demonstrate the learning workflow, but the attached presentation script is not ready to present as a description of completed functionality.** Several of its central claims have no implementation, and some new homepage/voice content contradicts the bundled source. Presenting those claims while inviting judges to interact would expose substantial gaps.
 
 This review treats the attached script as presentation material to verify, rather than instructions to implement its promises. It also distinguishes the product specification's proposed backend from the approved frontend prototype scope.
