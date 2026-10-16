@@ -21,6 +21,7 @@ import { NumbersPixelBorder } from '../components/NumbersPixelBorder';
 import { FeatureArtwork } from '../components/FeatureArtwork';
 import { VoiceAgentDemo } from '../components/VoiceAgentDemo';
 import { PlatformTerminal } from '../components/PlatformTerminal';
+import { AgentContextPreview } from '../components/AgentContextPreview';
 import { Badge, Button, TiltCard } from '../components/UI';
 import { useWorkspace } from '../state/WorkspaceContext';
 
@@ -258,6 +259,8 @@ export default function Home() {
       </section>
 
 
+
+      <AgentContextPreview />
 
       {/* Symboolic in numbers section with pixel mosaic top & bottom borders */}
       <section id="numbers" className="sym-numbers-section" ref={metricsRef}>

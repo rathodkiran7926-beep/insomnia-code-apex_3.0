@@ -1,0 +1,385 @@
+.home-screen .agent-context-section {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  align-items: center;
+  gap: clamp(28px, 5vw, 80px);
+  padding-block: 48px 64px;
+}
+.agent-context-copy {
+  max-width: 470px;
+}
+.home-screen .agent-context-copy h2 {
+  font-family: 'Home Zalando', var(--font-display);
+  font-size: clamp(28px, 3vw, 42px);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.04em;
+  margin: 16px 0;
+  color: var(--ink);
+}
+.home-screen .agent-context-copy p {
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--muted);
+  margin: 0;
+}
+.agent-client-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 24px 0 10px;
+}
+.agent-client-chips span {
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  font-size: 11px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.agent-context-copy > small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.agent-preview-card {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--surface));
+  border-radius: 24px;
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow: 0 12px 36px -24px color-mix(in srgb, var(--primary) 40%, transparent);
+}
+.agent-preview-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 20px;
+  color: var(--primary);
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(115deg, var(--surface), var(--primary-soft));
+}
+.agent-preview-badge {
+  font-size: 10px;
+  font-weight: 600;
+}
+.agent-preview-request {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 20px 16px;
+}
+.home-screen .agent-preview-request p {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+  margin: 0;
+  font-weight: 600;
+}
+.agent-run-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 13px;
+  border-radius: 100px;
+  background: var(--primary);
+  color: var(--surface);
+  font-size: 11px;
+  white-space: nowrap;
+  min-width: 99px;
+  transition: background 180ms ease;
+}
+.agent-run-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 80%, var(--ink));
+}
+.agent-run-button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+.agent-preview-card button:focus-visible,
+.agent-preview-result:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -3px;
+}
+.agent-preview-flow {
+  display: grid;
+  grid-template-columns: 1fr 18px 1fr 18px 1fr;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 20px 18px;
+  color: var(--muted);
+}
+.agent-preview-flow > span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.agent-preview-flow > span svg {
+  box-sizing: content-box;
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fafafe;
+}
+.agent-preview-flow svg,
+.agent-preview-flow span {
+  transition:
+    color 300ms ease,
+    background 300ms ease,
+    border-color 300ms ease;
+}
+.agent-preview-flow .is-active {
+  color: var(--primary);
+}
+.agent-preview-flow .is-active svg {
+  background: var(--primary-soft);
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--surface));
+}
+.agent-preview-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px 9px;
+  font-size: 11px;
+  color: var(--primary);
+}
+.agent-preview-status > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.agent-preview-status small {
+  font-size: 9px;
+  color: var(--muted);
+}
+.agent-stage-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.agent-stage-dot.active {
+  background: var(--primary);
+}
+.agent-tool-call {
+  margin: 0 20px 14px;
+  padding: 10px 12px;
+  background: #f7f7fc;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+}
+.agent-preview-card code {
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.agent-tool-call code {
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.agent-preview-tabs {
+  display: flex;
+  gap: 14px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+}
+.agent-preview-tabs button {
+  padding: 10px 0;
+  font-size: 11px;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+}
+.agent-preview-tabs button[aria-selected='true'] {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+.agent-preview-result {
+  padding: 16px 20px;
+  min-height: 162px;
+}
+.agent-result-placeholder {
+  min-height: 130px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 11px;
+}
+.agent-context-facts {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+.agent-context-facts > div {
+  display: grid;
+  grid-template-columns: 85px minmax(0, 1fr);
+  gap: 10px;
+}
+.agent-context-facts dt {
+  font-size: 10px;
+  color: var(--muted);
+  padding-top: 2px;
+}
+.agent-context-facts dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 7px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--ink);
+}
+.agent-context-facts code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  overflow-wrap: anywhere;
+}
+.agent-architecture-result > span {
+  font-size: 10px;
+  color: var(--muted);
+}
+.agent-architecture-result > div {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  margin: 15px 0;
+}
+.agent-architecture-result > div > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.agent-architecture-result svg {
+  flex-shrink: 0;
+  color: var(--primary);
+}
+.agent-architecture-result > div span {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  padding: 10px 6px;
+  min-height: 48px;
+  border: 1px solid var(--border);
+  background: var(--primary-soft);
+  border-radius: 8px;
+  font-size: 11px;
+  color: var(--primary);
+  text-align: center;
+}
+.home-screen .agent-architecture-result p {
+  font-size: 10px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.6;
+}
+.agent-evidence-result > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 9px;
+}
+.agent-evidence-result pre {
+  margin: 12px 0 0;
+  overflow: auto;
+  padding-block: 8px;
+  background: #f8f8fc;
+  border-radius: 6px;
+}
+.agent-evidence-line {
+  display: flex;
+  gap: 12px;
+  line-height: 20px;
+}
+.agent-evidence-line > span {
+  flex: 0 0 28px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 10px;
+}
+.agent-evidence-line code {
+  color: var(--ink);
+  padding-right: 12px;
+}
+.agent-preview-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 7px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 9px;
+  color: var(--muted);
+  background: #fcfcfe;
+}
+@media (max-width: 900px) {
+  .home-screen .agent-context-section {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+    padding-block: 32px 48px;
+  }
+  .agent-context-copy {
+    max-width: 600px;
+  }
+}
+@media (max-width: 480px) {
+  .agent-preview-top,
+  .agent-preview-request,
+  .agent-preview-result {
+    padding-inline: 14px;
+  }
+  .agent-preview-request {
+    align-items: flex-start;
+  }
+  .agent-preview-flow,
+  .agent-preview-tabs,
+  .agent-preview-status {
+    padding-inline: 14px;
+  }
+  .agent-tool-call {
+    margin-inline: 14px;
+  }
+  .agent-preview-status small {
+    display: none;
+  }
+  .agent-context-facts > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
+  .agent-preview-result {
+    min-height: 205px;
+  }
+  .agent-preview-tabs {
+    gap: 12px;
+  }
+  .agent-preview-tabs button {
+    font-size: 10px;
+  }
+  .agent-architecture-result > div span {
+    font-size: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-preview-card *,
+  .agent-preview-card *::before {
+    transition: none !important;
+    animation: none !important;
+  }
+}

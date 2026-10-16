@@ -24,18 +24,20 @@ export function CodeViewer({
   snapshot,
   compact = false,
   title,
+  fullFile = false,
 }: {
   source?: SourceRef;
   snapshot?: Snapshot;
   compact?: boolean;
   title?: string;
+  fullFile?: boolean;
 }) {
   const { state, notify } = useWorkspace();
   const ref = source ?? state.source;
   const version = snapshot ?? state.snapshot;
   const resolved = resolveSource(version, ref);
   const [tab, setTab] = useState<'source' | 'evidence'>('source');
-  const [all, setAll] = useState(false);
+  const [all, setAll] = useState(fullFile);
   const [collapsed, setCollapsed] = useState(false);
   const [copied, setCopied] = useState(false);
   const scroll = useRef<HTMLDivElement>(null);

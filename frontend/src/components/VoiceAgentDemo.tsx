@@ -588,11 +588,14 @@ export const VoiceAgentDemo: React.FC = () => {
 
           {/* Voice Model Selector Pill Bar */}
           <div className="voice-model-selector-bar">
-            <span className="voice-model-label">Voice:</span>
-            <div className="voice-model-chips">
+            <span className="voice-model-label">Choose a voice</span>
+            <div className="voice-model-chips" role="group" aria-label="Choose a voice">
               {ELEVENLABS_VOICES.map((v) => (
                 <button
                   key={v.id}
+                  type="button"
+                  aria-pressed={selectedVoice.id === v.id}
+                  aria-label={`${v.name}, ${v.gender}`}
                   className={`voice-model-chip ${selectedVoice.id === v.id ? 'active' : ''}`}
                   onClick={() => {
                     setSelectedVoice(v);
