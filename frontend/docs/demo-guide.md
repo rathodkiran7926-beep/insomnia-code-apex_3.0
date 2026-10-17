@@ -1,5 +1,7 @@
 # A connected five-minute walkthrough
 
+For the current judges presentation, use [the tested four-minute live demo guide](live-demo-guide.md). The walkthrough below predates the real local practice assertions, journey narration, PR #402 naming, and Agent Context Bridge.
+
 1. Open the Mentor Workspace. The workspace is clearly identified as prepared sample data. Select **Input validation**; inspect `validate.ts`, its highlighted condition, and the evidence tab.
 2. Choose **Follow a request**. Step through signup. At the validation checkpoint, predict whether invalid input reaches the service. At the duplicate-email checkpoint, intentionally try an incorrect answer, then retry; the first attempt remains recorded.
 3. Complete the success path and open **Practice**. Run the original prepared checks: letters-only passwords fail the new requirement. Reveal a hint, apply the guided example, then run the simulated checks again. Point out that no actual execution is claimed.

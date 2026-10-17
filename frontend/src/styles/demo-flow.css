@@ -1,0 +1,84 @@
+.agent-context-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 330px);
+  gap: 24px;
+  align-items: start;
+}
+.agent-context-layout > *,
+.context-controls > * {
+  min-width: 0;
+}
+.agent-context-layout .panel-heading {
+  flex-wrap: wrap;
+}
+.context-controls {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.context-controls label {
+  display: grid;
+  gap: 6px;
+  flex: 1;
+  font-size: 12px;
+}
+.context-controls select {
+  max-width: 100%;
+  padding: 10px;
+  border: 1px solid #dddbea;
+  border-radius: 8px;
+  background: white;
+}
+.context-output {
+  width: 100%;
+  height: 410px;
+  resize: vertical;
+  font:
+    12px/1.7 'Geist Mono',
+    monospace;
+  padding: 16px;
+  border: 1px solid #dedbea;
+  border-radius: 8px;
+  background: #faf9ff;
+  white-space: pre;
+  overflow: auto;
+}
+.context-actions {
+  flex-wrap: wrap;
+}
+.relearn-card > small {
+  display: block;
+  margin-top: 12px;
+  font-size: 11px;
+}
+.relearn-card > .badge {
+  margin-bottom: 12px;
+}
+.journey-narration {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 14px;
+  border-top: 1px solid #eeecf5;
+}
+.journey-narration > span {
+  font-size: 10px;
+  color: #777084;
+}
+.journey-player-details .journey-narration {
+  display: none;
+}
+@media (max-width: 1000px) {
+  .agent-context-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 620px) {
+  .context-output {
+    height: 300px;
+  }
+  .context-controls {
+    flex-direction: column;
+  }
+}

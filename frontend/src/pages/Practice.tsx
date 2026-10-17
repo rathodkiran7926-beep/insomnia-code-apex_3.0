@@ -27,6 +27,7 @@ import {
   TiltCard,
 } from '../components/UI';
 import { hints, initialPractice, solutionPractice } from '../data/fixtures';
+import { runPracticeChecks } from '../domain/practice';
 import { demoService } from '../services/demoService';
 import { useWorkspace } from '../state/WorkspaceContext';
 
@@ -40,6 +41,7 @@ export default function Practice() {
   const [saved, setSaved] = useState(false);
   const passing = state.practiceResult === 'solution';
   const unsupported = state.practiceResult === 'unsupported';
+  const report = state.practiceResult ? runPracticeChecks(state.practiceCode) : null;
   const mounted = useRef(true);
   const layoutRef = useScrollReveal<HTMLDivElement>({ stagger: 0.1 });
 
@@ -109,9 +111,13 @@ export default function Practice() {
           </div>
           <div className="subsection-divider" />
           <h3>Acceptance criteria</h3>
-          <ChecklistItem checked={passing}>Reject a letters-only password</ChecklistItem>
-          <ChecklistItem checked={passing}>Accept a valid mixed password</ChecklistItem>
-          <ChecklistItem checked={passing || state.practiceResult === 'baseline'}>
+          <ChecklistItem checked={Boolean(report?.checks[0]?.passed)}>
+            Reject a letters-only password
+          </ChecklistItem>
+          <ChecklistItem checked={Boolean(report?.checks[1]?.passed)}>
+            Accept a valid mixed password
+          </ChecklistItem>
+          <ChecklistItem checked={Boolean(report?.checks[2]?.passed)}>
             Keep the existing length check
           </ChecklistItem>
           <div className="subsection-divider" />
@@ -127,7 +133,7 @@ export default function Practice() {
           <ChecklistItem checked={state.practiceCode !== initialPractice}>
             Update the prepared schema
           </ChecklistItem>
-          <ChecklistItem checked={passing}>Inspect all prepared check outcomes</ChecklistItem>
+          <ChecklistItem checked={passing}>Pass all schema assertions</ChecklistItem>
           <SourceLink source={{ path: 'src/middleware/validate.ts', start: 4, end: 8 }} navigate />
           <div className="exercise-origin">
             <FlaskConical size={14} />
@@ -199,15 +205,15 @@ export default function Practice() {
             )}
           </TiltCard>
           <TiltCard className="panel test-panel" maxTilt={3}>
-            <PanelHeading icon={FlaskConical} title="Prepared check outcomes">
+            <PanelHeading icon={FlaskConical} title="Schema assertion results">
               {running ? (
-                <Badge tone="violet">Preparing…</Badge>
+                <Badge tone="violet">Running…</Badge>
               ) : state.practiceResult && !unsupported ? (
                 <Badge tone={passing ? 'green' : 'amber'}>
-                  {passing ? '3/3' : '2/3'} example checks pass
+                  {report?.checks.filter((check) => check.passed).length ?? 0}/3 assertions pass
                 </Badge>
               ) : (
-                <Badge>Not executed</Badge>
+                <Badge>Ready to run</Badge>
               )}
             </PanelHeading>
             <div className="test-actions">
@@ -218,51 +224,48 @@ export default function Practice() {
                 magnetic
                 onClick={() => void run()}
               >
-                {running ? 'Preparing results…' : 'Run demo checks'}
+                {running ? 'Running assertions…' : 'Run checks'}
               </Button>
-              <span>Simulated outcomes · no code is executed</span>
+              <span>Local Zod assertions · supported schema rules</span>
             </div>
             {unsupported ? (
               <div className="error-callout">
                 <CircleAlert size={18} />
                 <div>
-                  <strong>This edit has no prepared result</strong>
+                  <strong>This edit uses unsupported syntax</strong>
                   <p>
-                    The demo recognizes the original schema and the guided example. Use the example
-                    to explore passing outcomes; arbitrary edits require a real test runner.
+                    Keep the schema structure and edit the password chain using .min(length) and
+                    .regex(/[0-9]/) or .regex(/\d/), with an optional message. Arbitrary JavaScript
+                    is not evaluated. Apply the guided example to continue.
                   </p>
                 </div>
               </div>
             ) : state.practiceResult ? (
               <div className="test-results">
-                {[
-                  ['Reject a letters-only password', 'abcdefgh → rejected', passing],
-                  ['Accept a mixed password', 'abcdefg1 → accepted', true],
-                  ['Reject a short password', 'abc1 → rejected', true],
-                ].map(([title, example, pass]) => (
-                  <div key={String(title)} className="test-row">
-                    {pass ? (
+                {report?.checks.map(({ title, detail, passed }) => (
+                  <div key={title} className="test-row">
+                    {passed ? (
                       <CheckCircle2 size={16} className="green-text" />
                     ) : (
                       <CircleAlert size={16} className="amber-text" />
                     )}
                     <span>
                       <strong>{title}</strong>
-                      <small className="mono">{example}</small>
+                      <small className="mono">{detail}</small>
                     </span>
-                    <Badge tone={pass ? 'green' : 'red'}>{pass ? 'PASS' : 'FAIL'}</Badge>
+                    <Badge tone={passed ? 'green' : 'red'}>{passed ? 'PASS' : 'FAIL'}</Badge>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="checks-empty">
                 <FlaskConical size={22} />
-                <p>Run the prepared baseline, then apply a change and compare.</p>
+                <p>Run the baseline, then update the password rule and compare.</p>
               </div>
             )}
             <div className="test-disclosure">
-              Prepared examples illustrate acceptance criteria. They are not sandbox verification or
-              evidence of actual test execution.
+              Supported password rules are parsed into a real Zod schema and checked against input
+              assertions. This checks validation behavior, not the full API or database.
             </div>
           </TiltCard>
           {passing && (

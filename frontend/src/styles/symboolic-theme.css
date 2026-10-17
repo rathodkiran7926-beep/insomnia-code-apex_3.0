@@ -3388,3 +3388,23 @@ body {
     grid-template-columns: 1fr !important;
   }
 }
+
+@media (max-width: 620px) {
+  .journey-card-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .changes-tabs {
+    width: auto;
+    min-width: 0;
+    margin: 0 18px 18px !important;
+  }
+  .changes-tabs .workspace-tabs {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    flex: 1;
+  }
+  .changes-tabs .workspace-tabs > button {
+    flex-shrink: 0;
+  }
+}

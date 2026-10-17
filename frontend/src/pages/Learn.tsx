@@ -241,7 +241,7 @@ export default function Learn() {
             </div>
             <h3>A change to the code is a new connection to make.</h3>
             <p>
-              PR #42 introduces email verification. Compare the changed steps, then revisit only
+              PR #402 introduces email verification. Compare the changed steps, then revisit only
               what’s affected.
             </p>
             <button

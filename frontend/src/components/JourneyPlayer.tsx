@@ -18,6 +18,7 @@ import type { Scenario } from '../data/types';
 import { canAdvance, getJourneySteps } from '../domain/model';
 import { useWorkspace } from '../state/WorkspaceContext';
 import { Badge, Button, IconButton, SourceLink } from './UI';
+import { StepNarration } from './StepNarration';
 
 export function JourneyPlayer({ mode = 'full' }: { mode?: 'full' | 'controls' | 'details' }) {
   const { state, patch, next, goStep, predict, startJourney } = useWorkspace();
@@ -193,6 +194,13 @@ export function JourneyPlayer({ mode = 'full' }: { mode?: 'full' | 'controls' | 
           </div>
         )}
       </div>
+      {mode !== 'details' && (
+        <StepNarration
+          identity={key}
+          text={`${step.title}. ${state.detail === 'technical' ? step.technical : step.explanation}`}
+          onStart={() => patch({ playing: false })}
+        />
+      )}
       <div className="journey-controls">
         <div className="row gap-8">
           <IconButton

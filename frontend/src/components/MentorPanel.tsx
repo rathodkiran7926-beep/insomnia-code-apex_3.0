@@ -17,6 +17,7 @@ import { getJourneySteps } from '../domain/model';
 import { useWorkspace } from '../state/WorkspaceContext';
 import { Badge, Button, SourceLink } from './UI';
 import { JourneyPlayer } from './JourneyPlayer';
+import { useEffect, useRef } from 'react';
 
 export function MentorPanel() {
   const { state, patch, startJourney, selectNode } = useWorkspace();
@@ -28,6 +29,11 @@ export function MentorPanel() {
   const [tab, setTab] = useState<'mentor' | 'inspector'>('mentor');
   const [question, setQuestion] = useState('');
   const [asked, setAsked] = useState('');
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (state.journeyId) setTab('mentor');
+    if (bodyRef.current) bodyRef.current.scrollTop = 0;
+  }, [state.journeyId, state.step, state.snapshot]);
   const isWhy = /why|reason|decision/i.test(asked);
   const isValidation = /valid|password|input/i.test(asked);
   const relatedSource = isValidation
@@ -51,7 +57,7 @@ export function MentorPanel() {
         </button>
         <span className="mentor-presence" title="Prepared demo responses" />
       </div>
-      <div className="mentor-body">
+      <div className="mentor-body" ref={bodyRef}>
         {tab === 'mentor' ? (
           <>
             {state.journeyId && <JourneyPlayer mode="details" />}

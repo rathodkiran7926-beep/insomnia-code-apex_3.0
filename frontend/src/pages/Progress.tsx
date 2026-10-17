@@ -26,6 +26,7 @@ import {
 import { journeys } from '../data/fixtures';
 import { getJourneySteps } from '../domain/model';
 import { useWorkspace } from '../state/WorkspaceContext';
+import { RelearningCard } from '../components/RelearningCard';
 
 export default function Progress() {
   const { state, startJourney, reset, notify } = useWorkspace();
@@ -114,8 +115,8 @@ export default function Progress() {
           {
             icon: FlaskConical,
             title: 'Contribution practice',
-            value: state.practiceResult === 'solution' ? 'Example reviewed' : 'Not completed',
-            note: 'Prepared sample outcomes · not executed',
+            value: state.practiceResult === 'solution' ? 'Assertions passed' : 'Not completed',
+            note: 'Local schema assertions · full API not executed',
             tone: 'green',
           },
           {
@@ -258,6 +259,7 @@ export default function Progress() {
           </TiltCard>
         </div>
         <aside className="stack-20">
+          {state.review.length > 0 && <RelearningCard />}
           <TiltCard className="next-activity" maxTilt={4}>
             <span className="tiny-label">A USEFUL NEXT STEP</span>
             <Compass size={27} strokeWidth={1.4} />
@@ -272,7 +274,7 @@ export default function Progress() {
               {state.review.length
                 ? 'Email verification changed the account lifecycle. Compare the source and revisit the new guard.'
                 : completed.length
-                  ? 'Try the guided password-validation contribution and inspect the prepared outcomes.'
+                  ? 'Try the password-validation contribution and run the local schema assertions.'
                   : 'The signup journey connects the architecture, source code, and two decision checkpoints.'}
             </p>
             <Button

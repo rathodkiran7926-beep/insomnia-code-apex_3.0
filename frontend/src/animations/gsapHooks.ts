@@ -22,16 +22,17 @@ export function useHeroAnimation<T extends HTMLElement = HTMLDivElement>() {
   const containerRef = useRef<T>(null);
 
   useEffect(() => {
-    if (!containerRef.current || prefersReducedMotion()) return;
+    const element = containerRef.current;
+    if (!element || prefersReducedMotion()) return;
 
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
 
-      const eyebrow = containerRef.current?.querySelector('.hero-eyebrow, .eyebrow');
-      const title = containerRef.current?.querySelector('.hero-title, h1');
-      const desc = containerRef.current?.querySelector('.hero-desc, p');
-      const actions = containerRef.current?.querySelector('.hero-actions, .heading-actions');
-      const pattern = containerRef.current?.querySelector('.blueprint-pattern, .hero-pattern');
+      const eyebrow = element.querySelector('.hero-eyebrow, .eyebrow');
+      const title = element.querySelector('.hero-title, h1');
+      const desc = element.querySelector('.hero-desc, p');
+      const actions = element.querySelector('.hero-actions, .heading-actions');
+      const pattern = element.querySelector('.blueprint-pattern, .hero-pattern');
 
       if (pattern) {
         tl.fromTo(
@@ -43,30 +44,15 @@ export function useHeroAnimation<T extends HTMLElement = HTMLDivElement>() {
       }
 
       if (eyebrow) {
-        tl.fromTo(
-          eyebrow,
-          { opacity: 0, y: 15 },
-          { opacity: 1, y: 0, duration: 0.6 },
-          0.1,
-        );
+        tl.fromTo(eyebrow, { opacity: 0, y: 15 }, { opacity: 1, y: 0, duration: 0.6 }, 0.1);
       }
 
       if (title) {
-        tl.fromTo(
-          title,
-          { opacity: 0, y: 25 },
-          { opacity: 1, y: 0, duration: 0.8 },
-          0.2,
-        );
+        tl.fromTo(title, { opacity: 0, y: 25 }, { opacity: 1, y: 0, duration: 0.8 }, 0.2);
       }
 
       if (desc) {
-        tl.fromTo(
-          desc,
-          { opacity: 0, y: 20 },
-          { opacity: 1, y: 0, duration: 0.7 },
-          0.35,
-        );
+        tl.fromTo(desc, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.7 }, 0.35);
       }
 
       if (actions) {
@@ -77,7 +63,7 @@ export function useHeroAnimation<T extends HTMLElement = HTMLDivElement>() {
           0.45,
         );
       }
-    }, containerRef);
+    }, element);
 
     return () => ctx.revert();
   }, []);
@@ -96,12 +82,13 @@ export function useScrollReveal<T extends HTMLElement = HTMLDivElement>(options?
   const ref = useRef<T>(null);
 
   useEffect(() => {
-    if (!ref.current || prefersReducedMotion()) return;
+    const element = ref.current;
+    if (!element || prefersReducedMotion()) return;
 
     const ctx = gsap.context(() => {
       const targets = options?.selector
-        ? ref.current?.querySelectorAll(options.selector)
-        : ref.current?.children;
+        ? element.querySelectorAll(options.selector)
+        : Array.from(element.children);
 
       if (!targets || targets.length === 0) return;
 
@@ -119,13 +106,13 @@ export function useScrollReveal<T extends HTMLElement = HTMLDivElement>(options?
           delay: options?.delay ?? 0,
           ease: 'power3.out',
           scrollTrigger: {
-            trigger: ref.current,
+            trigger: element,
             start: 'top 88%',
             toggleActions: 'play none none none',
           },
         },
       );
-    }, ref);
+    }, element);
 
     return () => ctx.revert();
   }, [options?.selector, options?.stagger, options?.delay]);

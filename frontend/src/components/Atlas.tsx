@@ -1,4 +1,4 @@
-﻿import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -73,7 +73,7 @@ const ArchitectureNode = memo(function ArchitectureNode({ data }: NodeProps<Atla
         </span>
         <div>
           <strong className={data.functions ? 'node-function' : ''}>{data.label}</strong>
-          <span>{data.upcoming ? 'PR #42 · not in base' : data.info.subtitle}</span>
+          <span>{data.upcoming ? 'PR #402 · not in base' : data.info.subtitle}</span>
         </div>
       </div>
       <div className="node-bottom">
@@ -302,7 +302,7 @@ export function Atlas() {
                 <span>
                   <strong>{item.data.label}</strong>
                   <small>
-                    {item.data.upcoming ? 'PR #42 · not in base' : item.data.info.subtitle}
+                    {item.data.upcoming ? 'PR #402 · not in base' : item.data.info.subtitle}
                   </small>
                 </span>
                 <Badge tone={item.data.active ? 'violet' : 'neutral'}>

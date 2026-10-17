@@ -3,6 +3,7 @@ import '../styles/workspace-header.css';
 import {
   ArrowRight,
   Bell,
+  Bot,
   BookOpen,
   ChevronDown,
   CircleHelp,
@@ -36,6 +37,7 @@ const navigation = [
   { path: '/learn', label: 'My learning path', icon: BookOpen },
   { path: '/practice', label: 'Practice', icon: FlaskConical },
   { path: '/changes', label: 'Changes', icon: GitPullRequest, count: '2' },
+  { path: '/agent-context', label: 'Agent Context Bridge', icon: Bot },
   { path: '/progress', label: 'My progress', icon: TrendingUp },
 ];
 
@@ -384,7 +386,7 @@ export function Shell() {
               'Select a node to inspect its source and responsibility.',
               'Start signup and answer the prediction checkpoints.',
               'Try the password-validation exercise in Practice.',
-              'Open PR #42, compare the code, and relearn the changed steps.',
+              'Open PR #402, compare the code, and relearn the changed steps.',
             ].map((x, i) => (
               <div key={x}>
                 <span>{i + 1}</span>
@@ -481,7 +483,7 @@ export function Shell() {
         description="Learning updates are tied to specific source changes."
       >
         <div className="dialog-body stack-20">
-          <Badge tone="violet">Prepared change · PR #42</Badge>
+          <Badge tone="violet">Prepared change · PR #402</Badge>
           <h3>Email verification changes the account lifecycle</h3>
           <p>
             Signup creates an unverified account, and login gains a verification guard.{' '}

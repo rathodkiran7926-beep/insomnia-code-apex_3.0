@@ -9,6 +9,7 @@ import {
   getJourneySteps,
   reachableStep,
   conceptsNeedingReview,
+  relearningTarget,
 } from './model';
 import { files, journeys, graphNodes } from '../data/fixtures';
 
@@ -40,6 +41,12 @@ describe('versioned source navigation', () => {
 });
 
 describe('learning rules', () => {
+  it('relearns the affected journey the learner studied, including before selecting head', () => {
+    expect(relearningTarget({ signup: ['base'] })).toBe('signup');
+    expect(relearningTarget({ login: ['base'] })).toBe('login');
+    expect(relearningTarget({ signup: ['base', 'head'], login: ['base'] })).toBe('login');
+    expect(relearningTarget({})).toBe('signup');
+  });
   it('requires a prediction before advancing past a decision', () => {
     expect(canAdvance(true, undefined)).toBe(false);
     expect(canAdvance(false, undefined)).toBe(true);
@@ -92,6 +99,15 @@ describe('learning rules', () => {
           for (const step of getJourneySteps(id, scenario, snapshot))
             expect(resolveSource(snapshot, step.source)).not.toBeNull();
         }
+  });
+  it('links the head account-creation step to its new state and pending response', () => {
+    const step = getJourneySteps('signup', 'success', 'head').find(
+      (item) => item.id === 'persist',
+    )!;
+    const source = resolveSource('head', step.source)!.selected;
+    expect(source).toContain('emailVerified: false');
+    expect(source).toContain("status: 'pending'");
+    expect(step.technical).not.toContain('In the base snapshot');
   });
 });
 
