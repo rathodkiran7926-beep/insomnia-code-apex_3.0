@@ -33,6 +33,12 @@
   border-top: 1px solid #ede5f5;
   padding: 0 15px 15px;
 }
+.component-recorded-facts > summary {
+  padding: 12px 0;
+  cursor: pointer;
+  color: #ae93bf;
+  font-size: 10px;
+}
 .component-documentation-body section {
   padding: 14px 0;
   border-bottom: 1px solid #eee7f4;

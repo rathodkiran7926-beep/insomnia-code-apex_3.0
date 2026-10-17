@@ -38,8 +38,11 @@ export async function boundedFetch(
     current = next;
   }
   if (!response.ok)
-    throw new Error(
-      `Remote request failed (${response.status}). Check repository, revision, or API rate limit.`,
+    throw Object.assign(
+      new Error(
+        `Remote request failed (${response.status}). Check repository, revision, or API rate limit.`,
+      ),
+      { remoteStatus: response.status },
     );
   const chunks = [];
   let size = 0;

@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS relationships (id TEXT, snapshot_id TEXT, data TEXT N
 CREATE TABLE IF NOT EXISTS source_references (id TEXT, snapshot_id TEXT, data TEXT NOT NULL, PRIMARY KEY(snapshot_id,id));
 CREATE TABLE IF NOT EXISTS analysis_jobs (id TEXT PRIMARY KEY, status TEXT NOT NULL, progress INTEGER NOT NULL, message TEXT, snapshot_id TEXT, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS documentation (snapshot_id TEXT PRIMARY KEY, data TEXT NOT NULL, markdown TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS source_files (snapshot_id TEXT NOT NULL, path TEXT NOT NULL, content TEXT NOT NULL, PRIMARY KEY(snapshot_id,path));`);
+CREATE TABLE IF NOT EXISTS source_files (snapshot_id TEXT NOT NULL, path TEXT NOT NULL, content TEXT NOT NULL, PRIMARY KEY(snapshot_id,path));
+CREATE TABLE IF NOT EXISTS generated_guides (snapshot_id TEXT NOT NULL, cache_key TEXT NOT NULL, data TEXT NOT NULL, PRIMARY KEY(snapshot_id,cache_key));`);
 export function saveSnapshot(graph, docs, markdown, files = {}) {
   db.exec("BEGIN IMMEDIATE");
   try {
@@ -50,7 +51,11 @@ export function saveSnapshot(graph, docs, markdown, files = {}) {
     );
     const allowed = new Set(graph.references.map((r) => r.file));
     for (const [path, content] of Object.entries(files)) {
-      if (allowed.has(path)) sourceInsert.run(graph.snapshotId, path, content);
+      if (
+        allowed.has(path) ||
+        /(?:^|\/)(package\.json|README\.md)$/i.test(path)
+      )
+        sourceInsert.run(graph.snapshotId, path, content);
     }
     db.exec("COMMIT");
   } catch (error) {

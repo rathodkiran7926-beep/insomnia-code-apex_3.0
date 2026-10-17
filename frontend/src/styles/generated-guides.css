@@ -1,0 +1,118 @@
+.gemini-guide {
+  margin: 16px 0;
+  border: 1px solid #e7daf2;
+  border-radius: 10px;
+  background: linear-gradient(140deg, #fcf9ff, #fff);
+  overflow: hidden;
+}
+.gemini-guide-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #ede2f5;
+  color: #9774b4;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.gemini-guide-heading > span {
+  margin-left: auto;
+  font-size: 9px;
+  color: #baa0ca;
+}
+.gemini-guide-loading {
+  padding: 18px 16px;
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  color: #ac8dbf;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.gemini-guide-loading svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  animation: gemini-spin 1s linear infinite;
+}
+.gemini-guide-loading small {
+  display: block;
+  color: #bda2ce;
+  font-size: 10px;
+}
+.gemini-guide-error {
+  padding: 14px 16px;
+}
+.gemini-guide-error p {
+  font-size: 11px !important;
+  line-height: 1.8;
+  color: #b29374 !important;
+}
+.gemini-guide-error button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #e5d5f0;
+  border-radius: 6px;
+  background: #f8f0fe;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 10px;
+  color: #aa84c2;
+  cursor: pointer;
+}
+.gemini-guide .gemini-guide-section {
+  padding: 16px;
+  border-bottom: 1px solid #eee4f5;
+}
+.gemini-guide .gemini-guide-section h3 {
+  font-size: 13px;
+  color: #9270a9;
+  margin: 0 0 10px;
+}
+.gemini-guide .gemini-guide-section p {
+  white-space: pre-line;
+  font-size: 12px;
+  line-height: 1.95;
+  color: #8b759b;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.gemini-guide-citations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.gemini-guide-citations a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #f2eafa;
+  color: #a17cba !important;
+  padding: 4px 7px;
+  border-radius: 5px;
+  font-size: 9px;
+  text-decoration: none !important;
+}
+.gemini-guide footer {
+  padding: 12px 16px;
+  color: #b49ac6;
+  font-size: 9px;
+  line-height: 1.8;
+}
+.component-documentation-body > .gemini-guide {
+  margin: 14px -3px;
+}
+.component-documentation-body .gemini-guide .gemini-guide-section p {
+  font-size: 11px;
+}
+@keyframes gemini-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gemini-guide-loading svg {
+    animation: none;
+  }
+}

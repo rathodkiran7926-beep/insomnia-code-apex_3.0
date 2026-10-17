@@ -22,6 +22,8 @@ import {
 } from '../domain/repositoryDocumentation';
 import type { DocumentationScope, DocumentationSnapshot } from '../domain/repositoryDocumentation';
 import '../styles/repository-documentation.css';
+import { useGeneratedGuide, generatedGuideMarkdown } from '../services/generatedGuides';
+import { GeneratedGuide } from './GeneratedGuide';
 
 const scopes = [
   {
@@ -59,6 +61,10 @@ export function RepositoryDocumentation({
   const [limit, setLimit] = useState(12);
   const [moduleLimit, setModuleLimit] = useState(8);
   const model = useMemo(() => documentationModel(snapshot, scope), [snapshot, scope]);
+  const generated = useGeneratedGuide(
+    { snapshotId: snapshot.snapshotId, scope },
+    model.files.size > 0,
+  );
   const declarations = model.components.filter((c) => c.role !== 'module');
   const matching = declarations.filter((c) =>
     `${c.name} ${c.source?.file} ${c.role}`.toLowerCase().includes(search.toLowerCase()),
@@ -91,8 +97,15 @@ export function RepositoryDocumentation({
     ) : null;
   };
   const download = () => {
+    const sourceGuide = scopedDocumentationMarkdown(snapshot, scope);
+    const content = generated.guide
+      ? sourceGuide.replace(
+          '## Architecture',
+          generatedGuideMarkdown(generated.guide) + '\n\n## Architecture',
+        )
+      : sourceGuide;
     const url = URL.createObjectURL(
-      new Blob([scopedDocumentationMarkdown(snapshot, scope)], {
+      new Blob([content], {
         type: 'text/markdown;charset=utf-8',
       }),
     );
@@ -208,6 +221,7 @@ export function RepositoryDocumentation({
                     snapshot.report.frameworks.map((f) => <span key={f}>{f}</span>)}
                   <span>{model.relationships.length} internal connections</span>
                 </div>
+                <GeneratedGuide {...generated} />
                 <div className="doc-explainer">
                   <Braces size={18} />
                   <div>

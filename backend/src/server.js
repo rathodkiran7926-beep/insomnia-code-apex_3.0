@@ -7,6 +7,7 @@ import { z } from "zod";
 import { db, saveSnapshot } from "./storage.js";
 import { parseRepository } from "./github.js";
 import { readSource, answerQuestion } from "./workspace.js";
+import { generateGuide } from "./generatedGuides.js";
 const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: "8kb" }));
@@ -161,6 +162,16 @@ app.post("/api/snapshots/:id/questions", async (req, res, next) => {
     next(error);
   }
 });
+app.post(
+  "/api/snapshots/:id/generated-documentation",
+  async (req, res, next) => {
+    try {
+      res.json(await generateGuide(workspaceGraph(req.params.id), req.body));
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 app.get("/api/snapshots/:id/documentation", (req, res) => {
   const row = db
     .prepare("SELECT markdown FROM documentation WHERE snapshot_id=?")
