@@ -1,6 +1,6 @@
 # Codebase Mentor
 
-A frontend prototype for understanding an unfamiliar codebase through a connected architecture map, source-linked journeys, contribution practice, and change-aware relearning.
+A React frontend for understanding an unfamiliar codebase. The Repository page now connects to the Node.js backend for real public GitHub analysis, architecture diagrams and source-grounded documentation. Existing learning and practice screens retain their demo fixtures. See the [project README](../README.md) for backend setup and analysis limits.
 
 ## Run locally
 
@@ -20,32 +20,32 @@ npm run preview   # Serve dist at http://127.0.0.1:4173
 npm run format    # Format maintained source and configuration
 ```
 
-The application uses hash-based routes, so static hosts do not need a history fallback. The generated `dist/` directory can be hosted as a static application. No credentials or environment variables are required.
+The application uses hash-based routes, so static hosts do not need a history fallback. Repository analysis requires the backend: Vite proxies `/api` to port 3001. For production, the Node server serves `dist/` and the API together. No model key is required for extracted-fact documentation.
 
 ## Explore the prototype
 
 The default route opens the Mentor Workspace. Select a component to inspect its responsibility and source, or choose **Follow a request** to start signup. Journey steps, selected components, source ranges, explanations, and predictions share the same context.
 
-| Experience | What works |
-| --- | --- |
-| Repository | Sample selection, input validation, connection failure/retry, simulated indexing, base/head revision selection, capability limits |
+| Experience       | What works                                                                                                                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Repository       | Real GitHub URL/revision analysis, background job progress, commit-linked React Flow architecture, component docs, analysis report, Markdown/Mermaid export                                 |
 | Mentor Workspace | XYFlow pan/zoom, component search, focus, system/component/function views, node and relationship inspection, source/evidence tabs, source copying and collapse, contextual prepared answers |
-| Code Journeys | Signup and login, success/failure scenarios, synchronized stepping, play/pause/restart, keyboard arrows, explanation depth, gated predictions, retained first attempts |
-| Learning path | Beginner/experienced profiles, three goals, explainable prerequisite selection, connected lesson completion, personalization opt-out |
-| Practice | Editable sample patch, three progressive hints, original source, baseline and guided outcomes, unsupported-edit handling, self-reflection |
-| Changes | Verification PR comparison, independent proposed test patch, unified source diff, selectable changed steps, direct versus possible impact, static setup delta, targeted relearning |
-| Team knowledge | Source-linked question, editable draft, explicit review/approval/publication, revision-bound invalidation, superseded state, published rationale in mentor context |
-| Progress | Completed scenarios and journeys, first/retry answers, studied revisions, pending relearning, local export and reset |
+| Code Journeys    | Signup and login, success/failure scenarios, synchronized stepping, play/pause/restart, keyboard arrows, explanation depth, gated predictions, retained first attempts                      |
+| Learning path    | Beginner/experienced profiles, three goals, explainable prerequisite selection, connected lesson completion, personalization opt-out                                                        |
+| Practice         | Editable sample patch, three progressive hints, original source, baseline and guided outcomes, unsupported-edit handling, self-reflection                                                   |
+| Changes          | Verification PR comparison, independent proposed test patch, unified source diff, selectable changed steps, direct versus possible impact, static setup delta, targeted relearning          |
+| Team knowledge   | Source-linked question, editable draft, explicit review/approval/publication, revision-bound invalidation, superseded state, published rationale in mentor context                          |
+| Progress         | Completed scenarios and journeys, first/retry answers, studied revisions, pending relearning, local export and reset                                                                        |
 
 Use **Ctrl/⌘ K** for global search. Journey arrows work outside input fields, dialogs, and the graph. Narrow screens use a modal navigation drawer, stacked panels, and a readable component list with an optional interactive map. Motion respects reduced-motion preferences.
 
 ## What is simulated
 
-**`acme/relay-api` is a synthetic, bundled sample.** It is not an inspected upstream repository. Its apparent commit identifiers are demo revision labels, not public Git commits. The original project specification's real-repository analysis, AI orchestration, isolated execution, and peer study are outside this approved frontend implementation.
+**`acme/relay-api` is a synthetic, bundled sample used outside the Repository page.** Its apparent commit identifiers are demo revision labels, not public Git commits. The Repository page instead uses real analysis tied to exact Git commits; optional AI commentary is configured on the backend. Repository code is never executed.
 
 - Source snippets, graph relationships, explanations, PRs, and answer keys are prepared fixtures.
 - “Explained path” describes possible sample-source behavior. No recorded runtime scenario or real intermediate state is fabricated.
-- Repository connection and indexing are simulated. No GitHub account is connected.
+- The Repository page analyzes public repositories without connecting a GitHub account. Other sample workspace screens continue to show bundled fixtures.
 - The mentor supports prepared validation, duplicate-email, and design-rationale responses. Other questions show an explicit limitation.
 - Practice outcomes recognize the original schema and the guided example after whitespace/comment normalization. Arbitrary edits return **unsupported**. No edited code is evaluated or executed.
 - Setup findings come from a static sample diff. No setup check or email delivery is presented as verified.

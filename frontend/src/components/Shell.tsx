@@ -50,6 +50,7 @@ export function Shell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [updatesOpen, setUpdatesOpen] = useState(false);
   const current = navigation.find((x) => x.path === location.pathname)?.label ?? 'Team knowledge';
+  const analyzingRepository = location.pathname === '/repository';
   const learningRoute = getRoute(
     state.personalized ? state.profile : 'beginner',
     state.personalized ? state.goal : 'contribute',
@@ -60,6 +61,7 @@ export function Shell() {
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      if (analyzingRepository) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setSearchOpen((s) => !s);
@@ -70,7 +72,7 @@ export function Shell() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [analyzingRepository]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -122,20 +124,24 @@ export function Shell() {
           </span>
           <Badge tone="violet">beta</Badge>
         </NavLink>
-        <button
-          className="workspace-switcher"
-          onClick={() => go('/repository')}
-          title="Switch repository or inspect workspace"
-        >
-          <span className="repo-avatar">
-            r<span>↗</span>
-          </span>
-          <span>
-            <strong>Relay workspace</strong>
-            <small>acme / relay-api</small>
-          </span>
-          <ChevronDown size={14} />
-        </button>
+        {!analyzingRepository && (
+          <button
+            className="workspace-switcher"
+            onClick={() => go('/repository')}
+            title="Switch repository or inspect workspace"
+          >
+            <span className="repo-avatar">
+              r<span>↗</span>
+            </span>
+            <span>
+              <strong>{analyzingRepository ? 'Repository analysis' : 'Relay workspace'}</strong>
+              <small>
+                {analyzingRepository ? 'Public GitHub repositories' : 'acme / relay-api (demo)'}
+              </small>
+            </span>
+            <ChevronDown size={14} />
+          </button>
+        )}
         <div className="nav-label">WORKSPACE</div>
         <nav aria-label="Main navigation">
           {navigation.map(({ path, label, icon: Icon, count }) => (
@@ -162,22 +168,28 @@ export function Shell() {
           </NavLink>
         </div>
         <div className="sidebar-bottom">
-          <div className="next-step-card">
-            <div className="row between">
-              <span className="tiny-label">DAILY PROGRESS</span>
-              <Sparkles size={13} className="text-primary" />
+          {!analyzingRepository && (
+            <div className="next-step-card">
+              <div className="row between">
+                <span className="tiny-label">DAILY PROGRESS</span>
+                <Sparkles size={13} className="text-primary" />
+              </div>
+              <strong>Your first contribution starts here.</strong>
+              <ProgressBar value={routeProgress} />
+              <button onClick={() => go('/learn')}>
+                Continue learning path <ArrowRight size={13} />
+              </button>
             </div>
-            <strong>Your first contribution starts here.</strong>
-            <ProgressBar value={routeProgress} />
-            <button onClick={() => go('/learn')}>
-              Continue learning path <ArrowRight size={13} />
+          )}
+          {!analyzingRepository && (
+            <button className="sidebar-setting" onClick={() => setSettingsOpen(true)}>
+              <Settings2 size={15} /> Preferences <span>⌘ ,</span>
             </button>
-          </div>
-          <button className="sidebar-setting" onClick={() => setSettingsOpen(true)}>
-            <Settings2 size={15} /> Preferences <span>⌘ ,</span>
-          </button>
+          )}
           <div className="sidebar-footer">
-            <span className="status-dot" /> All work stays in browser <span>v0.1</span>
+            <span className="status-dot" />{' '}
+            {analyzingRepository ? 'Local repository analysis' : 'All work stays in browser'}{' '}
+            <span>v0.1</span>
           </div>
         </div>
       </aside>
@@ -191,12 +203,25 @@ export function Shell() {
               onClick={() => setMobileOpen(true)}
             />
             <div className="workspace-location">
-              <button className="breadcrumb-repo" onClick={() => go('/repository')} aria-label="Open acme / relay-api repository">
-                <GitBranch size={13} /> acme / relay-api <ChevronDown size={12} />
-              </button>
+              {analyzingRepository ? (
+                <span className="breadcrumb-repo">
+                  <GitBranch size={13} /> Public repository analysis
+                </span>
+              ) : (
+                <button
+                  className="breadcrumb-repo"
+                  onClick={() => go('/repository')}
+                  aria-label="Open repository analysis"
+                >
+                  <GitBranch size={13} />{' '}
+                  {analyzingRepository ? 'Repository analysis' : 'acme / relay-api'}{' '}
+                  <ChevronDown size={12} />
+                </button>
+              )}
               <span className="breadcrumb-page">{current}</span>
             </div>
           </div>
+          {!analyzingRepository && (
             <button
               className="global-search"
               aria-label="Search workspace"
@@ -209,25 +234,33 @@ export function Shell() {
                 <Command size={10} /> K
               </kbd>
             </button>
-          <div className="topbar-actions">
-            <Badge tone="violet" className="workspace-demo-badge">
-              <span className="tiny-dot" /> Demo workspace
-            </Badge>
-            <span className="topbar-divider" />
-            <IconButton
-              icon={CircleHelp}
-              label="Workspace guide"
-              onClick={() => setHelpOpen(true)}
-            />
-            <IconButton icon={Bell} label="Learning updates" onClick={() => setUpdatesOpen(true)} />
-            <button
-              className="user-avatar"
-              aria-label="Open learner preferences"
-              onClick={() => setSettingsOpen(true)}
-            >
-              JD
-            </button>
-          </div>
+          )}
+          {!analyzingRepository && (
+            <div className="topbar-actions">
+              <Badge tone="violet" className="workspace-demo-badge">
+                <span className="tiny-dot" />{' '}
+                {analyzingRepository ? 'Live analysis' : 'Demo workspace'}
+              </Badge>
+              <span className="topbar-divider" />
+              <IconButton
+                icon={CircleHelp}
+                label="Workspace guide"
+                onClick={() => setHelpOpen(true)}
+              />
+              <IconButton
+                icon={Bell}
+                label="Learning updates"
+                onClick={() => setUpdatesOpen(true)}
+              />
+              <button
+                className="user-avatar"
+                aria-label="Open learner preferences"
+                onClick={() => setSettingsOpen(true)}
+              >
+                JD
+              </button>
+            </div>
+          )}
         </header>
         <main id="main-content" tabIndex={-1} key={location.pathname} className="main-content">
           <Outlet />

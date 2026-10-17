@@ -1,346 +1,905 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Background, Controls, ReactFlow } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+import { Badge } from '../components/UI';
+import { RepositoryDocumentation } from '../components/RepositoryDocumentation';
+import { RepositorySource } from '../components/RepositorySource';
+import { BackendArchitecture } from '../components/BackendArchitecture';
+import { AnalysisProgress } from '../components/AnalysisProgress';
 import {
   ArrowRight,
-  Check,
   CheckCircle2,
-  ChevronRight,
-  CircleAlert,
   Code2,
-  Database,
   FileCode2,
+  FolderOpen,
   GitBranch,
-  GitFork as Github,
-  Layers3,
   LoaderCircle,
   Network,
   Search,
-  ShieldCheck,
+  X,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useScrollReveal } from '../animations/gsapHooks';
-import {
-  Badge,
-  Button,
-  ChecklistItem,
-  DemoNote,
-  Modal,
-  PageHeading,
-  PanelHeading,
-  ProgressBar,
-  TiltCard,
-} from '../components/UI';
-import { files, versions } from '../data/fixtures';
-import type { Snapshot } from '../data/types';
-import { demoService } from '../services/demoService';
-import { useWorkspace } from '../state/WorkspaceContext';
+import '../styles/repository-analysis.css';
+import '../styles/repository-source.css';
 
-const indexingSteps = [
-  'Resolve repository snapshot',
-  'Load source and configuration',
-  'Link architecture and journeys',
-  'Prepare your learning workspace',
-];
-
-export default function Repository() {
-  const { state, patch, setSnapshot } = useWorkspace();
-  const go = useNavigate();
-  const [name, setName] = useState('acme/relay-api');
-  const [error, setError] = useState('');
-  const [stage, setStage] = useState(-1);
-  const [connecting, setConnecting] = useState(false);
-  const [selector, setSelector] = useState(false);
-  const [search, setSearch] = useState('');
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const mounted = useRef(true);
-  const gridRef = useScrollReveal<HTMLDivElement>({ stagger: 0.12 });
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-      if (timer.current) clearInterval(timer.current);
+type Source = {
+  id: string;
+  snapshotId: string;
+  file: string;
+  startLine: number;
+  endLine: number;
+  url: string;
+  excerpt: string;
+};
+type Component = {
+  id: string;
+  name: string;
+  role: string;
+  inferred: boolean;
+  evidence: string[];
+  referenceId: string;
+  inputs?: string[];
+  output?: string;
+  validation: string;
+  fullPaths?: string[];
+};
+type Relation = {
+  id: string;
+  source: string;
+  target: string;
+  type: string;
+  referenceId: string;
+  mountPath?: string;
+};
+type Snapshot = {
+  readmeClaim?: string;
+  snapshotId: string;
+  repository: string;
+  commit: string;
+  components: Component[];
+  relationships: Relation[];
+  references: Source[];
+  report: {
+    supported: boolean;
+    languages: string[];
+    frameworks: string[];
+    patterns: string[];
+    limitations: string[];
+    exclusions: { path: string; reason: string }[];
+    unresolved: { kind: string; text: string; referenceId: string; reason: string }[];
+  };
+  documentation: {
+    snapshotId: string;
+    ai: {
+      message: string;
+      explanations: { componentId: string; explanation: string; referenceIds: string[] }[];
     };
-  }, []);
-
-  async function connect() {
-    if (connecting) return;
-    setError('');
-    setConnecting(true);
-    setStage(-1);
-    try {
-      await demoService.connectRepository(name);
-      if (!mounted.current) return;
-      setStage(0);
-      let index = 0;
-      timer.current = setInterval(() => {
-        index++;
-        setStage(index);
-        if (index >= indexingSteps.length) {
-          clearInterval(timer.current!);
-          patch({ connected: true });
-          setConnecting(false);
+  };
+};
+type Job = {
+  id: string;
+  status: string;
+  progress: number;
+  message: string;
+  snapshot_id: string | null;
+};
+async function api<T>(url: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(url, options);
+  if (!response.headers.get('content-type')?.includes('application/json'))
+    throw new Error('API unavailable. Start the Node.js backend on port 3001.');
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+const colors: Record<string, string> = {
+  route: '#dff5e9',
+  handler: '#e5edff',
+  service: '#efe6ff',
+  middleware: '#fff0cf',
+  router: '#dff4f5',
+  application: '#dff4f5',
+  database_client: '#ffe8db',
+  database_operation: '#ffe8db',
+};
+const roleLabels: Record<string, string> = {
+  all: 'All components',
+  application: 'Application',
+  router: 'Router',
+  route: 'HTTP route',
+  handler: 'Request handler',
+  service: 'Service (inferred)',
+  middleware: 'Middleware',
+  function: 'Function',
+  class: 'Class',
+  database_client: 'Database client',
+  database_operation: 'Database operation',
+  unresolved: 'Unresolved calls',
+};
+const relationshipLabels: Record<string, string> = {
+  imports: 'imports',
+  registers_route: 'registers route',
+  handles_route: 'handled by',
+  calls: 'calls',
+  mounts_router: 'mounts router',
+  uses_middleware: 'uses middleware',
+  queries_database: 'queries database',
+};
+function FolderGroup({ data }: { data: { label?: string } }) {
+  return (
+    <div className="analysis-folder-label">
+      <FolderOpen size={15} />
+      {data.label}
+    </div>
+  );
+}
+const analysisNodeTypes = { folderGroup: FolderGroup };
+export default function Repository() {
+  const [url, setUrl] = useState('https://github.com/heroku/node-js-getting-started');
+  const [revision, setRevision] = useState('');
+  const [jobId, setJobId] = useState(() => localStorage.getItem('mentor-analysis-job') || '');
+  const [job, setJob] = useState<Job | null>(null);
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [error, setError] = useState('');
+  const [starting, setStarting] = useState(false);
+  const [query, setQuery] = useState('');
+  const [role, setRole] = useState('all');
+  const [folder, setFolder] = useState('all');
+  const [showUnresolved, setShowUnresolved] = useState(false);
+  const [view, setView] = useState('system');
+  const [tab, setTab] = useState('architecture');
+  const [selected, setSelected] = useState('');
+  const busy = starting || job?.status === 'running';
+  useEffect(() => {
+    if (!jobId) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      try {
+        const next = await api<Job>(`/api/analyses/${jobId}`);
+        if (cancelled) return;
+        setJob(next);
+        if (next.status === 'complete' && next.snapshot_id) {
+          const result = await api<Snapshot>(`/api/snapshots/${next.snapshot_id}`);
+          if (!cancelled) {
+            setSnapshot(result);
+            setError('');
+            setUrl(result.repository);
+            setView('system');
+          }
+        } else if (next.status === 'failed') setError(next.message);
+        else timer = setTimeout(() => void poll(), 1000);
+      } catch (e) {
+        if (!cancelled) {
+          setError((e as Error).message);
+          setJob(null);
         }
-      }, 650);
+      }
+    }
+    void poll();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [jobId]);
+  async function start() {
+    setStarting(true);
+    setError('');
+    try {
+      const result = await api<{ id: string }>('/api/analyses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: url.trim(),
+          ...(revision.trim() ? { revision: revision.trim() } : {}),
+        }),
+      });
+      localStorage.setItem('mentor-analysis-job', result.id);
+      setSnapshot(null);
+      setSelected('');
+      setFolder('all');
+      setQuery('');
+      setRole('all');
+      setJob({
+        id: result.id,
+        status: 'running',
+        progress: 0,
+        message: 'Starting analysis',
+        snapshot_id: null,
+      });
+      setTab('architecture');
+      setJobId(result.id);
     } catch (e) {
       setError((e as Error).message);
-      setConnecting(false);
+    } finally {
+      setStarting(false);
     }
   }
-
-  const ready = state.connected && !connecting;
-
+  const source = (id: string) => snapshot?.references.find((r) => r.id === id);
+  const sourceLink = (id: string) => {
+    const r = source(id);
+    return (
+      r && (
+        <a href={r.url} target="_blank" rel="noreferrer">
+          {r.file}:{r.startLine}–{r.endLine} ↗
+        </a>
+      )
+    );
+  };
+  const graph = useMemo(() => {
+    if (!snapshot) return { nodes: [], edges: [] };
+    const refs = new Map(snapshot.references.map((r) => [r.id, r]));
+    const folderOf = (c: Component) =>
+      refs.get(c.referenceId)?.file.split('/').slice(0, -1).join('/') || '(root)';
+    if (view === 'overview') {
+      const folders = [...new Set(snapshot.components.map(folderOf))];
+      const nodes: Node[] = folders
+        .map((folder, i) => ({
+          id: `folder:${folder}`,
+          data: {
+            label: (
+              <div className="analysis-folder-node">
+                <FolderOpen size={21} />
+                <strong>{folder}</strong>
+                <span>
+                  {snapshot.components.filter((c) => folderOf(c) === folder).length} components{' '}
+                  <ArrowRight size={13} />
+                </span>
+              </div>
+            ),
+            searchText: folder,
+          },
+          position: { x: (i % 4) * 280, y: Math.floor(i / 4) * 150 },
+          style: { background: '#efedfc', width: 240, whiteSpace: 'pre-wrap' },
+        }))
+        .filter((n) => String(n.data.searchText).toLowerCase().includes(query.toLowerCase()));
+      const ids = new Set(nodes.map((n) => n.id));
+      const edgeMap = new Map<string, Edge>();
+      for (const e of snapshot.relationships) {
+        const from = snapshot.components.find((c) => c.id === e.source)!;
+        const to = snapshot.components.find((c) => c.id === e.target)!;
+        const s = `folder:${folderOf(from)}`,
+          t = `folder:${folderOf(to)}`;
+        if (s !== t && ids.has(s) && ids.has(t))
+          edgeMap.set(`${s}|${t}|${e.type}`, {
+            id: `${s}|${t}|${e.type}`,
+            source: s,
+            target: t,
+            label: relationshipLabels[e.type] || e.type,
+            type: 'smoothstep',
+          });
+      }
+      return { nodes, edges: [...edgeMap.values()] };
+    }
+    const visible = snapshot.components.filter(
+      (c) =>
+        c.role !== 'module' &&
+        (folder === 'all' || folderOf(c) === folder) &&
+        (role === 'all' || c.role === role) &&
+        `${c.name} ${refs.get(c.referenceId)?.file}`.toLowerCase().includes(query.toLowerCase()),
+    );
+    const folders = [...new Set(visible.map(folderOf))];
+    const nodes: Node[] = [];
+    let offset = 0;
+    for (const folder of folders) {
+      const members = visible.filter((c) => folderOf(c) === folder),
+        groupId = `group:${folder}`;
+      nodes.push({
+        id: groupId,
+        type: 'folderGroup',
+        data: { label: folder },
+        position: { x: 0, y: offset },
+        style: {
+          width: Math.min(3, members.length) * 275 + 24,
+          height: Math.ceil(members.length / 3) * 135 + 60,
+          background: '#f8f9fc',
+        },
+        selectable: false,
+      });
+      members.forEach((c, i) =>
+        nodes.push({
+          id: c.id,
+          parentId: groupId,
+          extent: 'parent',
+          position: { x: (i % 3) * 275 + 16, y: Math.floor(i / 3) * 135 + 45 },
+          data: {
+            label: (
+              <div className="analysis-component-node">
+                <span className="analysis-node-role">{roleLabels[c.role] || c.role}</span>
+                <strong title={c.name}>{c.name}</strong>
+                <span className="analysis-node-file" title={refs.get(c.referenceId)?.file}>
+                  <FileCode2 size={12} />
+                  {refs.get(c.referenceId)?.file.split('/').pop()}:
+                  {refs.get(c.referenceId)?.startLine}
+                </span>
+              </div>
+            ),
+          },
+          style: {
+            width: 250,
+            fontSize: 12,
+            whiteSpace: 'pre-wrap',
+            overflowWrap: 'anywhere',
+            background: colors[c.role] || 'white',
+            border: `${c.inferred ? '2px dashed' : '1px solid'} ${c.id === selected ? '#5855d9' : '#bcc7d9'}`,
+          },
+        }),
+      );
+      offset += Math.ceil(members.length / 3) * 135 + 110;
+    }
+    const ids = new Set(nodes.map((n) => n.id));
+    const edges: Edge[] = snapshot.relationships
+      .filter((e) => ids.has(e.source) && ids.has(e.target))
+      .map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        label: `${relationshipLabels[e.type] || e.type}${e.mountPath ? ` ${e.mountPath}` : ''}`,
+        type: 'smoothstep',
+        style: { stroke: '#7b86a0' },
+      }));
+    if ((role === 'all' && showUnresolved) || role === 'unresolved')
+      snapshot.report.unresolved
+        .filter((u) => u.kind === 'call')
+        .slice(0, 30)
+        .forEach((u, i) => {
+          const r = refs.get(u.referenceId);
+          const caller = snapshot.components
+            .filter((c) => c.role !== 'module' && ids.has(c.id))
+            .filter((c) => {
+              const cr = refs.get(c.referenceId);
+              return (
+                cr?.file === r?.file && cr!.startLine <= r!.startLine && cr!.endLine >= r!.endLine
+              );
+            })
+            .sort(
+              (a, b) =>
+                refs.get(a.referenceId)!.endLine -
+                refs.get(a.referenceId)!.startLine -
+                (refs.get(b.referenceId)!.endLine - refs.get(b.referenceId)!.startLine),
+            )[0];
+          if (!caller && role !== 'unresolved') return;
+          const id = `unresolved:${i}`;
+          nodes.push({
+            id,
+            data: { label: `${u.text}\nunresolved target` },
+            position: { x: 950 + (i % 2) * 240, y: Math.floor(i / 2) * 100 },
+            style: { width: 220, background: '#fff1e8', border: '1px dashed #c97e39' },
+          });
+          if (caller)
+            edges.push({
+              id: `unknown:${i}`,
+              source: caller.id,
+              target: id,
+              label: 'unresolved call',
+              style: { stroke: '#c97e39', strokeDasharray: '5 5' },
+            });
+        });
+    return { nodes, edges };
+  }, [snapshot, view, role, query, selected, showUnresolved, folder]);
+  const component = snapshot?.components.find((c) => c.id === selected);
+  const ai = snapshot?.documentation.ai.explanations.find((e) => e.componentId === selected);
+  function inspectComponent(id: string) {
+    const c = snapshot?.components.find((c) => c.id === id);
+    const ref = snapshot?.references.find((r) => r.id === c?.referenceId);
+    setTab('architecture');
+    setView('detail');
+    setRole('all');
+    setQuery('');
+    setFolder(ref?.file.split('/').slice(0, -1).join('/') || '(root)');
+    setSelected(id);
+  }
   return (
     <>
-      <PageHeading
-        eyebrow="REPOSITORY"
-        title="A new codebase. A clear way in."
-        description="Connect a repository and turn unfamiliar code into something you can navigate."
-        actions={<Badge tone="amber">Simulated connection</Badge>}
-      />
-      <div ref={gridRef} className="repository-grid">
-        <div className="stack-20">
-          <TiltCard className="panel connect-panel" maxTilt={4}>
-            <PanelHeading icon={Github} title="Connect your repository">
-              <Badge tone="violet">GitHub demo</Badge>
-            </PanelHeading>
-            <div className="panel-body stack-20">
-              <div className="row between">
-                <div>
-                  <h3>Start with a repository</h3>
-                  <p className="muted">
-                    Explore the prepared sample, without connecting an account.
-                  </p>
-                </div>
-                <span className="provider-logo">
-                  <Github size={30} />
-                </span>
-              </div>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void connect();
-                }}
-              >
-                <label className="field-label">
-                  Repository URL or owner / name
-                  <div className="input-action">
-                    <input
-                      aria-label="Repository URL or owner / name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="acme/relay-api"
-                      aria-invalid={Boolean(error)}
-                    />
-                    <Button
-                      variant="primary"
-                      icon={connecting ? LoaderCircle : ArrowRight}
-                      className={connecting ? 'loading-button' : ''}
-                      disabled={connecting || !name.trim()}
-                      type="submit"
-                      magnetic
-                    >
-                      {connecting ? 'Connecting' : 'Connect'}
-                    </Button>
-                  </div>
-                </label>
-              </form>
-              {error && (
-                <div className="error-callout" role="alert">
-                  <CircleAlert size={17} />
-                  <div>
-                    <strong>Repository unavailable in this demo</strong>
-                    <p>{error}</p>
-                    <button
-                      onClick={() => {
-                        setName('acme/relay-api');
-                        setError('');
-                      }}
-                    >
-                      Use the sample repository
-                    </button>
-                  </div>
-                </div>
-              )}
-              <div className="or-divider">
-                <span />
-                or choose from your workspace
-                <span />
-              </div>
-              <button className="repository-choice" onClick={() => setSelector(true)}>
-                <span className="repo-mark">
-                  <Code2 size={24} />
-                </span>
-                <span>
-                  <strong>acme / relay-api</strong>
-                  <small>A TypeScript authentication API, built for exploring.</small>
-                  <span className="row gap-8">
-                    <i className="language-dot" />
-                    TypeScript<span className="subtle">·</span>Express
-                    <span className="subtle">·</span>Sample fixture
-                  </span>
-                </span>
-                <ChevronRight size={18} />
-              </button>
-              <DemoNote>
-                The sample is synthetic. No GitHub authentication or live indexing occurs.
-              </DemoNote>
-            </div>
-          </TiltCard>
-          <TiltCard className="panel" maxTilt={4}>
-            <PanelHeading icon={Network} title="Your repository at a glance">
-              <Badge tone="green">{ready ? 'Ready to explore' : 'Prepared sample'}</Badge>
-            </PanelHeading>
-            <div className="panel-body">
-              <div className="repository-stats">
-                <div>
-                  <FileCode2 size={19} />
-                  <strong>{Object.keys(files[state.snapshot]).length}</strong>
-                  <span>source & config files</span>
-                </div>
-                <div>
-                  <Layers3 size={19} />
-                  <strong>8</strong>
-                  <span>mapped components</span>
-                </div>
-                <div>
-                  <Network size={19} />
-                  <strong>2</strong>
-                  <span>guided journeys</span>
-                </div>
-              </div>
-              <div className="repo-description">
-                <h3>Small enough to understand. Realistic enough to learn.</h3>
-                <p>
-                  Follow signup and login through routes, validation, services, and storage. Then
-                  see what changes when email verification is introduced.
-                </p>
-              </div>
-              <div className="tag-list">
-                <Badge tone="blue">TypeScript</Badge>
-                <Badge>Express</Badge>
-                <Badge>Prisma</Badge>
-                <Badge>PostgreSQL boundary</Badge>
-                <Badge>Zod</Badge>
-              </div>
-            </div>
-          </TiltCard>
+      <section className="panel analysis-connect">
+        <div className="analysis-connect-heading">
+          <span className="analysis-section-icon">
+            <GitBranch size={20} />
+          </span>
+          <div>
+            <h2>Explore a repository</h2>
+            <p>Paste a public GitHub link. We’ll turn its code into a map you can explore.</p>
+          </div>
         </div>
-        <div className="stack-20">
-          <section className="panel">
-            <PanelHeading icon={GitBranch} title="Version context" />
-            <div className="panel-body stack-16">
-              <label className="field-label">
-                Branch / prepared revision
-                <select
-                  value={state.snapshot}
-                  onChange={(e) => setSnapshot(e.target.value as Snapshot)}
-                >
-                  <option value="base">main · {versions.base.commit}</option>
-                  <option value="head">feat/email-verification · {versions.head.commit}</option>
-                </select>
-              </label>
-              <div className="version-info">
-                <span className="tiny-label">SELECTED SNAPSHOT</span>
-                <strong>{versions[state.snapshot].label}</strong>
-                <span className="mono">
-                  {versions[state.snapshot].commit} <Badge>Demo revision</Badge>
-                </span>
-              </div>
-            </div>
-          </section>
-          <section className="panel">
-            <PanelHeading
-              icon={Database}
-              title={connecting ? 'Preparing your workspace' : 'Workspace readiness'}
-            />
-            <div className="panel-body stack-20">
-              {indexingSteps.map((text, i) => (
-                <div className="indexing-step" key={text}>
-                  {connecting && stage === i ? (
-                    <LoaderCircle size={18} className="spinner violet-text" />
-                  ) : ready || stage > i ? (
-                    <CheckCircle2 size={18} className="green-text" />
-                  ) : (
-                    <span className="empty-circle" />
-                  )}
-                  <span>{text}</span>
-                  <small>
-                    {ready || stage > i ? 'Ready' : stage === i ? 'Preparing' : 'Waiting'}
-                  </small>
-                </div>
-              ))}
-              <ProgressBar value={connecting ? Math.max(5, (stage / 4) * 100) : ready ? 100 : 0} />
-              <Button
-                variant="primary"
-                icon={ArrowRight}
-                disabled={!ready}
-                magnetic
-                onClick={() => go('/workspace')}
-              >
-                Open mentor workspace
-              </Button>
-              <small className="muted">Preparation is simulated using bundled demo data.</small>
-            </div>
-          </section>
-          <section className="panel capabilities">
-            <PanelHeading icon={ShieldCheck} title="What this demo can show" />
-            <div className="panel-body stack-12">
-              <ChecklistItem checked>Source-linked component inspection</ChecklistItem>
-              <ChecklistItem checked>Reviewed sample signup and login paths</ChecklistItem>
-              <ChecklistItem checked>Prepared PR and setup comparison</ChecklistItem>
-              <div className="capability-limit">
-                <CircleAlert size={14} />
-                Live parsing, AI answers, repository execution, and recorded traces are not
-                connected.
-              </div>
-            </div>
-          </section>
-        </div>
-      </div>
-      <Modal
-        open={selector}
-        onOpenChange={setSelector}
-        title="Choose a repository"
-        description="One coherent sample connects every screen in this prototype."
-      >
-        <div className="dialog-body stack-16">
-          <label className="search-field">
-            <Search size={16} />
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void start();
+          }}
+        >
+          <label>
+            Public GitHub repository
             <input
-              aria-label="Search repositories"
-              placeholder="Search repositories"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Public GitHub repository"
+              type="url"
+              required
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://github.com/owner/repository"
+              disabled={busy}
             />
           </label>
-          {'acme/relay-api'.includes(search.toLowerCase()) ? (
-            <button
-              className="repository-choice"
-              onClick={() => {
-                setName('acme/relay-api');
-                setSelector(false);
-                patch({ connected: true });
-                go('/workspace');
-              }}
+          <label>
+            Revision (optional)
+            <input
+              aria-label="Revision"
+              value={revision}
+              onChange={(e) => setRevision(e.target.value)}
+              placeholder="Branch, tag, or commit"
+              disabled={busy}
+            />
+          </label>
+          <button className="analysis-primary" disabled={busy} type="submit">
+            {busy ? (
+              <LoaderCircle size={16} className="analysis-button-spinner" />
+            ) : (
+              <Network size={16} />
+            )}
+            {busy ? 'Analyzing…' : 'Analyze repository'}
+          </button>
+        </form>
+        <p className="muted">
+          JavaScript and TypeScript · Up to 200 eligible files / 5 MB · Repository scripts are never
+          executed
+        </p>
+        {error && (
+          <div className="error-callout" role="alert">
+            {error}
+          </div>
+        )}
+      </section>
+      {busy && (
+        <AnalysisProgress
+          progress={starting ? 0 : job?.progress || 0}
+          message={job?.message || 'Starting analysis'}
+        />
+      )}
+      {!snapshot && !busy && (
+        <div className="panel analysis-empty">
+          <div className="analysis-empty-icon">
+            <Network size={30} />
+          </div>
+          <h2>Your repository map starts here</h2>
+          <p>
+            Enter a public repository to discover supported routes, handlers, imports and calls.
+            Unsupported patterns will appear in the analysis report.
+          </p>
+        </div>
+      )}
+      {snapshot && (
+        <>
+          <div className="analysis-snapshot" data-snapshot-id={snapshot.snapshotId}>
+            <span className="analysis-ready">
+              <CheckCircle2 size={15} /> Analysis ready
+            </span>
+            <strong>{snapshot.repository.replace('https://github.com/', '')}</strong>
+            <a
+              href={`${snapshot.repository}/tree/${snapshot.commit}`}
+              target="_blank"
+              rel="noreferrer"
             >
-              <span className="repo-mark">
-                <Github size={23} />
-              </span>
-              <span>
-                <strong>acme / relay-api</strong>
-                <small>TypeScript · Express · prepared sample</small>
-              </span>
-              <Check size={18} className="violet-text" />
-            </button>
-          ) : (
-            <div className="empty-state">
-              <Search size={23} />
-              <strong>No repositories found</strong>
-              <p>Try “relay” or clear your search to see the sample.</p>
+              Commit {snapshot.commit.slice(0, 12)} ↗
+            </a>
+            <span>{snapshot.report.languages.join(' / ')}</span>
+          </div>
+          <div className="analysis-summary-grid">
+            {[
+              {
+                label: 'HTTP routes',
+                value: snapshot.components.filter((c) => c.role === 'route').length,
+                detail: 'Supported request entry points',
+              },
+              {
+                label: 'Components',
+                value: snapshot.components.filter((c) => c.role !== 'module').length,
+                detail: 'Functions, handlers and other declarations',
+              },
+              {
+                label: 'Connections',
+                value: snapshot.relationships.length,
+                detail: 'Relationships backed by source',
+              },
+              {
+                label: 'Needs inspection',
+                value: snapshot.report.unresolved.length,
+                detail: 'Calls and patterns not fully resolved',
+              },
+            ].map((item) => (
+              <div key={item.label}>
+                <span>{item.label}</span>
+                <strong>{item.value.toLocaleString()}</strong>
+                <small>{item.detail}</small>
+              </div>
+            ))}
+          </div>
+          {!snapshot.report.supported && (
+            <div className="error-callout" role="status">
+              No supported Express construction was confirmed in source. General symbols remain
+              available; Express route coverage is unavailable.
             </div>
           )}
-        </div>
-      </Modal>
+          <div className="analysis-tabs" role="tablist" aria-label="Analysis views">
+            {['architecture', 'documentation', 'report'].map((t) => (
+              <button
+                key={t}
+                role="tab"
+                data-view={t}
+                aria-selected={tab === t}
+                onClick={() => setTab(t)}
+              >
+                {t === 'architecture' ? (
+                  <Network size={15} />
+                ) : t === 'documentation' ? (
+                  <FileCode2 size={15} />
+                ) : (
+                  <Search size={15} />
+                )}
+                {t === 'report' ? 'Coverage & limitations' : t}
+              </button>
+            ))}
+          </div>
+          {tab === 'architecture' && (
+            <>
+              <div
+                className="system-view-switcher"
+                role="group"
+                aria-label="Architecture diagram type"
+              >
+                {[
+                  { id: 'system', label: 'Backend system' },
+                  { id: 'request', label: 'Request diagram' },
+                  { id: 'services', label: 'Services & data' },
+                  { id: 'overview', label: 'Source folders' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    data-diagram={item.id}
+                    aria-pressed={view === item.id || (item.id === 'overview' && view === 'detail')}
+                    onClick={() => {
+                      setView(item.id);
+                      setSelected('');
+                      setQuery('');
+                      setRole('all');
+                      setFolder('all');
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              {view === 'system' || view === 'request' || view === 'services' ? (
+                <BackendArchitecture
+                  key={snapshot.snapshotId}
+                  snapshot={snapshot}
+                  mode={view}
+                  onInspect={inspectComponent}
+                  onModeChange={setView}
+                />
+              ) : (
+                <>
+                  <div className="analysis-map-heading">
+                    <div>
+                      <h2>
+                        {view === 'overview'
+                          ? 'Start with the big picture'
+                          : 'Explore the code connections'}
+                      </h2>
+                      <p>
+                        {view === 'overview'
+                          ? 'Each folder is a module. Select one to see its components and source.'
+                          : 'Select a component to understand its role, source and connections. Scroll to zoom; drag the canvas to move.'}
+                      </p>
+                    </div>
+                    {(query || role !== 'all' || folder !== 'all') && (
+                      <button
+                        className="analysis-reset"
+                        onClick={() => {
+                          setQuery('');
+                          setRole('all');
+                          setFolder('all');
+                          setSelected('');
+                        }}
+                      >
+                        <X size={14} /> Clear filters
+                      </button>
+                    )}
+                  </div>
+                  <div className="analysis-toolbar">
+                    <label>
+                      Search
+                      <input
+                        aria-label="Search components"
+                        placeholder="Component or source file"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      View
+                      <select value={view} onChange={(e) => setView(e.target.value)}>
+                        <option value="detail">Component details</option>
+                        <option value="overview">Folder overview</option>
+                      </select>
+                    </label>
+                    <label>
+                      Component role
+                      <select
+                        aria-label="Component role"
+                        value={role}
+                        disabled={view === 'overview'}
+                        onChange={(e) => setRole(e.target.value)}
+                      >
+                        {[
+                          'all',
+                          ...new Set(
+                            snapshot.components.map((c) => c.role).filter((r) => r !== 'module'),
+                          ),
+                          'unresolved',
+                        ].map((r) => (
+                          <option key={r} value={r}>
+                            {roleLabels[r] || r}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {view === 'detail' && (
+                      <label>
+                        Folder
+                        <select
+                          aria-label="Filter by folder"
+                          value={folder}
+                          onChange={(e) => {
+                            setFolder(e.target.value);
+                            setSelected('');
+                          }}
+                        >
+                          <option value="all">All folders</option>
+                          {[
+                            ...new Set(
+                              snapshot.references.map(
+                                (r) => r.file.split('/').slice(0, -1).join('/') || '(root)',
+                              ),
+                            ),
+                          ]
+                            .sort()
+                            .map((f) => (
+                              <option key={f} value={f}>
+                                {f}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                    )}
+                  </div>
+                  <details className="analysis-diagram-options">
+                    <summary>
+                      Diagram details{showUnresolved ? ' · unresolved calls visible' : ''}
+                    </summary>
+                    <div className="analysis-map-legend">
+                      <span>
+                        <i />
+                        Source-backed connection
+                      </span>
+                      <span>
+                        <i className="inferred" />
+                        Inferred role
+                      </span>
+                      <span>
+                        <i className="unresolved" />
+                        Unresolved call
+                      </span>
+                      <small>Static code map · not a runtime trace</small>
+                    </div>
+                    {view === 'detail' && (
+                      <label className="analysis-unresolved-toggle">
+                        <input
+                          type="checkbox"
+                          checked={showUnresolved}
+                          onChange={(e) => setShowUnresolved(e.target.checked)}
+                        />{' '}
+                        Show unresolved call targets (
+                        {snapshot.report.unresolved.filter((u) => u.kind === 'call').length})
+                      </label>
+                    )}
+                  </details>
+                  <div className="analysis-layout">
+                    <div className="analysis-canvas">
+                      {graph.nodes.length ? (
+                        <ReactFlow
+                          key={`${snapshot.snapshotId}:${view}:${showUnresolved}:${role}:${folder}:${query}`}
+                          nodeTypes={analysisNodeTypes}
+                          nodes={graph.nodes}
+                          edges={graph.edges}
+                          fitView
+                          minZoom={0.05}
+                          maxZoom={2}
+                          onNodeClick={(_e, node) => {
+                            if (node.id.startsWith('folder:')) {
+                              setFolder(node.id.slice(7));
+                              setQuery('');
+                              setRole('all');
+                              setSelected('');
+                              setView('detail');
+                            } else if (node.id.startsWith('unresolved:')) setTab('report');
+                            else setSelected(node.id);
+                          }}
+                          nodesDraggable={false}
+                        >
+                          <Background />
+                          <Controls showInteractive={false} />
+                        </ReactFlow>
+                      ) : (
+                        <div className="analysis-empty">No components match these filters.</div>
+                      )}
+                    </div>
+                    <aside className="panel analysis-details" key={selected || 'empty'}>
+                      {component ? (
+                        <>
+                          <div className="analysis-detail-heading">
+                            <span className="analysis-kicker">COMPONENT DETAILS</span>
+                            <button
+                              aria-label="Close component details"
+                              onClick={() => setSelected('')}
+                            >
+                              <X size={17} />
+                            </button>
+                          </div>
+                          <h2>{component.name}</h2>
+                          <Badge>
+                            {roleLabels[component.role] || component.role}
+                            {component.inferred ? ' · inferred' : ''}
+                          </Badge>
+                          <p className="analysis-component-description">
+                            {component.evidence.join('. ') ||
+                              `A ${component.role} declaration found in the source. Open the code below to inspect its implementation.`}
+                          </p>
+                          <RepositorySource
+                            key={component.referenceId}
+                            source={source(component.referenceId)}
+                            commit={snapshot.commit}
+                          />
+                          <details className="analysis-component-facts">
+                            <summary>Inputs, outputs & error handling</summary>
+                            <dl>
+                              <div>
+                                <dt>Inputs</dt>
+                                <dd>
+                                  {component.inputs?.length
+                                    ? component.inputs.join(', ')
+                                    : 'No declared parameters / not determined'}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt>Output</dt>
+                                <dd>{component.output || 'Not determined from source'}</dd>
+                              </div>
+                            </dl>
+                            <p>{component.validation}</p>
+                            {component.fullPaths && (
+                              <p>Mounted paths: {component.fullPaths.join(', ') || 'Unresolved'}</p>
+                            )}
+                          </details>
+                          {ai && (
+                            <>
+                              <h3>Inferred AI commentary</h3>
+                              <p>{ai.explanation}</p>
+                              {ai.referenceIds.map((id) => (
+                                <div key={id}>{sourceLink(id)}</div>
+                              ))}
+                            </>
+                          )}
+                          {snapshot.relationships.some(
+                            (e) => e.source === selected || e.target === selected,
+                          ) ? (
+                            <details className="analysis-connected-code">
+                              <summary>
+                                Connected code (
+                                {
+                                  snapshot.relationships.filter(
+                                    (e) => e.source === selected || e.target === selected,
+                                  ).length
+                                }
+                                )
+                              </summary>
+                              {snapshot.relationships
+                                .filter((e) => e.source === selected || e.target === selected)
+                                .map((e) => (
+                                  <div className="analysis-relationship" key={e.id}>
+                                    <button
+                                      onClick={() =>
+                                        setSelected(e.source === selected ? e.target : e.source)
+                                      }
+                                    >
+                                      {snapshot.components.find((c) => c.id === e.source)?.name} →{' '}
+                                      {relationshipLabels[e.type] || e.type} →{' '}
+                                      {snapshot.components.find((c) => c.id === e.target)?.name}
+                                    </button>
+                                    {sourceLink(e.referenceId)}
+                                  </div>
+                                ))}
+                            </details>
+                          ) : (
+                            <p className="analysis-no-connections">
+                              No incoming or outgoing connections were statically resolved for this
+                              component.
+                            </p>
+                          )}
+                          <details className="analysis-ai-note">
+                            <summary>About this analysis</summary>
+                            <p>{snapshot.documentation.ai.message}</p>
+                            {!ai && (
+                              <p>
+                                No AI explanation is stored for this component. The source preview
+                                remains available.
+                              </p>
+                            )}
+                          </details>
+                        </>
+                      ) : (
+                        <>
+                          <div className="analysis-empty-icon">
+                            <Code2 size={27} />
+                          </div>
+                          <h2>Get to know a component</h2>
+                          <p>
+                            Choose a component to inspect its source, role, connections and
+                            generated documentation.
+                          </p>
+                          <ol className="analysis-inspect-steps">
+                            <li>Open a folder or choose a role.</li>
+                            <li>Select a component in the diagram.</li>
+                            <li>Read its purpose and follow the source links.</li>
+                          </ol>
+                        </>
+                      )}
+                    </aside>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+          {tab === 'documentation' && (
+            <RepositoryDocumentation
+              key={snapshot.snapshotId}
+              snapshot={snapshot}
+              onInspect={inspectComponent}
+            />
+          )}
+          {tab === 'report' && (
+            <section className="panel analysis-report">
+              <h2>Analysis coverage</h2>
+              <p>{snapshot.report.frameworks.join(', ') || 'No supported framework confirmed'}</p>
+              <h3>Supported patterns</h3>
+              <ul>
+                {snapshot.report.patterns.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+              <h3>Limitations</h3>
+              <ul>
+                {snapshot.report.limitations.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+              <h3>Excluded files ({snapshot.report.exclusions.length})</h3>
+              {snapshot.report.exclusions.map((e, i) => (
+                <p key={i}>
+                  <code>{e.path}</code> — {e.reason}
+                </p>
+              ))}
+              <h3>Unresolved items ({snapshot.report.unresolved.length})</h3>
+              {snapshot.report.unresolved.map((u, i) => (
+                <div className="analysis-relationship" key={i}>
+                  <strong>
+                    {u.kind}: {u.text}
+                  </strong>
+                  <p>{u.reason}</p>
+                  {sourceLink(u.referenceId)}
+                </div>
+              ))}
+            </section>
+          )}
+        </>
+      )}
     </>
   );
 }
