@@ -21,6 +21,7 @@ import { useRepositoryAnalysis } from '../state/RepositoryAnalysisContext';
 import { analysisApi } from '../services/analysisApi';
 import type { RepositorySnapshot } from '../domain/analysisTypes';
 import { RepositorySource } from './RepositorySource';
+import { ComponentDocumentation } from './ComponentDocumentation';
 import { clearConnections, clearEdgeTypes, withConnectionBounds } from './GraphConnections';
 import { directedLayout } from '../domain/graphLayout';
 import '../styles/repository-source.css';
@@ -142,9 +143,6 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
   const source = fullSource?.file === file ? fullSource : reference;
   const draft = drafts[file];
   const dirty = draft !== undefined && fullSource?.file === file && draft !== fullSource.excerpt;
-  const explanation = snapshot.documentation.ai.explanations.find(
-    (e) => e.componentId === selectedId,
-  );
   function select(id: string) {
     setSelectedId(id);
     setEditing(false);
@@ -460,27 +458,13 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
             </div>
             {selected && (
               <>
-                <div className="mentor-about">
-                  <small>UNDERSTAND THIS COMPONENT</small>
-                  <h2>{selected.name}</h2>
-                  <p>
-                    {explanation?.explanation ||
-                      `${selected.role.replaceAll('_', ' ')} identified in the selected source. Read the implementation and inspect its connected components.`}
-                  </p>
-                  {explanation && <small>AI commentary · verify against source</small>}
-                  <details>
-                    <summary>Inputs, output & validation</summary>
-                    <p>Inputs: {selected.inputs?.join(', ') || 'Not determined'}</p>
-                    <p>Output: {selected.output || 'Not determined'}</p>
-                    <p>{selected.validation}</p>
-                  </details>
-                  <details>
-                    <summary>Source evidence</summary>
-                    {selected.evidence.map((e, i) => (
-                      <p key={i}>{e}</p>
-                    ))}
-                  </details>
-                </div>
+                <ComponentDocumentation
+                  defaultOpen={false}
+                  key={selectedId}
+                  snapshot={snapshot}
+                  componentId={selectedId}
+                  onInspect={select}
+                />
                 <div className="mentor-conversation" aria-live="polite">
                   {turns
                     .filter((t) => t.componentId === selectedId)

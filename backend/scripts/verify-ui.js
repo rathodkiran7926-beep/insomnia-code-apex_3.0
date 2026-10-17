@@ -403,6 +403,21 @@ try {
   await waitFor(
     "document.querySelector('.analysis-panel-divider').getAttribute('aria-valuenow') === '35'",
   );
+  assert(
+    await evaluate(
+      "document.querySelector('.analysis-details .component-documentation')?.dataset.componentId.length > 0",
+    ),
+  );
+  assert(
+    await evaluate(
+      "document.querySelector('.analysis-details .component-documentation').innerText.includes('Inputs & output')",
+    ),
+  );
+  assert(
+    await evaluate(
+      "document.querySelector('.analysis-details .component-doc-source').href.includes('/blob/')",
+    ),
+  );
   const sourceScreenshot = await send("Page.captureScreenshot", {
     format: "png",
   });
@@ -583,6 +598,9 @@ try {
     root + "/data/ui-live-workspace.png",
     Buffer.from(workspaceScreenshot.data, "base64"),
   );
+  const originalDocumentation = await evaluate(
+    "document.querySelector('.real-mentor-panel .component-documentation').dataset.componentId",
+  );
   const originalSelection = await evaluate(
     "document.querySelector('.mentor-selection h1').innerText",
   );
@@ -593,6 +611,11 @@ try {
     `document.querySelector('.mentor-selection h1').innerText !== ${JSON.stringify(originalSelection)}`,
   );
   assert(await evaluate("!document.querySelector('.mentor-turn')"));
+  assert(
+    await evaluate(
+      `document.querySelector('.real-mentor-panel .component-documentation').dataset.componentId !== ${JSON.stringify(originalDocumentation)}`,
+    ),
+  );
   await send("Emulation.setDeviceMetricsOverride", {
     width: 390,
     height: 844,

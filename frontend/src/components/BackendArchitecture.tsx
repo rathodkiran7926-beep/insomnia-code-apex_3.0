@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Background, Controls, Handle, Position, ReactFlow, MarkerType } from '@xyflow/react';
 import type { Node, Edge } from '@xyflow/react';
 import { clearConnections, clearEdgeTypes, withConnectionBounds } from './GraphConnections';
@@ -63,6 +63,14 @@ export function BackendArchitecture({
   onModeChange: (mode: string) => void;
 }) {
   const backend = useMemo(() => backendArchitecture(snapshot), [snapshot]);
+  const canvas = useRef<HTMLDivElement>(null);
+  const [canvasWidth, setCanvasWidth] = useState(1100);
+  useEffect(() => {
+    if (!canvas.current) return;
+    const observer = new ResizeObserver(([entry]) => setCanvasWidth(entry.contentRect.width));
+    observer.observe(canvas.current);
+    return () => observer.disconnect();
+  }, [mode, backend]);
   const routes = backend.components.filter((c) => c.role === 'route');
   const [route, setRoute] = useState(routes[0]?.id || '');
   const [section, setSection] = useState('');
@@ -119,11 +127,18 @@ export function BackendArchitecture({
         l.components.length &&
         (mode !== 'services' || ['handlers', 'services', 'database'].includes(l.id)),
     );
+    const cardWidth = Math.max(
+      160,
+      Math.min(
+        260,
+        (canvasWidth - 40 - Math.max(0, layers.length - 1) * 110) / Math.max(1, layers.length),
+      ),
+    );
     layers.forEach((l, i) =>
       nodes.push({
         id: `layer:${l.id}`,
         type: 'system',
-        position: { x: i * 410, y: 90 },
+        position: { x: i * (cardWidth + 110), y: 90 },
         data: {
           title: l.name,
           subtitle: l.description,
@@ -135,7 +150,7 @@ export function BackendArchitecture({
           color: l.color,
           inferred: l.id === 'services',
         },
-        style: { width: 260 },
+        style: { width: cardWidth },
       }),
     );
     const ids = new Set(layers.map((l) => l.id));
@@ -167,7 +182,7 @@ export function BackendArchitecture({
       edges: routed,
       total: backend.components.length,
     };
-  }, [snapshot, backend, mode, route]);
+  }, [snapshot, backend, mode, route, canvasWidth]);
   const focused = backend.layers.find((l) => l.id === section);
   const catalog = (
     focused?.components ||
@@ -231,15 +246,15 @@ export function BackendArchitecture({
             </span>
             <span>Arrows show code relationships, not runtime order</span>
           </div>
-          <div className="system-architecture-canvas">
+          <div className="system-architecture-canvas" ref={canvas}>
             <ReactFlow
-              key={`${mode}:${route}`}
+              key={`${mode}:${route}:${Math.round(canvasWidth / 50)}`}
               nodes={graph.nodes}
               edges={graph.edges}
               nodeTypes={nodeTypes}
               edgeTypes={clearEdgeTypes}
               fitView
-              fitViewOptions={{ padding: 0.12, maxZoom: 1 }}
+              fitViewOptions={{ padding: 0.04, maxZoom: 1 }}
               minZoom={0.25}
               maxZoom={1.8}
               nodesDraggable={false}

@@ -14,6 +14,7 @@ import '@xyflow/react/dist/style.css';
 import { Badge } from '../components/UI';
 import { RepositoryDocumentation } from '../components/RepositoryDocumentation';
 import { RepositoryFileSource } from '../components/RepositoryFileSource';
+import { ComponentDocumentation } from '../components/ComponentDocumentation';
 import { ResizableAnalysisLayout } from '../components/ResizableAnalysisLayout';
 import { BackendArchitecture } from '../components/BackendArchitecture';
 import { AnalysisProgress } from '../components/AnalysisProgress';
@@ -338,7 +339,6 @@ export default function Repository() {
     return { nodes: withConnectionBounds(nodes, routed), edges: routed };
   }, [snapshot, view, role, query, selected, showUnresolved, folder]);
   const component = snapshot?.components.find((c) => c.id === selected);
-  const ai = snapshot?.documentation.ai.explanations.find((e) => e.componentId === selected);
   function inspectComponent(id: string) {
     const c = snapshot?.components.find((c) => c.id === id);
     const ref = snapshot?.references.find((r) => r.id === c?.referenceId);
@@ -756,82 +756,11 @@ export default function Repository() {
                             commit={snapshot.commit}
                             snapshotId={snapshot.snapshotId}
                           />
-                          <details className="analysis-component-facts">
-                            <summary>Inputs, outputs & error handling</summary>
-                            <dl>
-                              <div>
-                                <dt>Inputs</dt>
-                                <dd>
-                                  {component.inputs?.length
-                                    ? component.inputs.join(', ')
-                                    : 'No declared parameters / not determined'}
-                                </dd>
-                              </div>
-                              <div>
-                                <dt>Output</dt>
-                                <dd>{component.output || 'Not determined from source'}</dd>
-                              </div>
-                            </dl>
-                            <p>{component.validation}</p>
-                            {component.fullPaths && (
-                              <p>Mounted paths: {component.fullPaths.join(', ') || 'Unresolved'}</p>
-                            )}
-                          </details>
-                          {ai && (
-                            <>
-                              <h3>Inferred AI commentary</h3>
-                              <p>{ai.explanation}</p>
-                              {ai.referenceIds.map((id) => (
-                                <div key={id}>{sourceLink(id)}</div>
-                              ))}
-                            </>
-                          )}
-                          {snapshot.relationships.some(
-                            (e) => e.source === selected || e.target === selected,
-                          ) ? (
-                            <details className="analysis-connected-code">
-                              <summary>
-                                Connected code (
-                                {
-                                  snapshot.relationships.filter(
-                                    (e) => e.source === selected || e.target === selected,
-                                  ).length
-                                }
-                                )
-                              </summary>
-                              {snapshot.relationships
-                                .filter((e) => e.source === selected || e.target === selected)
-                                .map((e) => (
-                                  <div className="analysis-relationship" key={e.id}>
-                                    <button
-                                      onClick={() =>
-                                        setSelected(e.source === selected ? e.target : e.source)
-                                      }
-                                    >
-                                      {snapshot.components.find((c) => c.id === e.source)?.name} →{' '}
-                                      {relationshipLabels[e.type] || e.type} →{' '}
-                                      {snapshot.components.find((c) => c.id === e.target)?.name}
-                                    </button>
-                                    {sourceLink(e.referenceId)}
-                                  </div>
-                                ))}
-                            </details>
-                          ) : (
-                            <p className="analysis-no-connections">
-                              No incoming or outgoing connections were statically resolved for this
-                              component.
-                            </p>
-                          )}
-                          <details className="analysis-ai-note">
-                            <summary>About this analysis</summary>
-                            <p>{snapshot.documentation.ai.message}</p>
-                            {!ai && (
-                              <p>
-                                No AI explanation is stored for this component. The source preview
-                                remains available.
-                              </p>
-                            )}
-                          </details>
+                          <ComponentDocumentation
+                            snapshot={snapshot}
+                            componentId={component.id}
+                            onInspect={inspectComponent}
+                          />
                         </>
                       ) : (
                         <>

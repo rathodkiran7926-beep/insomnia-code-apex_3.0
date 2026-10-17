@@ -1,0 +1,179 @@
+.component-documentation {
+  margin: 18px 0;
+  border: 1px solid #e7dff1;
+  border-radius: 10px;
+  background: #fdfbff;
+  overflow: hidden;
+  color: #756084;
+}
+.component-documentation > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 14px;
+  color: #8966ab;
+  font-size: 12px;
+  list-style: none;
+}
+.component-documentation > summary:after {
+  content: '+';
+  margin-left: auto;
+  font-size: 16px;
+}
+.component-documentation[open] > summary:after {
+  content: '−';
+}
+.component-documentation > summary small {
+  font-size: 9px;
+  color: #ac94bc;
+  overflow-wrap: anywhere;
+}
+.component-documentation-body {
+  border-top: 1px solid #ede5f5;
+  padding: 0 15px 15px;
+}
+.component-documentation-body section {
+  padding: 14px 0;
+  border-bottom: 1px solid #eee7f4;
+}
+.component-documentation .component-documentation-body h3 {
+  font-size: 11px;
+  color: #9273a7;
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+.component-documentation .component-documentation-body p {
+  font-size: 11px;
+  line-height: 1.85;
+  color: #94809f;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.component-doc-inference {
+  display: block;
+  font-size: 9px;
+  color: #b098be;
+  margin-top: 8px;
+}
+.component-doc-source {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  line-height: 1.7;
+  padding: 12px 0;
+  color: #9976b4 !important;
+}
+.component-doc-source span {
+  overflow-wrap: anywhere;
+}
+.component-doc-source svg {
+  flex-shrink: 0;
+}
+.component-documentation dl {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+.component-documentation dl > div {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  gap: 8px;
+}
+.component-documentation dt {
+  font-size: 10px;
+  color: #b09abb;
+}
+.component-documentation dd {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #8c729f;
+  overflow-wrap: anywhere;
+}
+.component-doc-connections {
+  padding: 12px 0;
+  border-bottom: 1px solid #eee7f4;
+}
+.component-doc-connections > summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: #9779ad;
+}
+.component-doc-connections > summary span {
+  margin-left: 4px;
+  border: 1px solid #e2d4ed;
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-size: 9px;
+}
+.component-doc-connections ul {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  max-height: 250px;
+  overflow: auto;
+}
+.component-doc-connections li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0e9f5;
+}
+.component-doc-connections li > span {
+  font-size: 9px;
+  color: #b299c2;
+}
+.component-doc-connections button {
+  border: 0;
+  background: #f1eafa;
+  color: #9671b1;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 10px;
+  padding: 5px 7px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.component-doc-connections li > a {
+  color: #ac8bc2;
+}
+.component-doc-connections > p {
+  padding-top: 10px;
+}
+.component-doc-paths {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.component-doc-paths li {
+  padding: 4px 0;
+  font-size: 11px;
+  color: #9875b2;
+  overflow-wrap: anywhere;
+}
+.component-doc-change {
+  background: #f9f5fd;
+  padding: 12px !important;
+  border-radius: 7px;
+  margin-top: 14px;
+}
+.component-documentation footer {
+  font-size: 9px;
+  line-height: 1.8;
+  color: #b39ac2;
+  padding-top: 12px;
+}
+.real-mentor-panel > .component-documentation {
+  margin: 15px;
+}
+.real-mentor-panel .component-documentation > summary {
+  flex-wrap: wrap;
+}
+.real-mentor-panel .component-documentation > summary small {
+  display: none;
+}
