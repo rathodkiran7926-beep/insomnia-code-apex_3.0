@@ -3,7 +3,7 @@ async (page) => {
   page.on('pageerror', (error) => errors.push(error.message));
   await page.setViewportSize({ width: 1366, height: 768 });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.goto('http://127.0.0.1:4173/#/workspace');
+  await page.goto('http://127.0.0.1:4173/#/demo-workspace');
   await page.getByRole('link', { name: 'My progress', exact: true }).waitFor();
   const result = {};
   const check = (condition, message) => { if (!condition) throw new Error(message); };

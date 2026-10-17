@@ -20,6 +20,7 @@ type StoredSource = {
   endLine: number;
   excerpt: string;
   url: string;
+  complete?: boolean;
 };
 type Segment = { text: string; classes: string[] };
 function highlightedLines(text: string, language: string) {
@@ -42,8 +43,31 @@ function highlightedLines(text: string, language: string) {
   walk(Prism.languages[language] ? Prism.tokenize(text, Prism.languages[language]) : text);
   return lines;
 }
-export function RepositorySource({ source, commit }: { source?: StoredSource; commit: string }) {
+export function RepositorySource({
+  source,
+  commit,
+  focusRange,
+}: {
+  source?: StoredSource;
+  commit: string;
+  focusRange?: { startLine: number; endLine: number };
+}) {
+  const viewer = useRef<HTMLDivElement>(null);
+  const expandedViewer = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState(false);
+  function showSelection(root: HTMLDivElement | null) {
+    const line = root?.querySelector<HTMLElement>('.source-focused-line');
+    const scroll = root?.querySelector<HTMLElement>('.repository-source-scroll');
+    if (line && scroll)
+      scroll.scrollTop +=
+        line.getBoundingClientRect().top - scroll.getBoundingClientRect().top - 70;
+  }
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      showSelection(expanded ? expandedViewer.current : viewer.current);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [source?.file, source?.excerpt, focusRange?.startLine, focusRange?.endLine, expanded]);
   const [wrap, setWrap] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
@@ -72,7 +96,8 @@ export function RepositorySource({ source, commit }: { source?: StoredSource; co
           ? 'JavaScript JSX'
           : 'JavaScript';
   const previewEnd = Math.min(source.endLine, source.startLine + lines.length - 1);
-  const truncated = previewEnd < source.endLine || source.excerpt.length >= 1800;
+  const truncated =
+    !source.complete && (previewEnd < source.endLine || source.excerpt.length >= 1800);
   async function copy() {
     try {
       await navigator.clipboard.writeText(source!.excerpt);
@@ -87,6 +112,8 @@ export function RepositorySource({ source, commit }: { source?: StoredSource; co
   const render = (large: boolean) => (
     <div
       className={`repository-source ${wrap ? 'source-wrapped' : ''} ${large ? 'source-expanded' : ''}`}
+      ref={large ? expandedViewer : viewer}
+      data-source-complete={source.complete ? 'true' : 'false'}
     >
       <div className="repository-source-toolbar">
         <span>
@@ -106,8 +133,8 @@ export function RepositorySource({ source, commit }: { source?: StoredSource; co
             <WrapText size={15} />
           </button>
           <button
-            aria-label="Copy source excerpt"
-            title={copied ? 'Copied' : 'Copy excerpt'}
+            aria-label="Copy source code"
+            title={copied ? 'Copied' : 'Copy displayed code'}
             onClick={() => void copy()}
           >
             {copied ? <Check size={15} /> : <Copy size={15} />}
@@ -134,15 +161,42 @@ export function RepositorySource({ source, commit }: { source?: StoredSource; co
         </span>
         <span className="repository-source-language">{languageLabel}</span>
       </div>
+      <div className="repository-source-selection">
+        <span>
+          {source.complete ? 'Complete file' : 'Saved excerpt'}
+          {focusRange && (
+            <>
+              {' '}
+              · Selected lines {focusRange.startLine}–{focusRange.endLine}
+            </>
+          )}
+        </span>
+        {focusRange && (
+          <button onClick={() => showSelection(large ? expandedViewer.current : viewer.current)}>
+            Jump to selection
+          </button>
+        )}
+      </div>
       <div
         className="repository-source-scroll"
         role="region"
-        aria-label={`Source excerpt: ${source.file}, lines ${source.startLine} to ${previewEnd}`}
+        aria-label={`Source code: ${source.file}, lines ${source.startLine} to ${previewEnd}`}
         tabIndex={0}
       >
         <pre>
           {lines.map((segments, i) => (
-            <div className="repository-source-line" key={i}>
+            <div
+              className={`repository-source-line ${focusRange && source.startLine + i >= focusRange.startLine && source.startLine + i <= focusRange.endLine ? 'source-focused-line' : ''}`}
+              key={i}
+              data-line={source.startLine + i}
+              aria-label={
+                focusRange &&
+                source.startLine + i >= focusRange.startLine &&
+                source.startLine + i <= focusRange.endLine
+                  ? `Selected line ${source.startLine + i}`
+                  : undefined
+              }
+            >
               <span className="repository-source-number" aria-hidden="true">
                 {source.startLine + i}
               </span>
@@ -165,10 +219,12 @@ export function RepositorySource({ source, commit }: { source?: StoredSource; co
           {commit.slice(0, 7)}
           <i />L{source.startLine}–L{previewEnd}
           <i />
-          <span className="repository-editor-selection">{lines.length} lines in preview</span>
+          <span className="repository-editor-selection">
+            {lines.length} lines · {source.complete ? 'Full file' : 'Excerpt'}
+          </span>
         </span>
         <a href={source.url} target="_blank" rel="noreferrer">
-          View full source <ExternalLink size={12} />
+          Open on GitHub <ExternalLink size={12} />
         </a>
       </div>
       {truncated && (
@@ -180,7 +236,7 @@ export function RepositorySource({ source, commit }: { source?: StoredSource; co
       {(copied || copyError) && (
         <div className="repository-source-feedback" role="status">
           {copied
-            ? 'Source excerpt copied.'
+            ? 'Source code copied.'
             : 'Clipboard is unavailable. Select the code and copy it manually.'}
         </div>
       )}
@@ -193,7 +249,7 @@ export function RepositorySource({ source, commit }: { source?: StoredSource; co
         open={expanded}
         onOpenChange={setExpanded}
         title={name || 'Source code'}
-        description={`Source preview at commit ${commit.slice(0, 12)}. ${source.file}`}
+        description={`${source.complete ? 'Complete file' : 'Saved excerpt'} at commit ${commit.slice(0, 12)}. ${source.file}`}
         className="repository-source-dialog"
       >
         {render(true)}

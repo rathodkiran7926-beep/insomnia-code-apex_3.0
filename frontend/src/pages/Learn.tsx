@@ -36,7 +36,7 @@ export default function Learn() {
   function open(lesson: Lesson) {
     if (lesson.journey) {
       startJourney(lesson.journey, 'success', lesson.id);
-      go('/workspace');
+      go('/demo-workspace');
     } else if (lesson.id === 'practice') {
       patch({ activeLesson: null, journeyId: null, playing: false });
       go('/practice');
@@ -47,7 +47,7 @@ export default function Learn() {
     } else {
       selectNode('router');
       complete('architecture');
-      go('/workspace');
+      go('/demo-workspace');
     }
   }
 
@@ -248,7 +248,7 @@ export default function Learn() {
               onClick={() => {
                 setSnapshot('head');
                 startJourney('login');
-                go('/workspace');
+                go('/demo-workspace');
               }}
             >
               Explore the verification lesson

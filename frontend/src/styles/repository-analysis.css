@@ -491,6 +491,10 @@
   font-size: 13px;
   color: #26314a;
   line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .analysis-node-file {
   display: flex;
@@ -498,6 +502,12 @@
   gap: 5px;
   color: #68738a;
   font: 9px var(--mono);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.analysis-node-file svg {
+  flex-shrink: 0;
 }
 .analysis-folder-node {
   display: grid;

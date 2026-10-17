@@ -74,7 +74,7 @@ export default function Practice() {
             icon={BookOpen}
             onClick={() => {
               startJourney('signup');
-              go('/workspace');
+              go('/demo-workspace');
             }}
           >
             Revisit the signup journey
@@ -344,7 +344,7 @@ export default function Practice() {
             <button
               onClick={() => {
                 startJourney('signup', 'invalid');
-                go('/workspace');
+                go('/demo-workspace');
               }}
             >
               Follow the invalid-input path

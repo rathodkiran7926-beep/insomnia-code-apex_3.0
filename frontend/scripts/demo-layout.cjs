@@ -7,7 +7,7 @@ async (page) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const width of [1366, 390]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 768 });
-    for (const route of ['workspace', 'journeys', 'practice', 'changes', 'agent-context', 'progress']) {
+    for (const route of ['demo-workspace', 'journeys', 'practice', 'changes', 'agent-context', 'progress']) {
       await page.goto(`http://127.0.0.1:4173/#/${route}`);
       await page.locator('main').waitFor();
       await page.getByRole('heading').first().waitFor();

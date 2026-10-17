@@ -47,6 +47,41 @@ const snapshot: ArchitectureSnapshot = {
   references: components.map((c) => ({ id: c.referenceId, file: `src/${c.id}.ts` })),
 };
 describe('backend system architecture', () => {
+  it('includes only middleware with matching recorded mount paths in request views', () => {
+    const middleware = ['globalAuth', 'unrelatedAuth'].map((id) => ({
+      id,
+      name: id,
+      role: 'middleware',
+      referenceId: 'ref-app',
+      inferred: false,
+    }));
+    const model: ArchitectureSnapshot = {
+      ...snapshot,
+      components: [...snapshot.components, ...middleware],
+      relationships: [
+        ...snapshot.relationships,
+        {
+          id: 'm1',
+          source: 'app',
+          target: 'globalAuth',
+          type: 'uses_middleware',
+          mountPath: '/',
+          referenceId: 'ref-app',
+        },
+        {
+          id: 'm2',
+          source: 'app',
+          target: 'unrelatedAuth',
+          type: 'uses_middleware',
+          mountPath: '/admin',
+          referenceId: 'ref-app',
+        },
+      ],
+    };
+    const result = requestArchitecture(model, 'users');
+    expect(result.components.some((c) => c.id === 'globalAuth')).toBe(true);
+    expect(result.components.some((c) => c.id === 'unrelatedAuth')).toBe(false);
+  });
   it('groups all confirmed backend parts and reachable helpers without pulling in same-named frontend functions', () => {
     const model = backendArchitecture(snapshot);
     expect(model.components.map((c) => c.id)).not.toContain('frontend');

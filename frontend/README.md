@@ -24,19 +24,19 @@ The application uses hash-based routes, so static hosts do not need a history fa
 
 ## Explore the prototype
 
-The default route opens Home. Open **Mentor workspace** to inspect components and source, or choose **Follow a request** to start signup. Journey steps, selected components, source ranges, explanations, and predictions share the same context. Use **Read this step** for browser narration that stops when the step or revision changes.
+The default route opens Home. Analyze a public repository on **Repository**, then open **Mentor workspace** to inspect its actual files and components in an editor layout, follow their connections, ask source-grounded questions, and edit/download local drafts. Architecture and documentation stay on the separate Repository page. The repository identity, Git commit and snapshot are shared across navigation and reload. With no analysis, the workspace asks you to connect a repository; it never falls back to sample data. Bundled signup/login learning workflows remain on the explicit `/#/demo-workspace` route, including the existing **Read this step** narration.
 
-| Experience       | What works                                                                                                                                                                                  |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Repository       | Real GitHub URL/revision analysis, background job progress, commit-linked React Flow architecture, component docs, analysis report, Markdown/Mermaid export                                 |
-| Mentor Workspace | XYFlow pan/zoom, component search, focus, system/component/function views, node and relationship inspection, source/evidence tabs, source copying and collapse, contextual prepared answers |
-| Code Journeys | Signup and login, success/failure scenarios, synchronized stepping, play/pause/restart, keyboard arrows, explanation depth, gated predictions, retained first attempts |
-| Learning path | Beginner/experienced profiles, three goals, explainable prerequisite selection, connected lesson completion, personalization opt-out |
-| Practice | Editable sample patch, progressive hints, real local Zod assertions for supported password rules, per-assertion criteria, unsupported-syntax handling, self-reflection |
-| Changes | Verification PR comparison, independent proposed test patch, unified source diff, selectable changed steps, direct versus possible impact, static setup delta, targeted relearning |
-| Team knowledge | Source-linked question, editable draft, explicit review/approval/publication, revision-bound invalidation, superseded state, published rationale in mentor context |
-| Progress | Completed scenarios and journeys, first/retry answers, studied revisions, pending relearning, local export and reset |
-| Agent Context Bridge | Revision-bound JSON and prompt export with checked source slices, environment names, clipboard/file handoff, and a targeted relearning card |
+| Experience           | What works                                                                                                                                                                               |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Repository           | Real GitHub URL/revision analysis, background job progress, commit-linked React Flow architecture, component docs, analysis report, Markdown/Mermaid export                              |
+| Mentor Workspace     | Actual analyzed repository and commit, backend/request/service diagrams, source search and filters, code inspection, source-grounded documentation; no fixture answers or dummy journeys |
+| Code Journeys        | Signup and login, success/failure scenarios, synchronized stepping, play/pause/restart, keyboard arrows, explanation depth, gated predictions, retained first attempts                   |
+| Learning path        | Beginner/experienced profiles, three goals, explainable prerequisite selection, connected lesson completion, personalization opt-out                                                     |
+| Practice             | Editable sample patch, progressive hints, real local Zod assertions for supported password rules, per-assertion criteria, unsupported-syntax handling, self-reflection                   |
+| Changes              | Verification PR comparison, independent proposed test patch, unified source diff, selectable changed steps, direct versus possible impact, static setup delta, targeted relearning       |
+| Team knowledge       | Source-linked question, editable draft, explicit review/approval/publication, revision-bound invalidation, superseded state, published rationale in mentor context                       |
+| Progress             | Completed scenarios and journeys, first/retry answers, studied revisions, pending relearning, local export and reset                                                                     |
+| Agent Context Bridge | Revision-bound JSON and prompt export with checked source slices, environment names, clipboard/file handoff, and a targeted relearning card                                              |
 
 Use **Ctrl/⌘ K** for global search. Journey arrows work outside input fields, dialogs, and the graph. Narrow screens use a modal navigation drawer, stacked panels, and a readable component list with an optional interactive map. Motion respects reduced-motion preferences.
 
@@ -82,3 +82,5 @@ React, TypeScript, Vite, XYFlow, Radix Dialog, Lucide, Prism, Geist, and Vitest 
 Implementation references: [XYFlow custom nodes](https://reactflow.dev/learn/customization/custom-nodes), [XYFlow component API](https://reactflow.dev/api-reference/react-flow), [Radix Dialog](https://www.radix-ui.com/primitives/docs/components/dialog), and [Vite setup](https://vite.dev/guide/).
 
 See [the judges live demo guide](docs/live-demo-guide.md) for the tested click-through, precise pitch wording, and repeatable Playwright commands. [The 17 October verification report](docs/live-demo-verification-2026-10-17.md) records the current checks and limits; older audit documents describe earlier revisions.
+
+The live workspace loads complete eligible source files from the analyzed commit. Older snapshots retrieve their selected file from GitHub once and cache it locally on the backend; if unavailable, the saved excerpt is clearly labeled and editing stays disabled. Drafts are browser-local and are never executed or pushed to GitHub. Mentor questions use the server-side Gemini configuration (`LLM_API_KEY`, `LLM_MODEL`, `LLM_BASE_URL`); if unavailable, the workspace shows recorded source facts and says so. Answers use the original snapshot, not local drafts.

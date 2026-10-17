@@ -2,9 +2,11 @@ import { Suspense, lazy } from 'react';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Shell } from './components/Shell';
 import { WorkspaceProvider } from './state/WorkspaceContext';
+import { RepositoryAnalysisProvider } from './state/RepositoryAnalysisContext';
 
 const Home = lazy(() => import('./pages/Home'));
 const Workspace = lazy(() => import('./pages/Workspace'));
+const DemoWorkspace = lazy(() => import('./pages/DemoWorkspace'));
 const Repository = lazy(() => import('./pages/Repository'));
 const Journeys = lazy(() => import('./pages/Journeys'));
 const Learn = lazy(() => import('./pages/Learn'));
@@ -17,46 +19,49 @@ const AgentContext = lazy(() => import('./pages/AgentContext'));
 export default function App() {
   return (
     <WorkspaceProvider>
-      <HashRouter>
-        <a
-          href="#main-content"
-          className="skip-link"
-          onClick={(e) => {
-            e.preventDefault();
-            document.getElementById('main-content')?.focus();
-          }}
-        >
-          Skip to content
-        </a>
-        <Suspense
-          fallback={
-            <div className="app-loading">
-              <span className="loading-spinner" />
-              Opening Codebase Mentor…
-            </div>
-          }
-        >
-          <Routes>
-            {/* Dedicated full-width Symboolic-inspired Home Screen */}
-            <Route path="/" element={<Home />} />
-            <Route path="/home" element={<Home />} />
+      <RepositoryAnalysisProvider>
+        <HashRouter>
+          <a
+            href="#main-content"
+            className="skip-link"
+            onClick={(e) => {
+              e.preventDefault();
+              document.getElementById('main-content')?.focus();
+            }}
+          >
+            Skip to content
+          </a>
+          <Suspense
+            fallback={
+              <div className="app-loading">
+                <span className="loading-spinner" />
+                Opening Codebase Mentor…
+              </div>
+            }
+          >
+            <Routes>
+              {/* Dedicated full-width Symboolic-inspired Home Screen */}
+              <Route path="/" element={<Home />} />
+              <Route path="/home" element={<Home />} />
 
-            {/* Application Workspace Shell */}
-            <Route element={<Shell />}>
-              <Route path="workspace" element={<Workspace />} />
-              <Route path="repository" element={<Repository />} />
-              <Route path="journeys" element={<Journeys />} />
-              <Route path="learn" element={<Learn />} />
-              <Route path="practice" element={<Practice />} />
-              <Route path="changes" element={<Changes />} />
-              <Route path="knowledge" element={<Knowledge />} />
-              <Route path="progress" element={<Progress />} />
-              <Route path="agent-context" element={<AgentContext />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
-        </Suspense>
-      </HashRouter>
+              {/* Application Workspace Shell */}
+              <Route element={<Shell />}>
+                <Route path="workspace" element={<Workspace />} />
+                <Route path="demo-workspace" element={<DemoWorkspace />} />
+                <Route path="repository" element={<Repository />} />
+                <Route path="journeys" element={<Journeys />} />
+                <Route path="learn" element={<Learn />} />
+                <Route path="practice" element={<Practice />} />
+                <Route path="changes" element={<Changes />} />
+                <Route path="knowledge" element={<Knowledge />} />
+                <Route path="progress" element={<Progress />} />
+                <Route path="agent-context" element={<AgentContext />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Route>
+            </Routes>
+          </Suspense>
+        </HashRouter>
+      </RepositoryAnalysisProvider>
     </WorkspaceProvider>
   );
 }

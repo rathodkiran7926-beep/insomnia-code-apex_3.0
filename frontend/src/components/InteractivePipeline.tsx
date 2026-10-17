@@ -166,7 +166,7 @@ export const InteractivePipeline: React.FC = () => {
 
   function handleLaunchWorkspace() {
     startJourney('signup');
-    go('/workspace');
+    go('/demo-workspace');
   }
 
   return (

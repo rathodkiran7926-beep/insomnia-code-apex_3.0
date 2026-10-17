@@ -243,7 +243,7 @@ export default function Changes() {
                   onClick={() => {
                     setSnapshot('head');
                     openSource({ path: step.path, start: step.start, end: step.end });
-                    go('/workspace');
+                    go('/demo-workspace');
                   }}
                 >
                   Inspect this source in the workspace

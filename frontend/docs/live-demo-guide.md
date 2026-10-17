@@ -1,6 +1,6 @@
 # Judges live demo: 4:00–8:00
 
-Use the built app at **http://127.0.0.1:4173/#/workspace**. This guide describes the working prototype as verified on 17 October 2026. It supersedes the older demo guide and the feature-status findings in the 16 October readiness audit for the changes listed below.
+Use the bundled demo at **http://127.0.0.1:4173/#/demo-workspace**. The main Mentor workspace now uses actual repository analysis. This guide describes the separate demo as verified on 17 October 2026. It supersedes the older demo guide and the feature-status findings in the 16 October readiness audit for the changes listed below.
 
 ## Prepare before presenting
 
@@ -49,7 +49,7 @@ These Playwright CLI scripts use a real browser and the production preview. The 
 In a second terminal from `frontend/`:
 
 ```powershell
-npx.cmd --yes --package @playwright/cli@0.1.22 playwright-cli open http://127.0.0.1:4173/#/workspace --headed
+npx.cmd --yes --package @playwright/cli@0.1.22 playwright-cli open http://127.0.0.1:4173/#/demo-workspace --headed
 npx.cmd --yes --package @playwright/cli@0.1.22 playwright-cli snapshot
 npx.cmd --yes --package @playwright/cli@0.1.22 playwright-cli run-code --filename scripts/demo-rehearsal.cjs
 npx.cmd --yes --package @playwright/cli@0.1.22 playwright-cli run-code --filename scripts/demo-layout.cjs

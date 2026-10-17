@@ -36,7 +36,7 @@ export function RelearningCard() {
         onClick={() => {
           setSnapshot('head');
           startJourney(target);
-          go('/workspace');
+          go('/demo-workspace');
         }}
       >
         Relearn {target}

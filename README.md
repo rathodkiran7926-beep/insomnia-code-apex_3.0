@@ -1,6 +1,6 @@
 # Codebase Mentor
 
-The existing React/Vite app now has a Node.js/Express backend for public repository analysis. Open **Repository** in the sidebar (`/#/repository`) to analyze a repository and inspect its real graph and documentation. Other existing workspace screens continue to use their labelled demo data.
+The React/Vite app has a Node.js/Express backend for public repository analysis. Open **Repository** (`/#/repository`) to analyze a repository, then **Mentor workspace** (`/#/workspace`) to inspect real files and components in a separate editor workspace, follow callers and dependencies, ask source-grounded questions, and download local code drafts. Architecture and documentation stay on the Repository page. Both pages share one analysis session; the workspace restores it after reload and never substitutes demo data. Existing bundled learning/practice workflows use an explicit `/#/demo-workspace` route.
 
 Requires Node.js 24 or newer. On Windows PowerShell, use `npm.cmd` if script execution policy blocks `npm`.
 

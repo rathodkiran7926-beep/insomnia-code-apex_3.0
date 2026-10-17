@@ -27,6 +27,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { graphNodes, journeys, versions } from '../data/fixtures';
 import { getRoute } from '../domain/model';
 import { useWorkspace } from '../state/WorkspaceContext';
+import { useRepositoryAnalysis } from '../state/RepositoryAnalysisContext';
 import { Badge, Button, IconButton, Modal, ProgressBar } from './UI';
 
 const navigation = [
@@ -42,6 +43,7 @@ const navigation = [
 ];
 
 export function Shell() {
+  const { snapshot: activeRepository } = useRepositoryAnalysis();
   const { state, patch, notice, startJourney, selectNode, notify } = useWorkspace();
   const location = useLocation();
   const go = useNavigate();
@@ -51,8 +53,12 @@ export function Shell() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [updatesOpen, setUpdatesOpen] = useState(false);
-  const current = navigation.find((x) => x.path === location.pathname)?.label ?? 'Team knowledge';
-  const analyzingRepository = location.pathname === '/repository';
+  const current =
+    location.pathname === '/demo-workspace'
+      ? 'Demo workspace'
+      : (navigation.find((x) => x.path === location.pathname)?.label ?? 'Team knowledge');
+  const analyzingRepository =
+    location.pathname === '/repository' || location.pathname === '/workspace';
   const learningRoute = getRoute(
     state.personalized ? state.profile : 'beginner',
     state.personalized ? state.goal : 'contribute',
@@ -98,7 +104,7 @@ export function Shell() {
       description: x.source?.path ?? 'External boundary',
       action: () => {
         selectNode(x.id);
-        go('/workspace');
+        go('/demo-workspace');
       },
     })),
     ...journeys.map((x) => ({
@@ -107,7 +113,7 @@ export function Shell() {
       description: `${x.duration} · explained path`,
       action: () => {
         startJourney(x.id);
-        go('/workspace');
+        go('/demo-workspace');
       },
     })),
   ]
@@ -154,7 +160,7 @@ export function Shell() {
             >
               <Icon size={17} strokeWidth={1.7} />
               <span>{label}</span>
-              {count && <span className="nav-count">{count}</span>}
+              {count && !analyzingRepository && <span className="nav-count">{count}</span>}
             </NavLink>
           ))}
         </nav>
@@ -166,7 +172,7 @@ export function Shell() {
           >
             <MessageSquareText size={17} strokeWidth={1.7} />
             <span>Knowledge & decisions</span>
-            {state.decision === 'open' && <span className="small-dot" />}
+            {!analyzingRepository && state.decision === 'open' && <span className="small-dot" />}
           </NavLink>
         </div>
         <div className="sidebar-bottom">
@@ -207,7 +213,10 @@ export function Shell() {
             <div className="workspace-location">
               {analyzingRepository ? (
                 <span className="breadcrumb-repo">
-                  <GitBranch size={13} /> Public repository analysis
+                  <GitBranch size={13} />{' '}
+                  {activeRepository
+                    ? activeRepository.repository.replace('https://github.com/', '')
+                    : 'Select a repository'}
                 </span>
               ) : (
                 <button
@@ -412,7 +421,7 @@ export function Shell() {
             icon={Compass}
             onClick={() => {
               startJourney('signup');
-              go('/workspace');
+              go('/demo-workspace');
               setHelpOpen(false);
             }}
           >

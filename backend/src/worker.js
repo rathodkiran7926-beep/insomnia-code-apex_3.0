@@ -19,6 +19,7 @@ try {
     type: "complete",
     graph,
     docs,
+    files: input.files,
     markdown: markdown(graph, docs),
   });
 } catch (error) {

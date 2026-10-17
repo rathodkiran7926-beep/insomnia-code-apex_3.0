@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Background, Controls, Handle, Position, ReactFlow, MarkerType } from '@xyflow/react';
-import type { Node, Edge, EdgeProps } from '@xyflow/react';
-import { BaseEdge, EdgeLabelRenderer } from '@xyflow/react';
+import type { Node, Edge } from '@xyflow/react';
+import { clearConnections, clearEdgeTypes, withConnectionBounds } from './GraphConnections';
+import { directedLayout } from '../domain/graphLayout';
 import { ArrowRight, ChevronRight, Code2, GitBranch, Network, Search, Server } from 'lucide-react';
 import {
   architectureLayers,
@@ -26,14 +27,14 @@ function SystemNode({
 }) {
   return (
     <div
-      className={`system-architecture-node ${data.inferred ? 'system-inferred' : ''}`}
+      className={`system-architecture-node ${data.count === undefined ? 'system-component-node' : ''} ${data.inferred ? 'system-inferred' : ''}`}
       style={{ borderTopColor: data.color }}
     >
       <Handle type="target" position={Position.Left} />
       <span className="system-node-icon" style={{ background: data.color }}>
         <Server size={18} />
       </span>
-      <strong>{data.title}</strong>
+      <strong title={data.title}>{data.title}</strong>
       <span>{data.subtitle}</span>
       {data.count !== undefined && (
         <b>
@@ -50,38 +51,6 @@ function SystemNode({
   );
 }
 const nodeTypes = { system: SystemNode };
-function ArchitectureLink({
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  markerEnd,
-  style,
-  label,
-  data,
-}: EdgeProps) {
-  const detour = Boolean(data?.detour);
-  const laneY = Math.min(sourceY, targetY) - 165 - Number(data?.lane || 0) * 23;
-  const path = detour
-    ? `M ${sourceX},${sourceY} L ${sourceX + 18},${sourceY} L ${sourceX + 18},${laneY} L ${targetX - 18},${laneY} L ${targetX - 18},${targetY} L ${targetX},${targetY}`
-    : `M ${sourceX},${sourceY} L ${targetX},${targetY}`;
-  return (
-    <>
-      <BaseEdge path={path} markerEnd={markerEnd} style={style} />
-      <EdgeLabelRenderer>
-        <div
-          className="system-edge-label"
-          style={{
-            transform: `translate(-50%, -50%) translate(${(sourceX + targetX) / 2}px,${detour ? laneY : (sourceY + targetY) / 2 - 14}px)`,
-          }}
-        >
-          {label}
-        </div>
-      </EdgeLabelRenderer>
-    </>
-  );
-}
-const edgeTypes = { architectureLink: ArchitectureLink };
 export function BackendArchitecture({
   snapshot,
   mode,
@@ -110,42 +79,26 @@ export function BackendArchitecture({
       edges: Edge[] = [];
     if (mode === 'request') {
       const detail = requestArchitecture(snapshot, route);
-      const rank = (role: string) =>
-        role === 'application'
-          ? 0
-          : role === 'router'
-            ? 1
-            : role === 'route'
-              ? 2
-              : role === 'middleware'
-                ? 3
-                : role === 'handler'
-                  ? 4
-                  : ['service', 'function', 'class'].includes(role)
-                    ? 5
-                    : role === 'database_operation'
-                      ? 6
-                      : 7;
-      const ranks = [...new Set(detail.components.map((c) => rank(c.role)))].sort((a, b) => a - b);
-      const rows = new Map<number, number>();
+      const layout = directedLayout(
+        detail.components.map((c) => c.id),
+        detail.relationships,
+        { width: 260, height: 210, gapX: 170, gapY: 65, maxRows: 5 },
+      );
       for (const c of detail.components) {
-        const col = rank(c.role),
-          row = rows.get(col) || 0;
-        rows.set(col, row + 1);
         const layer = architectureLayers.find((l) =>
           (l.roles as readonly string[]).includes(c.role),
         );
         nodes.push({
           id: c.id,
           type: 'system',
-          position: { x: ranks.indexOf(col) * 265, y: row * 205 },
+          position: layout.positions.get(c.id)!,
           data: {
             title: c.name,
             subtitle: c.role.replaceAll('_', ' ') + (c.inferred ? ' · inferred' : ''),
             color: layer?.color || '#e9eaf3',
             inferred: c.inferred,
           },
-          style: { width: 215 },
+          style: { width: 260 },
         });
       }
       for (const e of detail.relationships)
@@ -158,7 +111,8 @@ export function BackendArchitecture({
           markerEnd: { type: MarkerType.ArrowClosed, color: '#9b94b6' },
           style: { stroke: '#a29bb8' },
         });
-      return { nodes, edges, total: detail.total };
+      const routed = clearConnections(edges, nodes);
+      return { nodes: withConnectionBounds(nodes, routed), edges: routed, total: detail.total };
     }
     const layers = backend.layers.filter(
       (l) =>
@@ -169,7 +123,7 @@ export function BackendArchitecture({
       nodes.push({
         id: `layer:${l.id}`,
         type: 'system',
-        position: { x: i * 310, y: 90 },
+        position: { x: i * 410, y: 90 },
         data: {
           title: l.name,
           subtitle: l.description,
@@ -181,7 +135,7 @@ export function BackendArchitecture({
           color: l.color,
           inferred: l.id === 'services',
         },
-        style: { width: 215 },
+        style: { width: 260 },
       }),
     );
     const ids = new Set(layers.map((l) => l.id));
@@ -207,7 +161,12 @@ export function BackendArchitecture({
         markerEnd: { type: MarkerType.ArrowClosed, color: '#9b94b6' },
         style: { stroke: '#a29bb8' },
       });
-    return { nodes, edges, total: backend.components.length };
+    const routed = clearConnections(edges, nodes);
+    return {
+      nodes: withConnectionBounds(nodes, routed),
+      edges: routed,
+      total: backend.components.length,
+    };
   }, [snapshot, backend, mode, route]);
   const focused = backend.layers.find((l) => l.id === section);
   const catalog = (
@@ -278,9 +237,9 @@ export function BackendArchitecture({
               nodes={graph.nodes}
               edges={graph.edges}
               nodeTypes={nodeTypes}
-              edgeTypes={edgeTypes}
+              edgeTypes={clearEdgeTypes}
               fitView
-              fitViewOptions={{ padding: 0.14, maxZoom: 1 }}
+              fitViewOptions={{ padding: 0.12, maxZoom: 1 }}
               minZoom={0.25}
               maxZoom={1.8}
               nodesDraggable={false}
@@ -318,6 +277,9 @@ export function BackendArchitecture({
         <p>
           {mode === 'request' && graph.total > 40
             ? `Showing 40 of ${graph.total} connected components. Narrow the selection using the source map. `
+            : ''}
+          {mode === 'request'
+            ? 'Middleware is shown only for matching recorded mount paths; registration order and runtime execution are not verified. '
             : ''}
           {missing.length ? `Not identified: ${missing.join(', ')}. ` : ''}Missing layers are not
           invented. {backend.unconnectedCount.toLocaleString()} other declarations are available in

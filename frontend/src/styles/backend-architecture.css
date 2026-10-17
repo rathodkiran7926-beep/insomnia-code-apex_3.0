@@ -68,7 +68,7 @@
   border-radius: 50%;
 }
 .system-architecture-canvas {
-  height: 410px;
+  height: clamp(440px, 58vh, 660px);
   border: 1px solid #e3e1ed;
   border-radius: 15px;
   background: linear-gradient(140deg, #fff, #fbfaff);
@@ -86,7 +86,7 @@
   flex-direction: column;
   gap: 10px;
   min-height: 195px;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .system-architecture-node.system-inferred {
   border-left-style: dashed;
@@ -105,6 +105,17 @@
   letter-spacing: -0.3px;
   color: #3d3453;
   line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.system-component-node {
+  height: 210px;
+  min-height: 210px;
+}
+.system-component-node > strong {
+  font-size: 15px;
 }
 .system-architecture-node > span:not(.system-node-icon) {
   font-size: 11px;

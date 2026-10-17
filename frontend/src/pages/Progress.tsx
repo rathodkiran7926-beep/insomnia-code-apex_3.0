@@ -189,7 +189,7 @@ export default function Progress() {
                     aria-label={`Open ${j.id} journey`}
                     onClick={() => {
                       startJourney(j.id);
-                      go('/workspace');
+                      go('/demo-workspace');
                     }}
                   >
                     <ArrowRight size={16} />
@@ -238,7 +238,7 @@ export default function Progress() {
                   magnetic
                   onClick={() => {
                     startJourney('signup');
-                    go('/workspace');
+                    go('/demo-workspace');
                   }}
                 >
                   Try a signup checkpoint
@@ -286,7 +286,7 @@ export default function Progress() {
                 else if (completed.length) go('/practice');
                 else {
                   startJourney('signup');
-                  go('/workspace');
+                  go('/demo-workspace');
                 }
               }}
             >

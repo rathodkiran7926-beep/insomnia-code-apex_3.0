@@ -1,10 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Background, Controls, ReactFlow } from '@xyflow/react';
+import { Link } from 'react-router-dom';
+import { useRepositoryAnalysis } from '../state/RepositoryAnalysisContext';
+import { analysisApi } from '../services/analysisApi';
+import { directedLayout } from '../domain/graphLayout';
+import {
+  clearConnections,
+  clearEdgeTypes,
+  withConnectionBounds,
+} from '../components/GraphConnections';
+import { Background, Controls, Position, ReactFlow, MarkerType } from '@xyflow/react';
 import type { Edge, Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Badge } from '../components/UI';
 import { RepositoryDocumentation } from '../components/RepositoryDocumentation';
-import { RepositorySource } from '../components/RepositorySource';
+import { RepositoryFileSource } from '../components/RepositoryFileSource';
+import { ResizableAnalysisLayout } from '../components/ResizableAnalysisLayout';
 import { BackendArchitecture } from '../components/BackendArchitecture';
 import { AnalysisProgress } from '../components/AnalysisProgress';
 import {
@@ -14,6 +24,7 @@ import {
   FileCode2,
   FolderOpen,
   GitBranch,
+  ChevronDown,
   LoaderCircle,
   Network,
   Search,
@@ -21,16 +32,8 @@ import {
 } from 'lucide-react';
 import '../styles/repository-analysis.css';
 import '../styles/repository-source.css';
+import '../styles/live-workspace.css';
 
-type Source = {
-  id: string;
-  snapshotId: string;
-  file: string;
-  startLine: number;
-  endLine: number;
-  url: string;
-  excerpt: string;
-};
 type Component = {
   id: string;
   name: string;
@@ -43,54 +46,6 @@ type Component = {
   validation: string;
   fullPaths?: string[];
 };
-type Relation = {
-  id: string;
-  source: string;
-  target: string;
-  type: string;
-  referenceId: string;
-  mountPath?: string;
-};
-type Snapshot = {
-  readmeClaim?: string;
-  snapshotId: string;
-  repository: string;
-  commit: string;
-  components: Component[];
-  relationships: Relation[];
-  references: Source[];
-  report: {
-    supported: boolean;
-    languages: string[];
-    frameworks: string[];
-    patterns: string[];
-    limitations: string[];
-    exclusions: { path: string; reason: string }[];
-    unresolved: { kind: string; text: string; referenceId: string; reason: string }[];
-  };
-  documentation: {
-    snapshotId: string;
-    ai: {
-      message: string;
-      explanations: { componentId: string; explanation: string; referenceIds: string[] }[];
-    };
-  };
-};
-type Job = {
-  id: string;
-  status: string;
-  progress: number;
-  message: string;
-  snapshot_id: string | null;
-};
-async function api<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(url, options);
-  if (!response.headers.get('content-type')?.includes('application/json'))
-    throw new Error('API unavailable. Start the Node.js backend on port 3001.');
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Request failed');
-  return data;
-}
 const colors: Record<string, string> = {
   route: '#dff5e9',
   handler: '#e5edff',
@@ -134,11 +89,9 @@ function FolderGroup({ data }: { data: { label?: string } }) {
 }
 const analysisNodeTypes = { folderGroup: FolderGroup };
 export default function Repository() {
-  const [url, setUrl] = useState('https://github.com/heroku/node-js-getting-started');
+  const { snapshot, job, loading, error: analysisError, setActiveJob } = useRepositoryAnalysis();
+  const [url, setUrl] = useState(snapshot?.repository || '');
   const [revision, setRevision] = useState('');
-  const [jobId, setJobId] = useState(() => localStorage.getItem('mentor-analysis-job') || '');
-  const [job, setJob] = useState<Job | null>(null);
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [error, setError] = useState('');
   const [starting, setStarting] = useState(false);
   const [query, setQuery] = useState('');
@@ -148,44 +101,18 @@ export default function Repository() {
   const [view, setView] = useState('system');
   const [tab, setTab] = useState('architecture');
   const [selected, setSelected] = useState('');
-  const busy = starting || job?.status === 'running';
+  const busy = starting || loading || job?.status === 'running';
   useEffect(() => {
-    if (!jobId) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout>;
-    async function poll() {
-      try {
-        const next = await api<Job>(`/api/analyses/${jobId}`);
-        if (cancelled) return;
-        setJob(next);
-        if (next.status === 'complete' && next.snapshot_id) {
-          const result = await api<Snapshot>(`/api/snapshots/${next.snapshot_id}`);
-          if (!cancelled) {
-            setSnapshot(result);
-            setError('');
-            setUrl(result.repository);
-            setView('system');
-          }
-        } else if (next.status === 'failed') setError(next.message);
-        else timer = setTimeout(() => void poll(), 1000);
-      } catch (e) {
-        if (!cancelled) {
-          setError((e as Error).message);
-          setJob(null);
-        }
-      }
+    if (snapshot) {
+      setUrl(snapshot.repository);
+      setView('system');
     }
-    void poll();
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [jobId]);
+  }, [snapshot]);
   async function start() {
     setStarting(true);
     setError('');
     try {
-      const result = await api<{ id: string }>('/api/analyses', {
+      const result = await analysisApi<{ id: string }>('/api/analyses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -193,21 +120,12 @@ export default function Repository() {
           ...(revision.trim() ? { revision: revision.trim() } : {}),
         }),
       });
-      localStorage.setItem('mentor-analysis-job', result.id);
-      setSnapshot(null);
       setSelected('');
       setFolder('all');
       setQuery('');
       setRole('all');
-      setJob({
-        id: result.id,
-        status: 'running',
-        progress: 0,
-        message: 'Starting analysis',
-        snapshot_id: null,
-      });
       setTab('architecture');
-      setJobId(result.id);
+      setActiveJob(result.id);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -257,6 +175,7 @@ export default function Repository() {
       for (const e of snapshot.relationships) {
         const from = snapshot.components.find((c) => c.id === e.source)!;
         const to = snapshot.components.find((c) => c.id === e.target)!;
+        if (!from || !to) continue;
         const s = `folder:${folderOf(from)}`,
           t = `folder:${folderOf(to)}`;
         if (s !== t && ids.has(s) && ids.has(t))
@@ -268,7 +187,24 @@ export default function Repository() {
             type: 'smoothstep',
           });
       }
-      return { nodes, edges: [...edgeMap.values()] };
+      const edges = [...edgeMap.values()];
+      const layout = directedLayout(
+        nodes.map((n) => n.id),
+        edges,
+        { width: 240, height: 110, gapX: 155, gapY: 60, maxRows: 5 },
+      );
+      const arranged = nodes.map((n) => ({
+        ...n,
+        position: layout.positions.get(n.id)!,
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+        style: { ...n.style, height: 110 },
+      }));
+      const routed = clearConnections(
+        edges.map((e) => ({ ...e, markerEnd: { type: MarkerType.ArrowClosed, color: '#a293b7' } })),
+        arranged,
+      );
+      return { nodes: withConnectionBounds(arranged, routed), edges: routed };
     }
     const visible = snapshot.components.filter(
       (c) =>
@@ -283,24 +219,34 @@ export default function Repository() {
     for (const folder of folders) {
       const members = visible.filter((c) => folderOf(c) === folder),
         groupId = `group:${folder}`;
+      const layout = directedLayout(
+        members.map((c) => c.id),
+        snapshot.relationships,
+        { width: 250, height: 122, gapX: 140, gapY: 58, maxRows: 6 },
+      );
       nodes.push({
         id: groupId,
         type: 'folderGroup',
         data: { label: folder },
         position: { x: 0, y: offset },
         style: {
-          width: Math.min(3, members.length) * 275 + 24,
-          height: Math.ceil(members.length / 3) * 135 + 60,
+          width: layout.width + 40,
+          height: layout.height + 90,
           background: '#f8f9fc',
         },
         selectable: false,
       });
-      members.forEach((c, i) =>
+      members.forEach((c) =>
         nodes.push({
           id: c.id,
           parentId: groupId,
           extent: 'parent',
-          position: { x: (i % 3) * 275 + 16, y: Math.floor(i / 3) * 135 + 45 },
+          position: {
+            x: layout.positions.get(c.id)!.x + 20,
+            y: layout.positions.get(c.id)!.y + 54,
+          },
+          sourcePosition: Position.Right,
+          targetPosition: Position.Left,
           data: {
             label: (
               <div className="analysis-component-node">
@@ -316,6 +262,7 @@ export default function Repository() {
           },
           style: {
             width: 250,
+            height: 122,
             fontSize: 12,
             whiteSpace: 'pre-wrap',
             overflowWrap: 'anywhere',
@@ -324,7 +271,7 @@ export default function Repository() {
           },
         }),
       );
-      offset += Math.ceil(members.length / 3) * 135 + 110;
+      offset += layout.height + 150;
     }
     const ids = new Set(nodes.map((n) => n.id));
     const edges: Edge[] = snapshot.relationships
@@ -335,7 +282,11 @@ export default function Repository() {
         target: e.target,
         label: `${relationshipLabels[e.type] || e.type}${e.mountPath ? ` ${e.mountPath}` : ''}`,
         type: 'smoothstep',
-        style: { stroke: '#7b86a0' },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#a293b7' },
+        style: {
+          stroke: '#a293b7',
+          opacity: selected && e.source !== selected && e.target !== selected ? 0.22 : 1,
+        },
       }));
     if ((role === 'all' && showUnresolved) || role === 'unresolved')
       snapshot.report.unresolved
@@ -374,7 +325,17 @@ export default function Repository() {
               style: { stroke: '#c97e39', strokeDasharray: '5 5' },
             });
         });
-    return { nodes, edges };
+    const routed = clearConnections(edges, nodes).map((e) => ({
+      ...e,
+      label: selected
+        ? e.source === selected || e.target === selected
+          ? e.label
+          : undefined
+        : edges.length > 12
+          ? undefined
+          : e.label,
+    }));
+    return { nodes: withConnectionBounds(nodes, routed), edges: routed };
   }, [snapshot, view, role, query, selected, showUnresolved, folder]);
   const component = snapshot?.components.find((c) => c.id === selected);
   const ai = snapshot?.documentation.ai.explanations.find((e) => e.componentId === selected);
@@ -390,63 +351,90 @@ export default function Repository() {
   }
   return (
     <>
-      <section className="panel analysis-connect">
-        <div className="analysis-connect-heading">
-          <span className="analysis-section-icon">
-            <GitBranch size={20} />
-          </span>
-          <div>
-            <h2>Explore a repository</h2>
-            <p>Paste a public GitHub link. We’ll turn its code into a map you can explore.</p>
+      {
+        <section className="panel analysis-connect">
+          <div className="analysis-connect-heading">
+            <span className="analysis-section-icon">
+              <GitBranch size={20} />
+            </span>
+            <div>
+              <h2>Connect your codebase</h2>
+              <p>
+                Analyze a public repository, then open its architecture and source in your mentor
+                workspace.
+              </p>
+            </div>
           </div>
-        </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void start();
-          }}
-        >
-          <label>
-            Public GitHub repository
-            <input
-              aria-label="Public GitHub repository"
-              type="url"
-              required
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://github.com/owner/repository"
-              disabled={busy}
-            />
-          </label>
-          <label>
-            Revision (optional)
-            <input
-              aria-label="Revision"
-              value={revision}
-              onChange={(e) => setRevision(e.target.value)}
-              placeholder="Branch, tag, or commit"
-              disabled={busy}
-            />
-          </label>
-          <button className="analysis-primary" disabled={busy} type="submit">
-            {busy ? (
-              <LoaderCircle size={16} className="analysis-button-spinner" />
-            ) : (
-              <Network size={16} />
-            )}
-            {busy ? 'Analyzing…' : 'Analyze repository'}
-          </button>
-        </form>
-        <p className="muted">
-          JavaScript and TypeScript · Up to 200 eligible files / 5 MB · Repository scripts are never
-          executed
-        </p>
-        {error && (
-          <div className="error-callout" role="alert">
-            {error}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void start();
+            }}
+          >
+            <label>
+              Public GitHub repository
+              <span className="repository-url-field">
+                <GitBranch size={16} />
+                <input
+                  aria-label="Public GitHub repository"
+                  type="url"
+                  required
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="https://github.com/owner/repository"
+                  disabled={busy}
+                />
+              </span>
+            </label>
+            <details className="repository-revision">
+              <summary>
+                <span>
+                  <small>VERSION</small>
+                  {revision || 'Default branch'}
+                </span>
+                <ChevronDown size={14} />
+              </summary>
+              <label>
+                Choose a branch, tag or commit
+                <input
+                  aria-label="Revision"
+                  value={revision}
+                  onChange={(e) => setRevision(e.target.value)}
+                  placeholder="Branch, tag, or commit"
+                  disabled={busy}
+                />
+              </label>
+            </details>
+            <button className="analysis-primary" disabled={busy} type="submit">
+              {busy ? (
+                <LoaderCircle size={16} className="analysis-button-spinner" />
+              ) : (
+                <Network size={16} />
+              )}
+              {busy ? 'Analyzing…' : 'Analyze repository'}
+            </button>
+          </form>
+          <div className="repository-form-footer">
+            <span>
+              <CheckCircle2 size={13} />
+              Public GitHub repositories
+            </span>
+            <span>JavaScript + TypeScript</span>
+            <details>
+              <summary>Support & limits</summary>
+              <p>
+                Node.js + Express analysis. Up to 200 eligible files / 5 MB. Dependencies, generated
+                output and sensitive paths are excluded. Repository code is never executed.
+              </p>
+            </details>
           </div>
-        )}
-      </section>
+          {(error || analysisError) && (
+            <div className="error-callout" role="alert">
+              {error || analysisError}
+            </div>
+          )}
+        </section>
+      }
       {busy && (
         <AnalysisProgress
           progress={starting ? 0 : job?.progress || 0}
@@ -480,6 +468,11 @@ export default function Repository() {
               Commit {snapshot.commit.slice(0, 12)} ↗
             </a>
             <span>{snapshot.report.languages.join(' / ')}</span>
+            {
+              <Link className="analysis-open-workspace" to="/workspace">
+                Open mentor workspace <ArrowRight size={15} />
+              </Link>
+            }
           </div>
           <div className="analysis-summary-grid">
             {[
@@ -606,12 +599,15 @@ export default function Repository() {
                   <div className="analysis-toolbar">
                     <label>
                       Search
-                      <input
-                        aria-label="Search components"
-                        placeholder="Component or source file"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                      />
+                      <span className="analysis-filter-search">
+                        <Search size={14} />
+                        <input
+                          aria-label="Search components"
+                          placeholder="Component or source file"
+                          value={query}
+                          onChange={(e) => setQuery(e.target.value)}
+                        />
+                      </span>
                     </label>
                     <label>
                       View
@@ -701,12 +697,14 @@ export default function Repository() {
                       </label>
                     )}
                   </details>
-                  <div className="analysis-layout">
+                  <ResizableAnalysisLayout enabled={Boolean(component)}>
                     <div className="analysis-canvas">
                       {graph.nodes.length ? (
                         <ReactFlow
                           key={`${snapshot.snapshotId}:${view}:${showUnresolved}:${role}:${folder}:${query}`}
                           nodeTypes={analysisNodeTypes}
+                          edgeTypes={clearEdgeTypes}
+                          fitViewOptions={{ padding: 0.12, maxZoom: 1 }}
                           nodes={graph.nodes}
                           edges={graph.edges}
                           fitView
@@ -752,10 +750,11 @@ export default function Repository() {
                             {component.evidence.join('. ') ||
                               `A ${component.role} declaration found in the source. Open the code below to inspect its implementation.`}
                           </p>
-                          <RepositorySource
+                          <RepositoryFileSource
                             key={component.referenceId}
                             source={source(component.referenceId)}
                             commit={snapshot.commit}
+                            snapshotId={snapshot.snapshotId}
                           />
                           <details className="analysis-component-facts">
                             <summary>Inputs, outputs & error handling</summary>
@@ -852,7 +851,7 @@ export default function Repository() {
                         </>
                       )}
                     </aside>
-                  </div>
+                  </ResizableAnalysisLayout>
                 </>
               )}
             </>

@@ -218,7 +218,7 @@ export function MentorPanel() {
               icon={BookOpen}
               onClick={() => {
                 startJourney('signup');
-                go('/workspace');
+                go('/demo-workspace');
               }}
             >
               Related signup journey

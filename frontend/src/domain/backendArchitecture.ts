@@ -12,6 +12,7 @@ export type ArchitectureRelationship = {
   target: string;
   type: string;
   referenceId: string;
+  mountPath?: string;
 };
 export type ArchitectureSnapshot = {
   components: ArchitectureComponent[];
@@ -169,6 +170,39 @@ export function requestArchitecture(snapshot: ArchitectureSnapshot, routeId: str
         descendants.add(e.source);
         parents.push(e.source);
       }
+  const route = backend.components.find((c) => c.id === routeId)!;
+  const localPath = route.name.replace(/^[A-Z]+\s+/, '');
+  for (const edge of backend.relationships) {
+    if (
+      edge.type !== 'uses_middleware' ||
+      !descendants.has(edge.source) ||
+      descendants.has(edge.target)
+    )
+      continue;
+    const owner = backend.components.find((c) => c.id === edge.source);
+    const paths = owner?.role === 'application' ? route.fullPaths || [localPath] : [localPath];
+    const mount = edge.mountPath;
+    if (
+      mount &&
+      paths.some(
+        (path) =>
+          mount === '/' || path === mount || path.startsWith(mount.replace(/\/$/, '') + '/'),
+      )
+    ) {
+      descendants.add(edge.target);
+      queue.push(edge.target);
+    }
+  }
+  // Middleware is a registered connection, not an assertion about execution order.
+  for (let i = 0; i < queue.length; i++)
+    for (const edge of backend.relationships.filter(
+      (e) => e.source === queue[i] && ['calls', 'queries_database'].includes(e.type),
+    )) {
+      if (!descendants.has(edge.target)) {
+        descendants.add(edge.target);
+        queue.push(edge.target);
+      }
+    }
   const total = descendants.size;
   const components = backend.components
     .filter((c) => descendants.has(c.id))

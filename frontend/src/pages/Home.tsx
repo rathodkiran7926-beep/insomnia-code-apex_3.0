@@ -23,7 +23,6 @@ import { VoiceAgentDemo } from '../components/VoiceAgentDemo';
 import { PlatformTerminal } from '../components/PlatformTerminal';
 import { AgentContextPreview } from '../components/AgentContextPreview';
 import { Badge, Button, TiltCard } from '../components/UI';
-import { useWorkspace } from '../state/WorkspaceContext';
 
 const faqs = [
   {
@@ -55,10 +54,12 @@ const faqs = [
 
 export default function Home() {
   const go = useNavigate();
-  const { startJourney } = useWorkspace();
   const heroRef = useHeroAnimation<HTMLDivElement>();
   const showcaseRef = useScrollReveal<HTMLDivElement>({ stagger: 0.12 });
-  const metricsRef = useScrollReveal<HTMLDivElement>({ selector: '.sym-numbers-container', stagger: 0.1 });
+  const metricsRef = useScrollReveal<HTMLDivElement>({
+    selector: '.sym-numbers-container',
+    stagger: 0.1,
+  });
   const faqRef = useScrollReveal<HTMLDivElement>({ stagger: 0.08 });
 
   const [activeFaq, setActiveFaq] = useState<number | null>(0);
@@ -72,7 +73,6 @@ export default function Home() {
   }, []);
 
   function handleLaunchWorkspace() {
-    startJourney('signup');
     go('/workspace');
   }
 
@@ -88,7 +88,10 @@ export default function Home() {
       {/* Symboolic Editorial Header */}
       <header className={`sym-header${isHeaderCompact ? ' is-compact' : ''}`} role="banner">
         <div className="sym-header-inner">
-          <div className="sym-brand" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+          <div
+            className="sym-brand"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          >
             <span className="sym-brand-logo">
               <Code2 size={24} strokeWidth={2.4} />
             </span>
@@ -98,17 +101,33 @@ export default function Home() {
           </div>
 
           <nav className="sym-nav-menu">
-            <a href="#about" onClick={(event) => scrollToSection(event, 'about')} className="sym-nav-item sym-nav-dropdown">
+            <a
+              href="#about"
+              onClick={(event) => scrollToSection(event, 'about')}
+              className="sym-nav-item sym-nav-dropdown"
+            >
               <span>Platform</span>
               <ChevronDown size={14} className="sym-dropdown-arrow" />
             </a>
-            <a href="#voice" onClick={(event) => scrollToSection(event, 'voice')} className="sym-nav-item">
+            <a
+              href="#voice"
+              onClick={(event) => scrollToSection(event, 'voice')}
+              className="sym-nav-item"
+            >
               AI Voice
             </a>
-            <a href="#features" onClick={(event) => scrollToSection(event, 'features')} className="sym-nav-item">
+            <a
+              href="#features"
+              onClick={(event) => scrollToSection(event, 'features')}
+              className="sym-nav-item"
+            >
               Atlas & Journeys
             </a>
-            <a href="#numbers" onClick={(event) => scrollToSection(event, 'numbers')} className="sym-nav-item">
+            <a
+              href="#numbers"
+              onClick={(event) => scrollToSection(event, 'numbers')}
+              className="sym-nav-item"
+            >
               Metrics
             </a>
           </nav>
@@ -127,13 +146,13 @@ export default function Home() {
 
         <div className="home-billboard-inner">
           <h1 className="home-hero-title hero-title">
-            <span>We are the first AI-Native</span>{' '}
-            <span>codebase mentor platform</span>
+            <span>We are the first AI-Native</span> <span>codebase mentor platform</span>
           </h1>
 
           <p className="home-hero-subtitle hero-desc">
-            Explore backend systems through connected architecture, guided code journeys,
-            and interactive inquiries. In a few seconds you will trace any runtime flow from route to database.
+            Explore backend systems through connected architecture, guided code journeys, and
+            interactive inquiries. In a few seconds you will trace any runtime flow from route to
+            database.
           </p>
 
           <PlatformTerminal onExplore={handleLaunchWorkspace} />
@@ -178,9 +197,7 @@ export default function Home() {
       <section id="features" className="home-section" ref={showcaseRef}>
         <div id="about" className="home-section-header">
           <span className="eyebrow">FOUR CONNECTED PILLARS</span>
-          <h2 className="home-section-title">
-            The big picture. The deciding code. In one place.
-          </h2>
+          <h2 className="home-section-title">The big picture. The deciding code. In one place.</h2>
           <p className="home-section-desc">
             Traditional tools force you to jump between high-level documentation and raw files.
             Codebase Mentor keeps them perpetually synchronized.
@@ -189,7 +206,9 @@ export default function Home() {
 
         <div className="home-feature-grid">
           <TiltCard className="home-feature-card feature-card--atlas" maxTilt={5}>
-            <span className="feature-card-number" aria-hidden="true">01</span>
+            <span className="feature-card-number" aria-hidden="true">
+              01
+            </span>
             <FeatureArtwork kind="atlas" />
             <div className="home-card-icon-wrap violet">
               <Layers3 size={24} />
@@ -197,8 +216,8 @@ export default function Home() {
             <span className="home-card-tag">Architecture</span>
             <h3>Interactive Atlas</h3>
             <p>
-              Navigate the entire system visually. Inspect routes, validation layers, services,
-              and persistence boundaries with live component relationships.
+              Navigate the entire system visually. Inspect routes, validation layers, services, and
+              persistence boundaries with live component relationships.
             </p>
             <button className="home-card-cta" onClick={() => go('/workspace')}>
               Explore Atlas <ArrowRight size={13} />
@@ -206,7 +225,9 @@ export default function Home() {
           </TiltCard>
 
           <TiltCard className="home-feature-card feature-card--journey" maxTilt={5}>
-            <span className="feature-card-number" aria-hidden="true">02</span>
+            <span className="feature-card-number" aria-hidden="true">
+              02
+            </span>
             <FeatureArtwork kind="journey" />
             <div className="home-card-icon-wrap blue">
               <Compass size={24} />
@@ -214,8 +235,8 @@ export default function Home() {
             <span className="home-card-tag">Walkthroughs</span>
             <h3>Guided Code Journeys</h3>
             <p>
-              Follow a single request from the HTTP entry point all the way to token issuance.
-              Pause at checkpoints to predict runtime decisions.
+              Follow a single request from the HTTP entry point all the way to token issuance. Pause
+              at checkpoints to predict runtime decisions.
             </p>
             <button className="home-card-cta" onClick={() => go('/journeys')}>
               Browse Journeys <ArrowRight size={13} />
@@ -223,7 +244,9 @@ export default function Home() {
           </TiltCard>
 
           <TiltCard className="home-feature-card feature-card--practice" maxTilt={5}>
-            <span className="feature-card-number" aria-hidden="true">03</span>
+            <span className="feature-card-number" aria-hidden="true">
+              03
+            </span>
             <FeatureArtwork kind="practice" />
             <div className="home-card-icon-wrap green">
               <FlaskConical size={24} />
@@ -231,8 +254,8 @@ export default function Home() {
             <span className="home-card-tag">Hands-on</span>
             <h3>Contribution Practice</h3>
             <p>
-              Apply what you learn in an in-browser sandbox. Modify real Zod validation rules
-              and verify your patch against acceptance criteria with zero setup.
+              Apply what you learn in an in-browser sandbox. Modify real Zod validation rules and
+              verify your patch against acceptance criteria with zero setup.
             </p>
             <button className="home-card-cta" onClick={() => go('/practice')}>
               Try Starter Exercise <ArrowRight size={13} />
@@ -240,7 +263,9 @@ export default function Home() {
           </TiltCard>
 
           <TiltCard className="home-feature-card feature-card--knowledge" maxTilt={5}>
-            <span className="feature-card-number" aria-hidden="true">04</span>
+            <span className="feature-card-number" aria-hidden="true">
+              04
+            </span>
             <FeatureArtwork kind="knowledge" />
             <div className="home-card-icon-wrap amber">
               <MessageSquareText size={24} />
@@ -248,8 +273,8 @@ export default function Home() {
             <span className="home-card-tag">Decisions</span>
             <h3>Team Knowledge</h3>
             <p>
-              Capture the human rationale behind architectural separations. Distinguish observed code
-              facts from reviewed design intent.
+              Capture the human rationale behind architectural separations. Distinguish observed
+              code facts from reviewed design intent.
             </p>
             <button className="home-card-cta" onClick={() => go('/knowledge')}>
               Review Decisions <ArrowRight size={13} />
@@ -257,8 +282,6 @@ export default function Home() {
           </TiltCard>
         </div>
       </section>
-
-
 
       <AgentContextPreview />
 
@@ -274,30 +297,40 @@ export default function Home() {
               in numbers
             </h2>
             <p className="sym-numbers-desc">
-              If your team is still wrestling with complex onboarding and untracked architectural drift,
-              you are in good company. We measure what engineers can understand, predict, and ship safely.
+              If your team is still wrestling with complex onboarding and untracked architectural
+              drift, you are in good company. We measure what engineers can understand, predict, and
+              ship safely.
             </p>
           </div>
 
           <div className="sym-numbers-grid">
             <div className="sym-number-card">
-              <span className="sym-number-val">200<span className="sym-number-suffix">+</span></span>
+              <span className="sym-number-val">
+                200<span className="sym-number-suffix">+</span>
+              </span>
               <p className="sym-number-label">
-                Parsed architecture endpoints and domain service boundaries across synthetic prototypes.
+                Parsed architecture endpoints and domain service boundaries across synthetic
+                prototypes.
               </p>
             </div>
 
             <div className="sym-number-card">
-              <span className="sym-number-val">50<span className="sym-number-suffix">+</span></span>
+              <span className="sym-number-val">
+                50<span className="sym-number-suffix">+</span>
+              </span>
               <p className="sym-number-label">
-                Guided code checkpoints and validation rules mastered by engineers in browser sandboxes.
+                Guided code checkpoints and validation rules mastered by engineers in browser
+                sandboxes.
               </p>
             </div>
 
             <div className="sym-number-card">
-              <span className="sym-number-val">10<span className="sym-number-suffix">s</span></span>
+              <span className="sym-number-val">
+                10<span className="sym-number-suffix">s</span>
+              </span>
               <p className="sym-number-label">
-                To trace any incoming HTTP route to its database persistence row with zero server setup.
+                To trace any incoming HTTP route to its database persistence row with zero server
+                setup.
               </p>
             </div>
           </div>
@@ -320,10 +353,7 @@ export default function Home() {
           {faqs.map((faq, index) => {
             const isOpen = activeFaq === index;
             return (
-              <div
-                key={faq.question}
-                className={`home-faq-item ${isOpen ? 'open' : ''}`}
-              >
+              <div key={faq.question} className={`home-faq-item ${isOpen ? 'open' : ''}`}>
                 <button
                   className="home-faq-trigger"
                   onClick={() => setActiveFaq(isOpen ? null : index)}
@@ -356,7 +386,8 @@ export default function Home() {
             Start following the story.
           </h2>
           <p className="home-prefooter-subtitle">
-            Walk through real code, understand deciding branches, and make your first contribution with confidence.
+            Walk through real code, understand deciding branches, and make your first contribution
+            with confidence.
           </p>
           <div className="home-prefooter-actions">
             <Button
@@ -385,51 +416,70 @@ export default function Home() {
       <footer className="home-footer" role="contentinfo">
         <NumbersPixelBorder edge="top" />
         <div className="footer-content">
-        <div className="home-footer-inner">
-          <div className="home-footer-left">
-            <div className="footer-brand-meta">
-              <Code2 size={28} strokeWidth={2} />
-              <Badge tone="violet">v0.1</Badge>
+          <div className="home-footer-inner">
+            <div className="home-footer-left">
+              <div className="footer-brand-meta">
+                <Code2 size={28} strokeWidth={2} />
+                <Badge tone="violet">v0.1</Badge>
+              </div>
+              <div className="footer-wordmark">
+                Codebase
+                <br />
+                Mentor<span className="footer-brand-dot">.</span>
+              </div>
             </div>
-            <div className="footer-wordmark">Codebase<br />Mentor<span className="footer-brand-dot">.</span></div>
+            <div className="footer-intro">
+              <p className="home-footer-tagline">
+                Understand a codebase through connected architecture, guided code journeys, and
+                contribution practice.
+              </p>
+              <button className="footer-workspace-link" onClick={handleLaunchWorkspace}>
+                Open Mentor Workspace{' '}
+                <span>
+                  <ArrowUpRight size={28} />
+                </span>
+              </button>
+            </div>
           </div>
-          <div className="footer-intro">
-            <p className="home-footer-tagline">
-              Understand a codebase through connected architecture, guided code journeys, and contribution practice.
-            </p>
-            <button className="footer-workspace-link" onClick={handleLaunchWorkspace}>
-              Open Mentor Workspace <span><ArrowUpRight size={28} /></span>
+          <div className="footer-navigation">
+            <button
+              className="footer-back-top"
+              onClick={() =>
+                window.scrollTo({
+                  top: 0,
+                  behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+                    ? 'auto'
+                    : 'smooth',
+                })
+              }
+            >
+              Back to top <ArrowUpRight size={18} />
             </button>
-          </div>
-        </div>
-        <div className="footer-navigation">
-          <button className="footer-back-top" onClick={() => window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })}>
-            Back to top <ArrowUpRight size={18} />
-          </button>
-          <div className="home-footer-links">
-            <div className="footer-col">
-              <strong>Workspace</strong>
-              <button onClick={() => go('/workspace')}>Architecture Atlas</button>
-              <button onClick={() => go('/journeys')}>Code Journeys</button>
-              <button onClick={() => go('/learn')}>Learning Path</button>
-              <button onClick={() => go('/practice')}>Practice Sandbox</button>
-            </div>
-            <div className="footer-col">
-              <strong>Evolution</strong>
-              <button onClick={() => go('/changes')}>Pull Requests</button>
-              <button onClick={() => go('/knowledge')}>Team Decisions</button>
-              <button onClick={() => go('/progress')}>Progress Record</button>
-              <button onClick={() => go('/repository')}>Repository Context</button>
+            <div className="home-footer-links">
+              <div className="footer-col">
+                <strong>Workspace</strong>
+                <button onClick={() => go('/workspace')}>Architecture Atlas</button>
+                <button onClick={() => go('/journeys')}>Code Journeys</button>
+                <button onClick={() => go('/learn')}>Learning Path</button>
+                <button onClick={() => go('/practice')}>Practice Sandbox</button>
+              </div>
+              <div className="footer-col">
+                <strong>Evolution</strong>
+                <button onClick={() => go('/changes')}>Pull Requests</button>
+                <button onClick={() => go('/knowledge')}>Team Decisions</button>
+                <button onClick={() => go('/progress')}>Progress Record</button>
+                <button onClick={() => go('/repository')}>Repository Context</button>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="home-footer-bottom">
-          <span>
-            <span className="status-dot" /> All work stays in your browser · No external code transmission
-          </span>
-          <span>Codebase Mentor · Sample API Prototype</span>
-        </div>
+          <div className="home-footer-bottom">
+            <span>
+              <span className="status-dot" /> All work stays in your browser · No external code
+              transmission
+            </span>
+            <span>Codebase Mentor · Sample API Prototype</span>
+          </div>
         </div>
       </footer>
     </div>

@@ -39,7 +39,7 @@ export default function Journeys() {
     scenario: 'success' | 'duplicate' | 'invalid' = 'success',
   ) {
     startJourney(id, scenario);
-    go('/workspace');
+    go('/demo-workspace');
   }
 
   return (

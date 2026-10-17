@@ -191,7 +191,7 @@ export function SourceLink({
       title={`${source.path}:${source.start}–${source.end}`}
       onClick={() => {
         openSource(source, snapshot);
-        if (navigate) go('/workspace');
+        if (navigate) go('/demo-workspace');
         setTimeout(
           () =>
             document.querySelector('.code-panel')?.scrollIntoView({
