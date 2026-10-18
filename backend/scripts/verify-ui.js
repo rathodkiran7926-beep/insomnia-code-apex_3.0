@@ -637,6 +637,31 @@ try {
   await waitFor(
     `document.querySelector('.code-workspace')?.dataset.snapshotId === ${JSON.stringify(job.snapshot_id)}`,
   );
+  // A full reload must render the workspace graph without first loading another route's CSS.
+  await evaluate(
+    "Array.from(document.querySelectorAll('.mentor-view-tabs button')).find(b=>b.innerText==='Connections').click()",
+  );
+  await waitFor(
+    "document.querySelector('.mentor-connection-map .react-flow__node-default')",
+  );
+  assert(
+    await evaluate(`{
+    const nodes=Array.from(document.querySelectorAll('.mentor-connection-map .react-flow__node-default')).filter(n=>getComputedStyle(n).opacity!=='0');
+    nodes.length>0 && nodes.every(n=>getComputedStyle(n).position==='absolute' && getComputedStyle(n).borderTopStyle==='solid');
+  }`),
+    "Cold workspace graph needs positioned, bordered cards",
+  );
+  assert(
+    await evaluate(
+      "getComputedStyle(document.querySelector('.mentor-connection-map .react-flow__edgelabel-renderer')).position==='absolute'",
+    ),
+    "Edge labels need their viewport positioning styles",
+  );
+  assert(
+    await evaluate(
+      "document.querySelector('.mentor-connection-map .react-flow__controls').getBoundingClientRect().bottom <= document.querySelector('.mentor-connection-map').getBoundingClientRect().bottom + 1",
+    ),
+  );
   await evaluate(`location.hash='/demo-workspace'`);
   await waitFor(
     'document.querySelector(".global-search") && document.querySelector(".next-step-card")',
@@ -686,6 +711,7 @@ try {
           "animated loading state and reduced motion",
           "mobile loading layout without horizontal overflow",
           "rendered graph nodes",
+          "direct workspace reload loads graph card, handle, label and control styles",
           "folder overview opens filtered component details",
           "clickable component details",
           "syntax highlighting and source line numbers",

@@ -10,7 +10,6 @@ import {
 } from '../components/GraphConnections';
 import { Background, Controls, Position, ReactFlow, MarkerType } from '@xyflow/react';
 import type { Edge, Node } from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
 import { Badge } from '../components/UI';
 import { RepositoryDocumentation } from '../components/RepositoryDocumentation';
 import { RepositoryFileSource } from '../components/RepositoryFileSource';

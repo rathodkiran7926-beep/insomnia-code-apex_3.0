@@ -5,6 +5,7 @@ import '@fontsource/geist/latin-500.css';
 import '@fontsource/geist/latin-600.css';
 import '@fontsource/geist/latin-700.css';
 import '@fontsource/geist-mono/latin-400.css';
+import '@xyflow/react/dist/style.css';
 import './styles.css';
 import './styles/symboolic-theme.css';
 import App from './App';
