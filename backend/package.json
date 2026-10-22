@@ -11,7 +11,10 @@
     "test": "node --test test/*.test.js",
     "verify:public": "node scripts/verify-public.js",
     "verify:http": "node scripts/verify-http.js",
-    "verify:ui": "node scripts/verify-ui.js"
+    "verify:ui": "node scripts/verify-ui.js",
+    "verify:discussion": "node scripts/verify-discussion-ui.js",
+    "verify:pr": "node scripts/verify-pr.js",
+    "verify:pr-ui": "node scripts/verify-pr-ui.js"
   },
   "dependencies": {
     "express": "^5.1.0",

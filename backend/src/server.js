@@ -8,9 +8,11 @@ import { db, saveSnapshot } from "./storage.js";
 import { parseRepository } from "./github.js";
 import { readSource, answerQuestion } from "./workspace.js";
 import { generateGuide } from "./generatedGuides.js";
+import { discussionRoutes } from "./discussionRoutes.js";
+import { prRoutes } from "./prRoutes.js";
 const app = express();
 app.disable("x-powered-by");
-app.use(express.json({ limit: "8kb" }));
+app.use(express.json({ limit: "24kb" }));
 app.use("/api", (req, res, next) => {
   res.set("Cache-Control", "no-store");
   if (
@@ -29,6 +31,8 @@ app.use("/api", (req, res, next) => {
 db.prepare(
   "UPDATE analysis_jobs SET status='failed', message='Server restarted; please retry analysis' WHERE status='running'",
 ).run();
+app.use("/api/discussions", discussionRoutes);
+app.use("/api/pr", prRoutes);
 let active = 0;
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.post("/api/analyses", (req, res, next) => {
@@ -197,7 +201,7 @@ app.use((error, _req, res, _next) =>
       error:
         error instanceof z.ZodError
           ? "Invalid request data"
-          : error.status === 400
+          : error.type === "entity.parse.failed"
             ? "Invalid JSON request"
             : error.message,
     }),

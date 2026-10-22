@@ -93,6 +93,8 @@ export function analyze(input) {
       file,
       startLine,
       endLine,
+      startOffset: node.getStart(sf),
+      endOffset: node.getEnd(),
       url: `${repository}/blob/${commit}/${file.split("/").map(encodeURIComponent).join("/")}#L${startLine}-L${endLine}`,
       excerpt: node.getText(sf).slice(0, 1800),
     });

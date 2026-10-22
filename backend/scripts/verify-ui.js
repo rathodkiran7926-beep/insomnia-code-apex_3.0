@@ -427,7 +427,7 @@ try {
   );
   assert(
     await evaluate(
-      'document.querySelector(".analysis-details a").href.includes("/blob/")',
+      'document.querySelector(".analysis-details .repository-source-footer a").href.includes("/blob/")',
     ),
   );
   await evaluate(

@@ -14,19 +14,21 @@ export async function boundedFetch(
       response = await fetch(current, {
         ...options,
         redirect: "manual",
-        signal: AbortSignal.timeout(30000),
+        signal: options.signal
+          ? AbortSignal.any([options.signal, AbortSignal.timeout(30000)])
+          : AbortSignal.timeout(30000),
         headers,
       });
     } catch (error) {
       const code = error.cause?.code || error.code;
       if (code === "EACCES" || code === "EPERM") {
-        throw new Error(
-          `Network access to ${current.hostname} was denied by the operating system (${code}). Restart the backend from a normal terminal outside the restricted environment: cd backend, then npm.cmd run dev. If access is still denied, check your firewall or proxy settings. A GitHub token cannot fix this network permission error.`,
-        );
+        throw Object.assign(new Error(
+          `Network access to ${current.hostname} was denied by the operating system (${code}). Restart the backend from a normal terminal outside the restricted environment: cd backend, then npm.cmd run dev. If access is still denied, check your firewall or proxy settings.${current.hostname === "api.github.com" ? " A GitHub token cannot fix this network permission error." : ""}`,
+        ), { code });
       }
-      throw new Error(
+      throw Object.assign(new Error(
         `Cannot reach ${current.hostname}: ${error.cause?.code || error.message}. Check network access and retry.`,
-      );
+      ), { code });
     }
     if (![301, 302, 307, 308].includes(response.status)) break;
     const next = new URL(response.headers.get("location"), current);

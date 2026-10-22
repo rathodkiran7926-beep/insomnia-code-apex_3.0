@@ -44,13 +44,16 @@ export function validateExplanations(value, graph) {
   }
   return parsed;
 }
-export async function documentGraph(graph) {
+export async function documentGraph(graph, { generateAI = true } = {}) {
   let ai = {
     status: "unavailable",
     message: "AI explanations unavailable: no LLM_API_KEY configured.",
     explanations: [],
   };
-  if (process.env.LLM_API_KEY) {
+  if (!generateAI)
+    ai.message =
+      "PR comparison uses deterministic source facts. Gemini guides can be requested separately.";
+  if (generateAI && process.env.LLM_API_KEY) {
     try {
       const components = graph.components
         .filter((c) => c.role !== "module")
