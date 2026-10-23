@@ -1,0 +1,114 @@
+/* Sidebar polish; scoped so mobile drawer and page controls keep their layout. */
+.refreshed-sidebar {
+  background: #fcfbff !important;
+  box-shadow: none;
+}
+.refreshed-sidebar .brand {
+  min-height: 88px;
+  flex-shrink: 0;
+  border-bottom: 1px solid #eeebf5;
+  background: #fff;
+}
+.refreshed-sidebar .brand-symbol {
+  box-shadow: 0 3px 8px #6550df24 !important;
+}
+.refreshed-sidebar .brand .badge {
+  font-size: 9px !important;
+  padding: 3px 7px;
+  letter-spacing: 0.03em;
+}
+.sidebar-navigation {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 18px 0;
+  scrollbar-width: none;
+}
+.sidebar-navigation::-webkit-scrollbar {
+  display: none;
+}
+.refreshed-sidebar .nav-label {
+  padding: 0 12px !important;
+  margin: 22px 0 9px !important;
+  font-size: 10px !important;
+  font-weight: 600;
+  letter-spacing: 0.09em !important;
+  text-transform: uppercase;
+  color: #91869f !important;
+}
+.refreshed-sidebar nav > .nav-label:first-child {
+  margin-top: 0 !important;
+}
+.refreshed-sidebar .nav-item {
+  min-height: 44px !important;
+  padding: 9px 10px !important;
+  margin: 4px 0;
+  gap: 11px;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0;
+  color: #625b72 !important;
+  border: 1px solid transparent;
+  border-radius: 10px !important;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s !important;
+}
+.refreshed-sidebar .nav-item > svg {
+  box-sizing: content-box;
+  width: 17px;
+  height: 17px;
+  padding: 6px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  color: #8b809c;
+  background: #f0edf6;
+}
+.refreshed-sidebar .nav-item:hover {
+  transform: none;
+  background: #f1edf9 !important;
+  color: #5743b3 !important;
+}
+.refreshed-sidebar .nav-item.active {
+  background: #ede7fc !important;
+  color: #5840c0 !important;
+  border-color: #ded3fa;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+}
+.refreshed-sidebar .nav-item.active > svg {
+  background: #6b51dc;
+  color: #fff !important;
+}
+.refreshed-sidebar .nav-item.active .nav-count {
+  background: #ded3fa !important;
+  color: #5840c0 !important;
+}
+.refreshed-sidebar .nav-item:focus-visible {
+  outline: 2px solid #9c85e7;
+  outline-offset: 2px;
+}
+.refreshed-sidebar .team-nav {
+  margin-top: 18px;
+  border-top: 1px solid #eeebf5;
+  padding-top: 0;
+}
+.refreshed-sidebar .sidebar-bottom {
+  flex-shrink: 0;
+  padding-top: 12px;
+  border-top: 1px solid #eeebf5;
+  background: #fcfbff;
+}
+.refreshed-sidebar .sidebar-footer {
+  border: 0;
+  padding: 13px 2px;
+  font-size: 9px;
+  color: #8b819b;
+}
+@media (prefers-reduced-motion: reduce) {
+  .refreshed-sidebar .nav-item,
+  .refreshed-sidebar .brand-symbol {
+    transition: none !important;
+  }
+}
