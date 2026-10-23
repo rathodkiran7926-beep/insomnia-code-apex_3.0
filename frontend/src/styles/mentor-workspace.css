@@ -1,16 +1,20 @@
 .main-content:has(.code-workspace) {
+  --workspace-inset: 8px;
   max-width: none;
-  padding: 16px;
+  padding: var(--workspace-inset);
 }
 .code-workspace {
-  height: calc(100dvh - var(--app-topbar-height, 52px) - 32px);
+  height: calc(
+    100dvh - var(--app-topbar-height, 52px) - var(--workspace-inset, 8px) -
+      var(--workspace-inset, 8px)
+  );
   min-height: 600px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: #fff;
   border: 1px solid #e0dced;
-  border-radius: 14px;
+  border-radius: 10px;
   box-shadow: 0 8px 32px #41366708;
   color: #39354c;
 }
@@ -56,8 +60,14 @@
 .mentor-bottom-talk:hover:not(:disabled) {
   background: #5840c0;
 }
-.mentor-bottom-talk:focus-visible { outline: 3px solid #b8a2f1; outline-offset: 3px; }
-.mentor-bottom-talk:disabled { opacity: .5; cursor: not-allowed; }
+.mentor-bottom-talk:focus-visible {
+  outline: 3px solid #b8a2f1;
+  outline-offset: 3px;
+}
+.mentor-bottom-talk:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 @media (max-width: 850px) {
   .mentor-status:has(.mentor-bottom-talk) {
     flex-wrap: wrap;
@@ -817,4 +827,1072 @@
   .mentor-spin {
     animation: none;
   }
+}
+
+/* Bounded IDE panes: source owns the remaining space instead of following graph content. */
+.code-workspace {
+  min-height: 420px;
+}
+.code-workspace,
+.code-workspace * {
+  scrollbar-width: thin;
+  scrollbar-color: #d5cde5 transparent;
+}
+.code-workspace *::-webkit-scrollbar {
+  display: block;
+  width: 6px;
+  height: 6px;
+}
+.code-workspace-header {
+  padding: 6px 14px;
+  min-height: 32px;
+}
+.code-workspace-header > div > span {
+  display: none;
+}
+.code-workspace-toolbar {
+  padding: 5px 10px;
+  gap: 6px;
+}
+.code-workspace-toolbar button {
+  min-height: 32px;
+}
+.code-workspace-toolbar .workspace-auto {
+  font: inherit;
+  font-size: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--primary);
+  border-radius: 5px;
+  padding: 4px 8px;
+}
+.mentor-status {
+  min-height: 26px;
+  padding: 4px 12px;
+  font-size: 10px;
+}
+.code-workspace-body.has-explorer {
+  grid-template-columns: var(--explorer-width) 6px minmax(0, 1fr);
+}
+.code-workspace-body.has-mentor {
+  grid-template-columns: minmax(0, 1fr) 6px var(--mentor-width);
+}
+.code-workspace-body.has-explorer.has-mentor {
+  grid-template-columns: var(--explorer-width) 6px minmax(0, 1fr) 6px var(--mentor-width);
+}
+.mentor-editor {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.mentor-selection {
+  padding: 8px 12px;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.mentor-selection h1 {
+  font-size: 15px;
+  margin: 3px 0;
+}
+.mentor-selection small {
+  font-size: 9px;
+}
+.mentor-selection p {
+  font-size: 10px;
+}
+.mentor-workbench {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.mentor-workbench > .mentor-connections {
+  flex: 0 0 var(--graph-share);
+  min-height: 100px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 10px;
+}
+.mentor-workbench.source-collapsed > .mentor-connections {
+  flex: 1;
+}
+.mentor-connections .mentor-section-title {
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  gap: 5px;
+}
+.mentor-connections .mentor-section-title small {
+  color: #766984;
+}
+.mentor-connections .mentor-connection-map {
+  flex: 1;
+  min-height: 90px;
+  height: auto;
+  margin: 4px 0;
+}
+.mentor-code-section {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+.mentor-code-section > .repository-source {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  border-radius: 0;
+  border: 0;
+}
+.mentor-code-section .repository-source-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+}
+.mentor-code-section .repository-source-file,
+.mentor-code-section .repository-source-selection {
+  padding-block: 4px;
+}
+.mentor-edit-toolbar {
+  padding: 4px 10px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.mentor-edit-toolbar button {
+  min-height: 28px;
+}
+.mentor-draft-editor {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+}
+.mentor-draft-editor textarea {
+  flex: 1;
+  min-height: 80px;
+  height: auto;
+}
+.workspace-connections-summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 6px 12px;
+  font-size: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.workspace-connections-summary button,
+.workspace-graph-collapse,
+.workspace-source-toggle {
+  border: 0;
+  color: var(--primary);
+  background: transparent;
+  font: inherit;
+  font-size: 10px;
+  padding: 5px;
+}
+.workspace-graph-collapse {
+  align-self: flex-end;
+}
+.workspace-source-toggle {
+  flex-shrink: 0;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  padding: 5px 10px;
+}
+.mentor-evidence-note {
+  font-size: 9px;
+  margin: 3px 0;
+  flex-shrink: 0;
+}
+.workspace-connection-list {
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.workspace-connection-list button {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  padding: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.workspace-connection-list button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-connection-list summary {
+  cursor: pointer;
+  padding: 4px;
+}
+.workspace-folder {
+  padding-left: 10px;
+}
+.workspace-folder > summary {
+  cursor: pointer;
+  padding: 6px 2px;
+  font-size: 11px;
+  color: #625b72;
+  overflow-wrap: anywhere;
+}
+.mentor-file-tree {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  padding: 4px;
+}
+.mentor-file {
+  min-height: 32px;
+}
+.mentor-tree-components button {
+  min-height: 30px;
+}
+.mentor-tree-components small {
+  display: none;
+}
+.mentor-explorer-note {
+  padding: 8px;
+  line-height: 1.4;
+}
+.mentor-panel-heading {
+  padding: 9px 12px;
+}
+.workspace-mentor-context {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.workspace-mentor-context small {
+  color: #766984;
+}
+.mentor-citations button {
+  color: var(--primary);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px;
+  font: inherit;
+  font-size: 10px;
+}
+.workspace-splitter {
+  background: #f2eff8;
+  cursor: col-resize;
+  touch-action: none;
+  position: relative;
+  z-index: 2;
+}
+.workspace-splitter.horizontal {
+  flex: 0 0 6px;
+  cursor: row-resize;
+}
+.workspace-splitter:hover,
+.workspace-splitter:focus-visible {
+  background: #a493e8;
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+.workspace-splitter::after {
+  content: '';
+  position: absolute;
+  inset: 0 -3px;
+}
+.workspace-splitter.horizontal::after {
+  inset: -3px 0;
+}
+.workspace-folder summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+@media (max-width: 1100px) {
+  .code-workspace-body,
+  .code-workspace-body.has-explorer,
+  .code-workspace-body.has-mentor,
+  .code-workspace-body.has-explorer.has-mentor {
+    display: flex;
+    position: relative;
+  }
+  .mentor-editor {
+    flex: 1;
+  }
+  .code-workspace-body > .workspace-splitter {
+    display: none;
+  }
+  .mentor-explorer {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: min(280px, 80%);
+    z-index: 10;
+    box-shadow: 6px 0 16px #39354c20;
+  }
+  .real-mentor-panel:not(.conversation-centered) {
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: min(340px, 90%);
+    z-index: 11;
+    box-shadow: -6px 0 16px #39354c20;
+  }
+  .mentor-view-tabs button {
+    padding: 6px;
+    font-size: 10px;
+  }
+  .code-workspace-header > div {
+    min-width: 0;
+  }
+  .code-workspace-header strong {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+@media (max-width: 600px) {
+  .code-workspace-header {
+    display: none;
+  }
+  .code-workspace {
+    min-height: 420px;
+  }
+  .mentor-selection {
+    align-items: flex-start;
+  }
+  .mentor-source-badge {
+    display: none;
+  }
+  .mentor-view-tabs {
+    width: 100%;
+  }
+  .mentor-view-tabs button {
+    flex: 1;
+  }
+  .mentor-status > span:last-child {
+    display: none;
+  }
+}
+
+/* Bound optional panes to leave the editor at least 44% of the workbench. */
+.code-workspace-body.has-explorer {
+  grid-template-columns: min(var(--explorer-width), 24%) 6px minmax(0, 1fr);
+}
+.code-workspace-body.has-mentor {
+  grid-template-columns: minmax(0, 1fr) 6px min(var(--mentor-width), 32%);
+}
+.code-workspace-body.has-explorer.has-mentor {
+  grid-template-columns: min(var(--explorer-width), 24%) 6px minmax(0, 1fr) 6px min(
+      var(--mentor-width),
+      32%
+    );
+}
+.mentor-code-section .repository-source-file {
+  display: none;
+}
+.mentor-code-section .repository-source-toolbar {
+  min-height: 32px;
+  padding: 4px 10px;
+}
+.mentor-code-section .repository-source-selection {
+  min-height: 26px;
+}
+.mentor-status a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--primary);
+}
+.workspace-connection-list button {
+  font: inherit;
+}
+
+.mentor-workbench > .mentor-connections {
+  flex-shrink: 1;
+}
+.mentor-workbench > .mentor-code-section {
+  min-height: 220px;
+}
+
+@media (max-width: 850px) {
+  .code-workspace {
+    height: calc(
+      100dvh - var(--app-topbar-height, 56px) - var(--workspace-inset, 8px) -
+        var(--workspace-inset, 8px)
+    );
+    overflow: hidden;
+  }
+  .code-workspace-body {
+    min-height: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .code-workspace .mentor-spin {
+    animation: none;
+  }
+}
+
+/* Files left, focus modes centered, mentor controls right. */
+.code-workspace {
+  container-type: inline-size;
+}
+.code-workspace-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas: 'files modes actions';
+  align-items: center;
+}
+.code-workspace-toolbar > .workspace-toolbar-left {
+  grid-area: files;
+  justify-self: start;
+  flex-wrap: wrap;
+}
+.code-workspace-toolbar > .mentor-view-tabs {
+  grid-area: modes;
+  justify-self: center;
+  width: auto;
+}
+.code-workspace-toolbar > .mentor-layout-buttons:not(.workspace-toolbar-left) {
+  grid-area: actions;
+  justify-self: end;
+}
+@container (max-width: 900px) {
+  .code-workspace-toolbar {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: 'modes modes' 'files actions';
+  }
+}
+
+/* Component context stays one line until its supporting details are requested. */
+.mentor-selection.compact-selection {
+  display: block;
+  padding: 2px 10px;
+  border-radius: 0;
+}
+.mentor-selection-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  min-width: 0;
+}
+.mentor-selection-summary > svg {
+  flex-shrink: 0;
+  color: var(--primary);
+}
+.mentor-selection-summary h1 {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.selection-filename {
+  color: #766984;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.selection-draft-status {
+  color: var(--primary);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.selection-details-toggle {
+  margin-left: auto;
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-size: 10px;
+}
+.selection-details-toggle:hover {
+  background: var(--primary-soft);
+}
+.mentor-selection-details {
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 10px;
+  color: #766984;
+}
+.mentor-selection-details p {
+  flex-basis: 100%;
+  overflow-wrap: anywhere;
+  font-size: 10px;
+}
+@media (max-width: 600px) {
+  .selection-filename {
+    display: none;
+  }
+}
+
+/* One compact source command row, with context left and file actions right. */
+.mentor-edit-toolbar.combined-source-toolbar {
+  justify-content: flex-start;
+  gap: 4px 12px;
+  padding: 3px 10px;
+}
+.combined-source-toolbar .workspace-connections-summary {
+  border: 0;
+  padding: 0;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 10px;
+}
+.combined-source-toolbar .workspace-source-status {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: #766984;
+}
+.combined-source-toolbar .workspace-source-status strong {
+  font-weight: 500;
+}
+.combined-source-toolbar .workspace-source-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.combined-source-toolbar .workspace-source-actions button {
+  min-height: 30px;
+}
+.combined-source-toolbar .workspace-connections-summary button {
+  min-height: 30px;
+}
+@container (max-width: 900px) {
+  .combined-source-toolbar .workspace-source-status {
+    margin-left: 0;
+  }
+  .combined-source-toolbar .workspace-source-actions {
+    margin-left: auto;
+  }
+}
+
+/* Compact the source tab itself; its old inner padding set the toolbar height. */
+.mentor-code-section .repository-source-toolbar {
+  min-height: 34px;
+  padding: 0 8px 0 0;
+  flex-shrink: 0;
+}
+.mentor-code-section .repository-source-toolbar > span {
+  padding: 4px 10px;
+  min-height: 34px;
+  gap: 6px;
+}
+.mentor-code-section .repository-source-toolbar strong {
+  font-size: 11px;
+}
+.mentor-code-section .repository-editor-file-icon {
+  padding: 2px 3px;
+  font-size: 8px;
+}
+.mentor-code-section .repository-editor-readonly {
+  padding: 2px 4px;
+}
+.mentor-code-section .repository-source-toolbar > div {
+  flex-shrink: 0;
+  gap: 2px;
+}
+.mentor-code-section .repository-source-toolbar > div > button {
+  min-width: 30px;
+  min-height: 30px;
+  padding: 4px 6px;
+}
+
+/* Component identity and source commands share one row; details expand below it. */
+.workspace-component-command-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  min-width: 0;
+}
+.workspace-component-command-row > .mentor-selection-summary {
+  flex: 1 1 220px;
+}
+.workspace-component-command-row .selection-filename {
+  max-width: 160px;
+}
+.workspace-component-command-row .selection-details-toggle {
+  margin-left: 0;
+}
+.workspace-component-command-row > .combined-source-toolbar {
+  flex: 0 1 auto;
+  margin-left: auto;
+  border-bottom: 0;
+  padding: 0;
+}
+.workspace-component-command-row .workspace-source-status {
+  margin-left: 0;
+}
+
+/* Workspace readability pass: the existing palette and type, with clearer pane hierarchy. */
+.code-workspace-body {
+  padding: 0 8px;
+  background: #f7f6fc;
+  overflow: hidden;
+}
+.mentor-editor {
+  background: transparent;
+}
+.mentor-explorer,
+.real-mentor-panel:not(.conversation-centered) {
+  margin: 6px 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.mentor-selection.compact-selection {
+  margin: 6px 8px 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px 8px 0 0;
+}
+.mentor-workbench > .mentor-connections {
+  margin: 6px 8px 0;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.mentor-workbench > .mentor-code-section {
+  margin: 0 8px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.workspace-splitter {
+  background: transparent;
+}
+.workspace-source-toggle {
+  padding: 4px 12px;
+  font-size: 11px;
+  border: 0;
+}
+.mentor-explorer .mentor-search {
+  margin: 8px;
+  padding: 5px 8px;
+  min-height: 32px;
+}
+.mentor-search input {
+  min-width: 0;
+  padding: 0;
+  font-size: 11px;
+}
+.mentor-panel-heading {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--primary);
+}
+.mentor-file,
+.mentor-tree-components button {
+  font-size: 11px;
+}
+.workspace-folder > summary {
+  font-size: 11px;
+  padding-block: 5px;
+}
+.workspace-folder > summary > svg {
+  color: #8b809c;
+  margin-right: 3px;
+}
+.mentor-tree-components button > svg {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+.mentor-selection-summary h1 {
+  font-size: 13px;
+}
+.selection-filename,
+.selection-details-toggle,
+.combined-source-toolbar .workspace-connections-summary {
+  font-size: 11px;
+}
+.mentor-connections .mentor-section-title {
+  font-size: 12px;
+  color: #39354c;
+}
+.mentor-connections .mentor-section-title small {
+  font-size: 10px;
+}
+.workspace-graph-legend {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px 2px;
+  color: #766984;
+  font-size: 10px;
+}
+.workspace-graph-legend > span:nth-child(2) {
+  color: var(--primary);
+}
+.mentor-connections .mentor-connection-map {
+  margin: 4px 0 0;
+  border-radius: 6px;
+  border-color: #eeebf6;
+}
+.mentor-connection-map .react-flow__node {
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid #ded7ed;
+  box-shadow: 0 2px 6px #39354c05;
+}
+.mentor-connection-map .react-flow__node.workspace-node-selected {
+  background: #f2efff;
+  border: 2px solid var(--primary);
+  box-shadow: 0 4px 14px #6550df16;
+}
+.mentor-connection-map .mentor-map-component {
+  padding: 10px;
+  gap: 4px;
+  height: 100%;
+  justify-content: center;
+}
+.workspace-node-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.workspace-node-name > svg {
+  flex-shrink: 0;
+  color: var(--primary);
+}
+.mentor-map-component .workspace-node-name strong {
+  font-size: 13px;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+.workspace-node-file {
+  font-size: 11px;
+  color: #766984;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mentor-map-component small {
+  font-size: 11px;
+  color: #766984;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.workspace-node-description {
+  font-size: 11px;
+  line-height: 1.4;
+  color: #625b72;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.workspace-graph-focus {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--primary);
+  box-shadow: 0 2px 5px #39354c08;
+}
+.workspace-graph-limit {
+  margin: 4px 0;
+  font-size: 11px;
+}
+.workspace-mentor-overview {
+  padding: 14px 12px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.workspace-mentor-overview header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.workspace-mentor-overview h2 {
+  font-size: 17px;
+  line-height: 1.3;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #39354c;
+}
+.workspace-component-kind {
+  padding: 3px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.workspace-overview-file {
+  margin: 6px 0 10px;
+  font-size: 11px;
+  color: #766984;
+  overflow-wrap: anywhere;
+}
+.workspace-overview-description {
+  font-size: 12px;
+  line-height: 1.65;
+  margin: 8px 0;
+  color: #625b72;
+  overflow-wrap: anywhere;
+}
+.workspace-evidence-caption {
+  display: block;
+  font-size: 10px;
+  color: #766984;
+  line-height: 1.5;
+}
+.workspace-relationship-counts {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.3fr;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 10px 0;
+  border-block: 1px solid var(--border);
+}
+.workspace-relationship-counts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.workspace-relationship-counts strong {
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+  color: #39354c;
+}
+.workspace-relationship-counts span {
+  font-size: 10px;
+  color: #766984;
+}
+.workspace-overview-links {
+  font-size: 11px;
+  margin-top: 8px;
+}
+.workspace-overview-links summary {
+  padding: 5px 0;
+  cursor: pointer;
+  color: var(--primary);
+}
+.workspace-overview-links summary span {
+  color: #766984;
+  margin-left: 4px;
+}
+.workspace-overview-links ul {
+  list-style: none;
+  margin: 4px 0;
+  padding: 0;
+  max-height: 144px;
+  overflow: auto;
+}
+.workspace-overview-links li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid #f2eff8;
+}
+.workspace-overview-links li button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  min-height: 30px;
+  text-align: left;
+  padding: 4px 0;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+}
+.workspace-overview-links li button strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.workspace-overview-links li button span {
+  font-size: 10px;
+  color: #766984;
+  flex-shrink: 0;
+}
+.workspace-overview-links li a {
+  font-size: 10px;
+  color: #766984;
+  padding: 4px 0;
+}
+.workspace-overview-links .workspace-unresolved-item {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  padding: 6px 0;
+  overflow-wrap: anywhere;
+}
+.workspace-overview-links p {
+  font-size: 11px;
+  color: #766984;
+}
+.mentor-question-suggestions {
+  padding: 12px;
+}
+.mentor-question-suggestions > small {
+  font-size: 10px;
+  color: var(--primary);
+}
+.mentor-question-suggestions > button {
+  min-height: 34px;
+  font-size: 11px;
+}
+.mentor-question-form label {
+  font-size: 11px;
+}
+.mentor-question-form textarea {
+  font-size: 12px;
+}
+.mentor-code-section .repository-source .source-focused-line {
+  background: #f5f1fc;
+  box-shadow: none;
+}
+.mentor-code-section .repository-source .source-focused-line .repository-source-number {
+  background: #f0eafb;
+  border-right-color: #e4d8f8;
+}
+.mentor-code-section .repository-source .source-focus-start {
+  background: #ece4fc;
+  box-shadow: inset 3px 0 var(--primary);
+}
+.mentor-code-section .repository-source .source-focus-start .repository-source-number {
+  color: var(--primary);
+  font-weight: 600;
+}
+.workspace-options {
+  position: relative;
+}
+.workspace-options > button {
+  min-width: 32px;
+}
+.workspace-options-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 240px;
+  z-index: 50;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px #39354c16;
+}
+.workspace-options-panel > button {
+  display: flex;
+  width: 100%;
+  padding: 8px;
+  text-align: left;
+  min-height: 34px;
+  font-size: 12px;
+}
+.workspace-options-panel > button:hover {
+  background: var(--primary-soft);
+}
+.workspace-options-panel > p {
+  margin: 6px 8px;
+  color: #766984;
+  font-size: 11px;
+  line-height: 1.5;
+}
+@media (max-width: 1100px) {
+  .mentor-explorer {
+    left: 8px;
+    max-height: none;
+  }
+  .real-mentor-panel:not(.conversation-centered) {
+    right: 8px;
+  }
+}
+@media (max-width: 600px) {
+  .code-workspace-body {
+    padding-inline: 4px;
+  }
+  .mentor-selection.compact-selection {
+    margin-inline: 4px;
+  }
+  .mentor-workbench > .mentor-connections,
+  .mentor-workbench > .mentor-code-section {
+    margin-inline: 4px;
+  }
+}
+
+.real-mentor-panel:has(.workspace-mentor-content) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.real-mentor-panel:has(.workspace-mentor-content) > .mentor-panel-heading {
+  flex-shrink: 0;
+}
+.workspace-mentor-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.real-mentor-panel:has(.workspace-mentor-content) > .mentor-question-form {
+  flex-shrink: 0;
+  margin: 0;
+  background: var(--surface);
+  padding: 10px 12px;
+}
+.real-mentor-panel:has(.workspace-mentor-content) .mentor-question-form textarea {
+  min-height: 60px;
+  height: 66px;
+}
+.mentor-explorer .mentor-search {
+  height: 34px;
+}
+
+/* Keep both panes reachable when a short viewport cannot fit their minimum heights. */
+@media (max-height: 740px), (max-width: 600px) {
+  .mentor-workbench {
+    overflow: auto;
+  }
+  .mentor-workbench > .mentor-code-section {
+    flex-shrink: 0;
+  }
+  .mentor-workbench > .mentor-connections {
+    flex-shrink: 0;
+    min-height: 190px;
+  }
+}
+.mentor-explorer .mentor-search:focus-within {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+.workspace-overview-links summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }

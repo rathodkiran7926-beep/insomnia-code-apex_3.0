@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
@@ -7,7 +6,8 @@ import {
   Columns2,
   Download,
   FileCode2,
-  GitCommitHorizontal,
+  Folder,
+  Braces,
   LoaderCircle,
   MessageCircle,
   Mic,
@@ -17,16 +17,24 @@ import {
   Search,
   Send,
 } from 'lucide-react';
-import { Background, Controls, MarkerType, Position, ReactFlow } from '@xyflow/react';
-import type { Node, Edge } from '@xyflow/react';
 import { useRepositoryAnalysis } from '../state/RepositoryAnalysisContext';
 import { analysisApi } from '../services/analysisApi';
 import type { RepositorySnapshot } from '../domain/analysisTypes';
 import { RepositorySource } from './RepositorySource';
 import { ComponentDocumentation } from './ComponentDocumentation';
 import { ComponentDiscussion } from './ComponentDiscussion';
-import { clearConnections, clearEdgeTypes, withConnectionBounds } from './GraphConnections';
-import { directedLayout } from '../domain/graphLayout';
+import { WorkspaceConnectionMap as ConnectionMap } from './WorkspaceConnectionMap';
+import { WorkspaceMentorOverview } from './WorkspaceMentorOverview';
+import { WorkspaceOptions } from './WorkspaceOptions';
+import { WorkspaceSplitter } from './WorkspaceSplitter';
+import {
+  automaticWorkspaceMode,
+  componentForCitation,
+  automaticGraphShare,
+  workspaceFileTree,
+  type WorkspaceFolder,
+  type WorkspaceMode,
+} from '../domain/workspaceLayout';
 import '../styles/repository-source.css';
 import '../styles/mentor-workspace.css';
 
@@ -82,10 +90,18 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
       '',
   );
   const selected = components.find((c) => c.id === selectedId);
-  const reference = selected ? refs.get(selected.referenceId) : undefined;
-  const [view, setView] = useState<'code' | 'split' | 'connections'>('split');
+  const [citation, setCitation] = useState<Reference | null>(null);
+  const reference = citation || (selected ? refs.get(selected.referenceId) : undefined);
+  const [manualMode, setManualMode] = useState<WorkspaceMode | null>(null);
+  const [explorerWidth, setExplorerWidth] = useState(240);
+  const [mentorWidth, setMentorWidth] = useState(320);
+  const [manualGraphShare, setManualGraphShare] = useState<number | null>(null);
+  const [selectionDetailsOpen, setSelectionDetailsOpen] = useState(false);
+  const [sourceCollapsed, setSourceCollapsed] = useState(false);
   const [explorer, setExplorer] = useState(true);
-  const [mentor, setMentor] = useState(true);
+  const [mentor, setMentor] = useState(
+    () => searchParams.get('discuss') === '1' || window.innerWidth >= 1280,
+  );
   const [discussing, setDiscussing] = useState(searchParams.get('discuss') === '1');
   const [centeredConversation, setCenteredConversation] = useState(false);
   const [search, setSearch] = useState('');
@@ -137,6 +153,14 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
   const edges = snapshot.relationships.filter(
     (e) => e.source === selectedId || e.target === selectedId,
   );
+  const view = manualMode || automaticWorkspaceMode(edges.length);
+  const graphShare =
+    manualGraphShare ?? (view === 'connections' ? 55 : automaticGraphShare(edges.length));
+  const changeView = (mode: WorkspaceMode) => {
+    setManualMode(mode);
+    setSourceCollapsed(false);
+    setManualGraphShare(null);
+  };
   const outgoing = edges.filter((e) => e.source === selectedId);
   const incoming = edges.filter((e) => e.target === selectedId);
   const files = [...new Set(components.map((c) => refs.get(c.referenceId)!.file))].sort();
@@ -154,6 +178,26 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
   const dirty = draft !== undefined && fullSource?.file === file && draft !== fullSource.excerpt;
   function select(id: string) {
     setSelectedId(id);
+    setCitation(null);
+    setEditing(false);
+  }
+  useEffect(() => {
+    if (searchParams.get('discuss') === '1') {
+      setMentor(true);
+      setDiscussing(true);
+    }
+    const id = searchParams.get('component');
+    if (id && components.some((component) => component.id === id)) {
+      setSelectedId(id);
+      setCitation(null);
+    }
+  }, [searchParams, components]);
+  function inspectCitation(next: Reference) {
+    const componentId = componentForCitation(components, snapshot.references, next, selectedId);
+    if (componentId) setSelectedId(componentId);
+    if (view === 'connections') changeView('split');
+    setCitation(next);
+    setSourceCollapsed(false);
     setEditing(false);
   }
   async function ask(text: string) {
@@ -189,50 +233,57 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  const connectionButtons = (items: typeof edges, direction: 'source' | 'target') =>
-    items.length ? (
-      items.map((e) => {
-        const other = components.find((c) => c.id === e[direction]);
-        return other ? (
-          <button key={e.id} onClick={() => select(other.id)}>
-            <span>{e.type.replaceAll('_', ' ')}</span>
-            <strong>{other.name}</strong>
-            <small>{refs.get(other.referenceId)?.file}</small>
-          </button>
-        ) : null;
-      })
-    ) : (
-      <p>No connections resolved by static analysis.</p>
-    );
-
   return (
-    <div className="code-workspace" data-snapshot-id={snapshot.snapshotId}>
-      <header className="code-workspace-header">
-        <div>
-          <Code2 size={19} />
-          <strong>{snapshot.repository.replace('https://github.com/', '')}</strong>
-          <span> / Mentor workspace</span>
-        </div>
-        <Link to="/repository">
-          Architecture & documentation <ArrowRight size={14} />
-        </Link>
-      </header>
+    <div
+      className="code-workspace"
+      data-snapshot-id={snapshot.snapshotId}
+      data-mode={view}
+      style={
+        {
+          '--explorer-width': `${explorerWidth}px`,
+          '--mentor-width': `${mentorWidth}px`,
+          '--graph-share': `${graphShare}%`,
+        } as CSSProperties
+      }
+    >
       <div className="code-workspace-toolbar">
+        <div className="workspace-toolbar-left mentor-layout-buttons">
+          <button
+            aria-controls="workspace-files"
+            aria-pressed={explorer}
+            onClick={() => setExplorer(!explorer)}
+          >
+            <PanelLeft size={15} />
+            Files
+          </button>
+          <WorkspaceOptions
+            automatic={manualMode === null && manualGraphShare === null}
+            onAuto={() => {
+              setManualMode(null);
+              setManualGraphShare(null);
+              setSourceCollapsed(false);
+            }}
+            onReset={() => {
+              setExplorerWidth(240);
+              setMentorWidth(320);
+              setManualGraphShare(null);
+            }}
+          />
+        </div>
         <div className="mentor-view-tabs" aria-label="Workspace view">
           {(
             [
-              { id: 'code', label: 'Code', icon: Code2 },
-              { id: 'split', label: 'Split', icon: Columns2 },
-              { id: 'connections', label: 'Connections', icon: Network },
+              { id: 'code', label: 'Code Focus', icon: Code2 },
+              { id: 'split', label: 'Split Focus', icon: Columns2 },
+              { id: 'connections', label: 'Architecture Focus', icon: Network },
             ] as const
           ).map((v) => (
-            <button key={v.id} aria-pressed={view === v.id} onClick={() => setView(v.id)}>
+            <button key={v.id} aria-pressed={view === v.id} onClick={() => changeView(v.id)}>
               <v.icon size={14} />
               {v.label}
             </button>
           ))}
         </div>
-        <p>Choose a component. Follow connections. Ask about the code.</p>
         <div className="mentor-layout-buttons">
           <button
             className="mentor-voice-launch"
@@ -247,13 +298,13 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
             }}
           >
             <Mic size={17} />
-            Talk with mentor
+            Voice & text
           </button>
-          <button aria-pressed={explorer} onClick={() => setExplorer(!explorer)}>
-            <PanelLeft size={15} />
-            Files
-          </button>
-          <button aria-pressed={mentor} onClick={() => setMentor(!mentor)}>
+          <button
+            aria-controls="workspace-mentor"
+            aria-pressed={mentor}
+            onClick={() => setMentor(!mentor)}
+          >
             <PanelRight size={15} />
             Mentor
           </button>
@@ -263,7 +314,7 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
         className={`code-workspace-body ${explorer ? 'has-explorer' : ''} ${mentor && !centeredConversation ? 'has-mentor' : ''} ${discussing ? 'has-discussion' : ''}`}
       >
         {explorer && (
-          <aside className="mentor-explorer">
+          <aside id="workspace-files" className="mentor-explorer" aria-label="File explorer">
             <div className="mentor-panel-heading">
               EXPLORER <small>{files.length} files</small>
             </div>
@@ -277,49 +328,62 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
               />
             </label>
             <div className="mentor-file-tree">
-              {filteredFiles.map((path) => {
-                const children = components.filter((c) => refs.get(c.referenceId)?.file === path);
-                const active = path === file;
-                return (
-                  <div key={path}>
-                    <button
-                      className={`mentor-file ${active ? 'active' : ''}`}
-                      title={path}
-                      onClick={() =>
-                        select((children.find((c) => c.role === 'module') || children[0]).id)
-                      }
-                    >
-                      <FileCode2 size={14} />
-                      <span>{path}</span>
-                      {drafts[path] !== undefined && <i title="Local draft">●</i>}
-                    </button>
-                    {(active || !!search) && (
-                      <div className="mentor-tree-components">
-                        {children
-                          .filter(
-                            (c) =>
-                              c.role !== 'module' &&
-                              (!search ||
-                                path.toLowerCase().includes(search.toLowerCase()) ||
-                                c.name.toLowerCase().includes(search.toLowerCase())),
-                          )
-                          .map((c) => (
-                            <button
-                              key={c.id}
-                              className={selectedId === c.id ? 'active' : ''}
-                              onClick={() => select(c.id)}
-                              title={`${c.role} · ${c.name}`}
-                            >
-                              <Code2 size={12} />
-                              <span>{c.name}</span>
-                              <small>{c.role.replaceAll('_', ' ')}</small>
-                            </button>
-                          ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              <WorkspaceFolders
+                tree={workspaceFileTree(filteredFiles)}
+                selectedFile={file}
+                searching={!!search}
+                renderFiles={(paths) => (
+                  <>
+                    {paths.map((path) => {
+                      const children = components.filter(
+                        (c) => refs.get(c.referenceId)?.file === path,
+                      );
+                      const active = path === file;
+                      return (
+                        <div key={path}>
+                          <button
+                            className={`mentor-file ${active ? 'active' : ''}`}
+                            aria-current={active ? 'true' : undefined}
+                            title={path}
+                            onClick={() =>
+                              select((children.find((c) => c.role === 'module') || children[0]).id)
+                            }
+                          >
+                            <FileCode2 size={14} />
+                            <span>{path.split('/').pop()}</span>
+                            {drafts[path] !== undefined && <i title="Local draft">●</i>}
+                          </button>
+                          {(active || !!search) && (
+                            <div className="mentor-tree-components">
+                              {children
+                                .filter(
+                                  (c) =>
+                                    c.role !== 'module' &&
+                                    (!search ||
+                                      path.toLowerCase().includes(search.toLowerCase()) ||
+                                      c.name.toLowerCase().includes(search.toLowerCase())),
+                                )
+                                .map((c) => (
+                                  <button
+                                    key={c.id}
+                                    className={selectedId === c.id ? 'active' : ''}
+                                    aria-current={selectedId === c.id ? 'true' : undefined}
+                                    onClick={() => select(c.id)}
+                                    title={`${c.role} · ${c.name}`}
+                                  >
+                                    <Braces size={12} />
+                                    <span>{c.name}</span>
+                                    <small>{c.role.replaceAll('_', ' ')}</small>
+                                  </button>
+                                ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+              />
               {!filteredFiles.length && <p>No matching files or components.</p>}
             </div>
             <p className="mentor-explorer-note">
@@ -328,154 +392,237 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
             </p>
           </aside>
         )}
-        <main className="mentor-editor">
+        {explorer && (
+          <WorkspaceSplitter
+            label="File explorer width"
+            controls="workspace-files"
+            value={explorerWidth}
+            min={160}
+            max={360}
+            onChange={setExplorerWidth}
+            onCollapse={() => {
+              setExplorer(false);
+              document
+                .querySelector<HTMLButtonElement>('[aria-controls="workspace-files"]')
+                ?.focus();
+            }}
+          />
+        )}
+        <section className="mentor-editor" aria-label="Selected component workspace">
           {selected ? (
             <>
-              <div className="mentor-selection">
-                <div>
-                  <small>
-                    {selected.role.replaceAll('_', ' ')}
-                    {selected.inferred ? ' · inferred' : ''}
-                  </small>
-                  <h1>{selected.name}</h1>
-                  <p>
-                    {file}{' '}
-                    <span>
-                      {' '}
-                      L{reference?.startLine}–{reference?.endLine}
+              <div className="mentor-selection compact-selection">
+                <div className="workspace-component-command-row">
+                  <div className="mentor-selection-summary">
+                    <Code2 size={14} aria-hidden="true" />
+                    <h1 title={selected.name}>{selected.name}</h1>
+                    <span className="selection-filename" title={file}>
+                      {file.split('/').pop()}
                     </span>
-                  </p>
-                </div>
-                <span className="mentor-source-badge">
-                  {dirty ? 'Local draft' : 'Analyzed source'}
-                </span>
-              </div>
-              {view !== 'code' && (
-                <section className="mentor-connections">
-                  <div className="mentor-section-title">
-                    <Network size={15} />
-                    <strong>Connected code</strong>
-                    <small>{edges.length} recorded relationships</small>
+                    {dirty && (
+                      <span className="selection-draft-status" role="status">
+                        Local draft
+                      </span>
+                    )}
+                    <button
+                      className="selection-details-toggle"
+                      aria-expanded={selectionDetailsOpen}
+                      aria-controls="workspace-selection-details"
+                      onClick={() => setSelectionDetailsOpen(!selectionDetailsOpen)}
+                    >
+                      {selectionDetailsOpen ? 'Less details' : 'Details'}
+                    </button>
                   </div>
-                  {view === 'connections' ? (
-                    <ConnectionMap selectedId={selectedId} snapshot={snapshot} onSelect={select} />
-                  ) : (
-                    <div className="mentor-flow">
-                      <div>
-                        <h3>
-                          Used by <span>{incoming.length}</span>
-                        </h3>
-                        {connectionButtons(incoming, 'source')}
-                      </div>
-                      <div className="mentor-flow-selected">
-                        <Code2 size={20} />
-                        <strong>{selected.name}</strong>
-                        <small>Selected component</small>
-                      </div>
-                      <div>
-                        <h3>
-                          Uses <span>{outgoing.length}</span>
-                        </h3>
-                        {connectionButtons(outgoing, 'target')}
-                      </div>
-                    </div>
-                  )}
-                  <p className="mentor-evidence-note">
-                    Connections come from static source analysis. Dynamic behavior may be missing.
-                  </p>
-                </section>
-              )}
-              {view !== 'connections' && (
-                <section className="mentor-code-section">
-                  <div className="mentor-edit-toolbar">
-                    <div>
-                      <FileCode2 size={14} />
-                      <strong>{fullSource ? 'Complete file' : 'Saved component excerpt'}</strong>
-                      {sourceLoading && <LoaderCircle size={14} className="mentor-spin" />}
-                    </div>
-                    <div>
-                      <button
-                        disabled={!fullSource}
-                        aria-pressed={editing}
-                        onClick={() => setEditing(!editing)}
-                      >
-                        {editing ? 'Read source' : 'Edit local draft'}
-                      </button>
-                      {draft !== undefined && (
-                        <button
-                          onClick={() => {
-                            setDrafts((old) => {
-                              const next = { ...old };
-                              delete next[file];
-                              return next;
-                            });
-                            setEditing(false);
-                          }}
-                        >
-                          Discard draft
-                        </button>
+                  {view !== 'connections' && (!sourceCollapsed || view === 'code') && (
+                    <div className="mentor-edit-toolbar combined-source-toolbar">
+                      {view === 'code' && (
+                        <div className="workspace-connections-summary">
+                          <Network size={14} />
+                          <span>
+                            {incoming.length} callers / {outgoing.length} dependencies
+                          </span>
+                          <button onClick={() => changeView('split')}>Explore connections</button>
+                        </div>
                       )}
-                      <button disabled={!fullSource} onClick={downloadDraft}>
-                        <Download size={13} />
-                        Download{dirty ? ' draft' : ' file'}
-                      </button>
+                      {sourceLoading && (
+                        <div
+                          className="workspace-source-status"
+                          role="status"
+                          aria-label="Loading source"
+                        >
+                          <LoaderCircle size={14} className="mentor-spin" />
+                        </div>
+                      )}
+                      <div className="workspace-source-actions">
+                        <button
+                          disabled={!fullSource}
+                          aria-pressed={editing}
+                          onClick={() => setEditing(!editing)}
+                        >
+                          {editing ? 'Read source' : 'Edit local draft'}
+                        </button>
+                        {draft !== undefined && (
+                          <button
+                            onClick={() => {
+                              setDrafts((old) => {
+                                const next = { ...old };
+                                delete next[file];
+                                return next;
+                              });
+                              setEditing(false);
+                            }}
+                          >
+                            Discard draft
+                          </button>
+                        )}
+                        <button disabled={!fullSource} onClick={downloadDraft}>
+                          <Download size={13} />
+                          Download{dirty ? ' draft' : ' file'}
+                        </button>
+                      </div>
                     </div>
+                  )}
+                </div>
+                {selectionDetailsOpen && (
+                  <div id="workspace-selection-details" className="mentor-selection-details">
+                    <span>
+                      {selected.role.replaceAll('_', ' ')}
+                      {selected.inferred ? ' / inferred' : ''}
+                    </span>
+                    <p>
+                      {file}{' '}
+                      <span>
+                        L{reference?.startLine}-{reference?.endLine}
+                      </span>
+                    </p>
+                    <span>
+                      {dirty ? 'Local draft' : 'Analyzed source'} / Commit{' '}
+                      {snapshot.commit.slice(0, 12)}
+                    </span>
                   </div>
-                  {sourceError && (
-                    <div className="mentor-source-warning" role="status">
-                      Complete file could not load: {sourceError} Showing the saved excerpt.{' '}
-                      <a href={reference?.url} target="_blank" rel="noreferrer">
-                        Open source on GitHub
-                      </a>
+                )}
+              </div>
+              <div
+                className={`mentor-workbench ${sourceCollapsed || view === 'connections' ? 'source-collapsed' : ''}`}
+              >
+                {view !== 'code' && (
+                  <section
+                    id="workspace-graph"
+                    className="mentor-connections"
+                    aria-label="Architecture connections"
+                  >
+                    <div className="mentor-section-title">
+                      <Network size={15} />
+                      <strong>Component connections</strong>
+                      <small>
+                        {edges.length} source-linked /{' '}
+                        {
+                          snapshot.report.unresolved.filter(
+                            (item) => refs.get(item.referenceId)?.file === file,
+                          ).length
+                        }{' '}
+                        unresolved in file
+                      </small>
                     </div>
-                  )}
-                  {editing && fullSource ? (
-                    <div className="mentor-draft-editor">
-                      <label htmlFor="local-source-draft">Local draft · {file}</label>
-                      <p>
-                        Changes stay in this browser tab. Download the file to apply them in your
-                        project. Mentor answers use the analyzed source.
-                      </p>
-                      <textarea
-                        id="local-source-draft"
-                        spellCheck={false}
-                        value={draft ?? fullSource.excerpt}
-                        onChange={(e) => setDrafts((old) => ({ ...old, [file]: e.target.value }))}
-                        onKeyDown={(e) => {
-                          if (e.key !== 'Tab') return;
-                          e.preventDefault();
-                          const target = e.currentTarget;
-                          const start = target.selectionStart;
-                          const end = target.selectionEnd;
-                          const value = target.value;
-                          setDrafts((old) => ({
-                            ...old,
-                            [file]: value.slice(0, start) + '  ' + value.slice(end),
-                          }));
-                          requestAnimationFrame(() => {
-                            target.selectionStart = target.selectionEnd = start + 2;
-                          });
-                        }}
-                      />
+                    <div className="workspace-graph-legend" aria-label="Graph layout">
+                      <span>Callers</span>
+                      <span>Selected component</span>
+                      <span>Dependencies</span>
                     </div>
-                  ) : (
-                    <RepositorySource
-                      source={source}
-                      commit={snapshot.commit}
-                      focusRange={reference}
+                    <ConnectionMap
+                      key={view}
+                      selectedId={selectedId}
+                      snapshot={snapshot}
+                      onSelect={select}
                     />
-                  )}
-                </section>
-              )}
+                  </section>
+                )}
+                {view === 'split' && !sourceCollapsed && (
+                  <WorkspaceSplitter
+                    label="Graph height"
+                    controls="workspace-graph"
+                    value={graphShare}
+                    min={20}
+                    max={75}
+                    horizontal
+                    onChange={(share) => {
+                      setManualGraphShare(share);
+                      setManualMode(view);
+                    }}
+                    onCollapse={() => {
+                      changeView('code');
+                      document
+                        .querySelector<HTMLButtonElement>('.mentor-view-tabs button')
+                        ?.focus();
+                    }}
+                  />
+                )}
+                {view !== 'connections' && (!sourceCollapsed || view === 'code') && (
+                  <section
+                    id="workspace-source"
+                    className="mentor-code-section"
+                    aria-label="Source code"
+                  >
+                    {sourceError && (
+                      <div className="mentor-source-warning" role="status">
+                        Complete file could not load: {sourceError} Showing the saved excerpt.{' '}
+                        <a href={reference?.url} target="_blank" rel="noreferrer">
+                          Open source on GitHub
+                        </a>
+                      </div>
+                    )}
+                    {editing && fullSource ? (
+                      <div className="mentor-draft-editor">
+                        <label htmlFor="local-source-draft">Local draft · {file}</label>
+                        <p>
+                          Changes stay in this browser tab. Download the file to apply them in your
+                          project. Mentor answers use the analyzed source.
+                        </p>
+                        <textarea
+                          id="local-source-draft"
+                          spellCheck={false}
+                          value={draft ?? fullSource.excerpt}
+                          onChange={(e) => setDrafts((old) => ({ ...old, [file]: e.target.value }))}
+                        />
+                      </div>
+                    ) : (
+                      <RepositorySource
+                        source={source}
+                        commit={snapshot.commit}
+                        focusRange={reference}
+                      />
+                    )}
+                  </section>
+                )}
+              </div>
             </>
           ) : (
             <p>
               No source components were resolved. See the analysis report for supported patterns.
             </p>
           )}
-        </main>
+        </section>
+        {mentor && !centeredConversation && (
+          <WorkspaceSplitter
+            label="Mentor width"
+            controls="workspace-mentor"
+            value={mentorWidth}
+            min={260}
+            max={520}
+            reverse
+            onChange={setMentorWidth}
+            onCollapse={() => {
+              setMentor(false);
+              document
+                .querySelector<HTMLButtonElement>('[aria-controls="workspace-mentor"]')
+                ?.focus();
+            }}
+          />
+        )}
         {mentor && (
           <aside
+            id="workspace-mentor"
+            aria-label="Mentor"
             className={`real-mentor-panel ${centeredConversation ? 'conversation-centered' : ''}`}
           >
             {discussing ? (
@@ -493,50 +640,72 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
                 </div>
                 {selected && (
                   <>
-                    <ComponentDocumentation
-                      defaultOpen={false}
-                      key={selectedId}
-                      snapshot={snapshot}
-                      componentId={selectedId}
-                      onInspect={select}
-                    />
-                    <div className="mentor-conversation" aria-live="polite">
-                      {turns
-                        .filter((t) => t.componentId === selectedId)
-                        .map((t, i) => (
-                          <article className="mentor-turn" key={i}>
-                            <h3>{t.question}</h3>
-                            <p>{t.answer}</p>
-                            <small>{t.notice}</small>
-                            <div className="mentor-citations">
-                              {t.citations.map((c) => (
-                                <a key={c.id} href={c.url} target="_blank" rel="noreferrer">
-                                  {c.file.split('/').pop()}:{c.startLine}–{c.endLine}
-                                </a>
-                              ))}
-                            </div>
-                          </article>
+                    <div className="workspace-mentor-content">
+                      <WorkspaceMentorOverview
+                        snapshot={snapshot}
+                        componentId={selectedId}
+                        onSelect={select}
+                      />
+                      <ComponentDocumentation
+                        defaultOpen={false}
+                        key={selectedId}
+                        snapshot={snapshot}
+                        componentId={selectedId}
+                        onInspect={select}
+                      />
+                      <div className="mentor-conversation" aria-live="polite">
+                        {turns
+                          .filter((t) => t.componentId === selectedId)
+                          .map((t, i) => (
+                            <article className="mentor-turn" key={i}>
+                              <h3>{t.question}</h3>
+                              <p>{t.answer}</p>
+                              <small>{t.notice}</small>
+                              <div className="mentor-citations">
+                                {t.citations.map((c) => (
+                                  <button
+                                    key={c.id}
+                                    title={c.file}
+                                    onClick={() => inspectCitation(c)}
+                                  >
+                                    {c.file.split('/').pop()}:{c.startLine}-{c.endLine}
+                                  </button>
+                                ))}
+                              </div>
+                            </article>
+                          ))}
+                        {asking && (
+                          <p role="status">
+                            <LoaderCircle size={14} className="mentor-spin" />
+                            Reading saved source…
+                          </p>
+                        )}
+                        {questionError && <p role="alert">{questionError}</p>}
+                      </div>
+                      <div className="mentor-question-suggestions">
+                        <small>ASK ABOUT THE SELECTED CODE</small>
+                        {['Explain Code', 'Explore Dependencies', 'What Could Break?'].map((q) => (
+                          <button
+                            key={q}
+                            disabled={asking}
+                            onClick={() =>
+                              void ask(
+                                {
+                                  'Explain Code':
+                                    'Explain this component using its source references.',
+                                  'Explore Dependencies':
+                                    'What calls this component and which dependencies does it use?',
+                                  'What Could Break?':
+                                    'What could break if I change this component, and what should I verify?',
+                                }[q] || q,
+                              )
+                            }
+                          >
+                            {q}
+                            <ArrowRight size={13} />
+                          </button>
                         ))}
-                      {asking && (
-                        <p role="status">
-                          <LoaderCircle size={14} className="mentor-spin" />
-                          Reading saved source…
-                        </p>
-                      )}
-                      {questionError && <p role="alert">{questionError}</p>}
-                    </div>
-                    <div className="mentor-question-suggestions">
-                      <small>ASK ABOUT THE SELECTED CODE</small>
-                      {[
-                        'What does this component do?',
-                        'What calls this and what does it use?',
-                        'What should I check before changing this?',
-                      ].map((q) => (
-                        <button key={q} disabled={asking} onClick={() => void ask(q)}>
-                          {q}
-                          <ArrowRight size={13} />
-                        </button>
-                      ))}
+                      </div>
                     </div>
                     <form
                       className="mentor-question-form"
@@ -569,109 +738,42 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
           </aside>
         )}
       </div>
-      <footer className="mentor-status">
-        <span>
-          <GitCommitHorizontal size={13} />
-          {snapshot.commit.slice(0, 12)} · Analyzed snapshot
-        </span>
-        {createPortal(<button
-          className="mentor-bottom-talk"
-          disabled={!selected}
-          onClick={() => {
-            setMentor(true);
-            setDiscussing(true);
-            setCenteredConversation(true);
-          }}
-        >
-          <Mic size={16} /> Talk with mentor
-        </button>, document.body)}
-        <span>
-          {Object.keys(drafts).length} local drafts · {components.length} components
-        </span>
-      </footer>
+
     </div>
   );
 }
 
-function ConnectionMap({
-  selectedId,
-  snapshot,
-  onSelect,
+function WorkspaceFolders({
+  tree,
+  selectedFile,
+  searching,
+  renderFiles,
 }: {
-  selectedId: string;
-  snapshot: RepositorySnapshot;
-  onSelect: (id: string) => void;
+  tree: WorkspaceFolder;
+  selectedFile: string;
+  searching: boolean;
+  renderFiles: (paths: string[]) => ReactNode;
 }) {
-  const all = snapshot.relationships.filter(
-    (e) => e.source === selectedId || e.target === selectedId,
-  );
-  const neighbors = [...new Set(all.flatMap((e) => [e.source, e.target]))].filter(
-    (id) => id !== selectedId,
-  );
-  const visible = new Set([selectedId, ...neighbors.slice(0, 24)]);
-  const layout = directedLayout([...visible], all, {
-    width: 260,
-    height: 105,
-    gapX: 160,
-    gapY: 55,
-    maxRows: 5,
-  });
-  const nodes: Node[] = snapshot.components
-    .filter((c) => visible.has(c.id))
-    .map((c) => ({
-      id: c.id,
-      data: {
-        label: (
-          <div className="mentor-map-component">
-            <strong title={c.name}>{c.role === 'module' ? c.name.split('/').pop() : c.name}</strong>
-            <small>{c.role.replaceAll('_', ' ')}</small>
-          </div>
-        ),
-      },
-      position: layout.positions.get(c.id)!,
-      sourcePosition: Position.Right,
-      targetPosition: Position.Left,
-      style: {
-        width: 260,
-        height: 105,
-        borderColor: c.id === selectedId ? '#7561ee' : '#ddd9eb',
-        background: c.id === selectedId ? '#f2efff' : 'white',
-        borderRadius: 9,
-      },
-    }));
-  const edges: Edge[] = all
-    .filter((e) => visible.has(e.source) && visible.has(e.target))
-    .map((e) => ({
-      id: e.id,
-      source: e.source,
-      target: e.target,
-      label: e.type.replaceAll('_', ' '),
-      markerEnd: { type: MarkerType.ArrowClosed },
-      style: { stroke: '#a599c6' },
-    }));
-  const routed = clearConnections(edges, nodes);
   return (
     <>
-      <div className="mentor-connection-map">
-        <ReactFlow
-          key={selectedId}
-          nodes={withConnectionBounds(nodes, routed)}
-          edges={routed}
-          edgeTypes={clearEdgeTypes}
-          fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
-          onNodeClick={(_, n) => onSelect(n.id)}
-          fitView
-          minZoom={0.2}
-          maxZoom={1.4}
-          nodesDraggable={false}
+      {tree.folders.map((folder) => (
+        <details
+          className="workspace-folder"
+          key={`${folder.path}-${searching}-${selectedFile.startsWith(folder.path + '/')}`}
+          open={searching || selectedFile.startsWith(folder.path + '/') || undefined}
         >
-          <Background />
-          <Controls showInteractive={false} />
-        </ReactFlow>
-      </div>
-      {neighbors.length > 24 && (
-        <p>Showing 24 nearby components. The Split view lists all recorded connections.</p>
-      )}
+          <summary title={folder.path}>
+            <Folder size={13} aria-hidden="true" /> {folder.name}
+          </summary>
+          <WorkspaceFolders
+            tree={folder}
+            selectedFile={selectedFile}
+            searching={searching}
+            renderFiles={renderFiles}
+          />
+        </details>
+      ))}
+      {renderFiles(tree.files)}
     </>
   );
 }

@@ -560,3 +560,301 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Expanded source is a reading workspace, with one bounded code scroller. */
+.dialog.repository-source-dialog {
+  inset: 12px;
+  transform: none;
+  width: calc(100vw - 24px) !important;
+  max-width: none !important;
+  height: calc(100dvh - 24px);
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 12px !important;
+  background: var(--surface) !important;
+  backdrop-filter: none !important;
+}
+.repository-source-dialog > .dialog-header {
+  padding: 12px 18px;
+  flex-shrink: 0;
+  gap: 12px;
+  align-items: center;
+}
+.repository-source-dialog > .dialog-header > div {
+  min-width: 0;
+}
+.repository-source-dialog > .dialog-header h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+.repository-source-dialog > .dialog-header p {
+  margin: 0;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.repository-source-dialog > .dialog-header .icon-button {
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+}
+.repository-source-dialog .repository-source.source-expanded {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.repository-source-dialog .source-expanded .repository-source-scroll {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.repository-source-dialog .source-expanded .repository-source-scroll pre {
+  font-size: var(--source-font-size, 14px);
+  line-height: 1.8;
+}
+.repository-source-dialog .source-expanded .repository-source-line {
+  min-height: calc(var(--source-font-size, 14px) * 1.8);
+}
+.repository-source-dialog .repository-source-toolbar {
+  min-height: 38px;
+  flex-shrink: 0;
+  padding: 0 12px;
+  flex-wrap: wrap;
+}
+.repository-source-dialog .repository-source-toolbar > span {
+  border: 0;
+  padding: 6px 0;
+  background: transparent;
+}
+.repository-source-dialog .repository-source-toolbar > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.repository-source-dialog button {
+  min-height: 30px;
+}
+.repository-source-dialog .repository-source-toolbar button {
+  min-width: 32px;
+}
+.repository-source-dialog .repository-source-file {
+  display: none;
+}
+.repository-source-dialog .repository-source-selection {
+  flex-shrink: 0;
+  min-height: 30px;
+  padding: 3px 14px;
+}
+.repository-source-dialog .repository-source-footer {
+  flex-shrink: 0;
+  padding: 6px 14px;
+}
+.source-reading-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 16px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.source-find-controls,
+.source-go-to-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.source-find-controls {
+  flex: 1 1 280px;
+}
+.source-find-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0 8px;
+  color: #766984;
+}
+.source-find-field input {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+}
+.source-find-field:focus-within {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+.source-find-field input:focus {
+  outline: none;
+}
+.source-match-count,
+.source-font-size {
+  font-size: 11px;
+  color: #766984;
+  white-space: nowrap;
+}
+.source-reading-tools button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 7px;
+  background: var(--surface);
+  color: var(--primary);
+  font: inherit;
+  font-size: 11px;
+}
+.source-reading-tools button:disabled,
+.repository-source-dialog button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.source-go-to-line input {
+  width: 74px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 12px;
+}
+.source-line-error {
+  flex-basis: 100%;
+  font-size: 11px;
+  color: #b45309;
+}
+.repository-source-dialog .source-search-match {
+  background: #fff7df;
+}
+.repository-source-dialog .source-active-match {
+  background: #ffefbd;
+  box-shadow: inset 3px 0 #b48122;
+}
+.repository-source-dialog .source-jump-line {
+  outline: 1px solid var(--primary);
+  outline-offset: -1px;
+}
+.repository-source-dialog button:focus-visible,
+.source-go-to-line input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+@media (max-width: 600px) {
+  .dialog.repository-source-dialog {
+    inset: 4px;
+    width: calc(100vw - 8px) !important;
+    height: calc(100dvh - 8px);
+    border-radius: 8px !important;
+  }
+  .repository-source-dialog > .dialog-header {
+    padding: 8px 10px;
+  }
+  .repository-source-dialog .repository-source-toolbar {
+    padding-inline: 10px;
+  }
+  .source-reading-tools {
+    padding: 6px 10px;
+  }
+  .source-find-controls {
+    flex-basis: 100%;
+  }
+  .source-match-count {
+    font-size: 10px;
+  }
+}
+
+/* Source identity, selected lines and reading actions share one toolbar. */
+.repository-source-toolbar {
+  flex-wrap: wrap;
+}
+.repository-source-toolbar > .repository-source-selection {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: 0;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 10px;
+}
+.repository-source-toolbar > .repository-source-selection > span {
+  white-space: nowrap;
+}
+.repository-source-toolbar > .repository-source-selection > button {
+  font-size: 10px;
+  min-height: 30px;
+}
+@media (max-width: 600px) {
+  .repository-source-toolbar > .repository-source-selection {
+    order: 3;
+    flex-basis: 100%;
+    justify-content: space-between;
+  }
+  .repository-source-toolbar > div:last-child {
+    margin-left: auto;
+  }
+}
+
+/* Match the explorer's selected-file treatment for the source selection action. */
+.repository-source-toolbar > .repository-source-selection > button {
+  background: #eee8ff;
+  border: 0;
+  border-radius: 5px;
+  color: #7557d8;
+  font-size: 11px;
+  font-weight: 400;
+  padding: 9px 7px;
+  box-shadow: none;
+}
+.repository-source-toolbar > .repository-source-selection > button:hover {
+  background: #e5dcfc;
+  color: #6546c5;
+}
+.repository-source-toolbar > .repository-source-selection > button:active {
+  background: #ddd1fa;
+}
+.repository-source-toolbar > .repository-source-selection > button:focus-visible {
+  outline: 2px solid var(--primary, #5855d9);
+  outline-offset: 3px;
+}
+
+.repository-source-toolbar > .repository-source-selection > span {
+  margin-right: 8px;
+}
+
+/* Override the shared dialog's generous header padding for the source reader. */
+.repository-source-dialog > .dialog-header {
+  padding: 6px 14px !important;
+  gap: 10px;
+}
+.repository-source-dialog > .dialog-header h2 {
+  margin: 0 0 2px;
+  font-size: 14px;
+  line-height: 1.3;
+}
+.repository-source-dialog > .dialog-header p {
+  font-size: 11px;
+  line-height: 1.4;
+}
