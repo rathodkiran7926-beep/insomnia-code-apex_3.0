@@ -17,7 +17,6 @@ import {
   Waypoints,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useScrollReveal } from '../animations/gsapHooks';
 import { CodeDiff } from '../components/CodeDiff';
 import { RelearningCard } from '../components/RelearningCard';
 import { setupDelta } from '../domain/agentContext';
@@ -96,11 +95,10 @@ function PreparedChanges() {
   const path = testOnly ? 'tests/password-rule.test.ts' : selectedFile;
   const testPatch = `describe('password strength proposal', () => {\n  it('rejects a letters-only password', () => {\n    const result = signupSchema.safeParse({\n      email: 'new@relay.example',\n      name: 'New developer',\n      password: 'abcdefgh',\n    });\n    expect(result.success).toBe(false);\n  });\n});`;
 
-  const layoutRef = useScrollReveal<HTMLDivElement>({ stagger: 0.1 });
-
   return (
     <>
       <PageHeading
+        className="changes-page-heading"
         eyebrow="CHANGES / UNDERSTAND WHAT MOVED"
         title="Code evolves. Your understanding follows."
         description="See the source change, follow its impact, and revisit only the lessons that need it."
@@ -195,7 +193,7 @@ function PreparedChanges() {
           <Button onClick={() => setTab('files')}>View proposed test</Button>
         </section>
       ) : tab === 'journey' ? (
-        <div ref={layoutRef} className="change-layout">
+        <div className="change-layout">
           <div className="stack-20">
             <TiltCard className="panel journey-comparison" maxTilt={3}>
               <PanelHeading icon={GitCompareArrows} title="Same feature. A new account lifecycle.">
@@ -268,7 +266,7 @@ function PreparedChanges() {
           <ImpactPanel />
         </div>
       ) : tab === 'files' ? (
-        <div ref={layoutRef} className="change-layout">
+        <div className="change-layout">
           <TiltCard className="panel files-diff-panel" maxTilt={3}>
             <PanelHeading
               icon={FileCode2}
@@ -303,7 +301,7 @@ function PreparedChanges() {
           <ImpactPanel testOnly={testOnly} />
         </div>
       ) : (
-        <div ref={layoutRef} className="setup-layout">
+        <div className="setup-layout">
           <TiltCard className="panel" maxTilt={3}>
             <PanelHeading icon={Terminal} title="A new integration. Two configuration entries.">
               <Badge tone="amber">Static discovery</Badge>

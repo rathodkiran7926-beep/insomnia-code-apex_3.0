@@ -32,6 +32,7 @@ export default function AgentContext() {
   return (
     <>
       <PageHeading
+        className="agent-context-page-heading"
         eyebrow="FEATURE 12 / AGENT CONTEXT BRIDGE"
         title="Give your coding agent the source."
         description="Export compact, revision-bound architecture and setup context for Cursor, Claude Code, or another coding agent."

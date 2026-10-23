@@ -83,17 +83,19 @@ export function PageHeading({
   description,
   actions,
   showBlueprint = true,
+  className = '',
 }: {
   eyebrow: string;
   title: string;
   description: string;
   actions?: ReactNode;
   showBlueprint?: boolean;
+  className?: string;
 }) {
   const heroRef = useHeroAnimation<HTMLDivElement>();
 
   return (
-    <div ref={heroRef} className="page-heading relative overflow-hidden">
+    <div ref={heroRef} className={`page-heading relative overflow-hidden ${className}`}>
       {showBlueprint && <BlueprintPattern position="right" opacity={0.06} />}
       <div className="relative z-10">
         <div className="eyebrow hero-eyebrow">{eyebrow}</div>

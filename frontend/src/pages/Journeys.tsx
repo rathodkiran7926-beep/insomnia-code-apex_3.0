@@ -14,7 +14,6 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useScrollReveal } from '../animations/gsapHooks';
 import { Badge, Button, DemoNote, PageHeading, TiltCard } from '../components/UI';
 import { journeys } from '../data/fixtures';
 import { useWorkspace } from '../state/WorkspaceContext';
@@ -24,7 +23,6 @@ export default function Journeys() {
   const go = useNavigate();
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
-  const cardGridRef = useScrollReveal<HTMLDivElement>({ stagger: 0.14 });
 
   const visible = journeys.filter(
     (j) =>
@@ -45,6 +43,7 @@ export default function Journeys() {
   return (
     <>
       <PageHeading
+        className="journeys-page-heading"
         eyebrow="CODE JOURNEYS · FROM REQUEST TO UNDERSTANDING"
         title="Don’t just read the code. Follow it."
         description="Walk through a feature, find the deciding conditions, and connect every step to its source. Each journey keeps the architecture, source code, and explanation in sync."
@@ -82,7 +81,7 @@ export default function Journeys() {
           />
         </label>
       </div>
-      <div ref={cardGridRef} className="journey-card-grid">
+      <div className="journey-card-grid">
         {visible.map((journey) => (
           <TiltCard className="panel journey-card" key={journey.id} maxTilt={6}>
             <div className={`journey-card-map map-${journey.id}`}>

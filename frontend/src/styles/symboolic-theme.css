@@ -73,6 +73,17 @@ body {
   box-shadow: 0 2px 10px rgba(32, 42, 60, 0.03) !important;
 }
 
+.page-heading.learn-page-heading,
+.page-heading.journeys-page-heading,
+.page-heading.practice-page-heading,
+.page-heading.changes-page-heading,
+.page-heading.agent-context-page-heading,
+.page-heading.progress-page-heading,
+.page-heading.knowledge-page-heading {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
 .page-heading h1 {
   font-size: 30px !important;
   font-weight: 700 !important;
@@ -694,7 +705,7 @@ body {
   display: grid;
   grid-template-columns: repeat(4, 1fr) !important;
   gap: 20px !important;
-  margin: 0 36px 32px !important;
+  margin: 0 0 32px !important;
 }
 
 .metric-card {
@@ -1261,9 +1272,8 @@ body {
   color: #4b5565;
 }
 
-/* Disable 3D tilt & cursor moving boxes across entire application */
+/* Keep hover tilt disabled while allowing card entrance transforms. */
 .tilt-card {
-  transform: none !important;
   perspective: none !important;
   transform-style: flat !important;
 }
@@ -3379,8 +3389,7 @@ body {
   .context-bar,
   .workspace-tabbar,
   .workspace-grid,
-  .journey-card-grid,
-  .progress-summary-grid {
+  .journey-card-grid {
     margin-left: 18px !important;
     margin-right: 18px !important;
   }

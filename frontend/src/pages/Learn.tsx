@@ -14,7 +14,6 @@ import {
   UserRound,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useScrollReveal } from '../animations/gsapHooks';
 import { Badge, Button, ChecklistItem, PageHeading, ProgressBar, TiltCard } from '../components/UI';
 import type { Goal, Lesson, Profile } from '../data/types';
 import { getRoute } from '../domain/model';
@@ -23,8 +22,6 @@ import { useWorkspace } from '../state/WorkspaceContext';
 export default function Learn() {
   const { state, patch, startJourney, selectNode, complete, setSnapshot } = useWorkspace();
   const go = useNavigate();
-  const setupRef = useScrollReveal<HTMLDivElement>({ stagger: 0.1 });
-  const gridRef = useScrollReveal<HTMLDivElement>({ stagger: 0.12 });
 
   const route = getRoute(
     state.personalized ? state.profile : 'beginner',
@@ -75,6 +72,7 @@ export default function Learn() {
   return (
     <>
       <PageHeading
+        className="learn-page-heading"
         eyebrow="MY LEARNING PATH"
         title="A route that starts where you are."
         description="Understand the right things, in the right order, with a contribution to work toward."
@@ -89,7 +87,7 @@ export default function Learn() {
           </Button>
         }
       />
-      <div ref={setupRef} className="learning-setup">
+      <div className="learning-setup">
         <TiltCard className="panel profile-panel" maxTilt={4}>
           <div className="row between">
             <span className="tiny-label">YOUR STARTING POINT</span>
@@ -156,7 +154,7 @@ export default function Learn() {
           </p>
         </TiltCard>
       </div>
-      <div ref={gridRef} className="learning-grid">
+      <div className="learning-grid">
         <section className="panel learning-route">
           <div className="panel-heading">
             <div>

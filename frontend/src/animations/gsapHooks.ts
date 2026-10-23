@@ -135,3 +135,89 @@ export function useMagnetic<T extends HTMLElement = HTMLButtonElement>(_strength
   const ref = useRef<T>(null);
   return ref;
 }
+
+/** Reveal major content cards once as they enter view, including async/tab content. */
+export function usePageCardReveal(pathname: string) {
+  const ref = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const root = ref.current;
+    // The landing page has its own choreographed hero and section entrances.
+    if (!root || pathname === '/') return;
+
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let cleanup = () => {};
+    const setup = () => {
+      cleanup();
+      if (media.matches) return;
+
+      const seen = new WeakSet<HTMLElement>();
+      const animations = new Map<HTMLElement, gsap.core.Tween>();
+      const selector =
+        '.panel, .tilt-card, .knowledge-banner, .relearning-card, .pr-card, .pr-empty, .pr-summary-live, .mentor-empty';
+      const ctx = gsap.context(() => {}, root);
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const visible = entries.filter((entry) => entry.isIntersecting);
+          visible.forEach((entry, index) => {
+            const card = entry.target as HTMLElement;
+            observer.unobserve(card);
+            ctx.add(() => {
+              const tween = gsap.fromTo(
+                card,
+                { opacity: 0, y: 24 },
+                {
+                  opacity: 1,
+                  y: 0,
+                  duration: 0.6,
+                  delay: Math.min(index * 0.07, 0.21),
+                  ease: 'power3.out',
+                  clearProps: 'opacity,transform',
+                  onComplete: () => {
+                    animations.delete(card);
+                  },
+                },
+              );
+              animations.set(card, tween);
+            });
+          });
+        },
+        { threshold: 0, rootMargin: '0px 0px -24px 0px' },
+      );
+
+      const scan = () => {
+        // Discard animations on removed tab content rather than retaining DOM nodes.
+        animations.forEach((tween, card) => {
+          if (!root.contains(card)) {
+            tween.kill();
+            animations.delete(card);
+          }
+        });
+        root.querySelectorAll<HTMLElement>(selector).forEach((card) => {
+          if (seen.has(card)) return;
+          // Nested panels enter with their containing card, avoiding double motion.
+          if (card.parentElement?.closest(selector)) return;
+          seen.add(card);
+          observer.observe(card);
+        });
+      };
+      scan();
+      const mutations = new MutationObserver(scan);
+      mutations.observe(root, { childList: true, subtree: true });
+      cleanup = () => {
+        observer.disconnect();
+        mutations.disconnect();
+        ctx.revert();
+        animations.clear();
+      };
+    };
+    setup();
+    media.addEventListener('change', setup);
+    return () => {
+      media.removeEventListener('change', setup);
+      cleanup();
+    };
+  }, [pathname]);
+
+  return ref;
+}

@@ -3,7 +3,7 @@
   padding: 16px;
 }
 .code-workspace {
-  height: calc(100dvh - 112px);
+  height: calc(100dvh - var(--app-topbar-height, 52px) - 32px);
   min-height: 600px;
   display: flex;
   flex-direction: column;

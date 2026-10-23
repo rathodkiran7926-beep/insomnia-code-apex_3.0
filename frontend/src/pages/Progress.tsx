@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useScrollReveal } from '../animations/gsapHooks';
 import {
   Badge,
   Button,
@@ -32,8 +31,6 @@ export default function Progress() {
   const { state, startJourney, reset, notify } = useWorkspace();
   const go = useNavigate();
   const [resetOpen, setResetOpen] = useState(false);
-  const metricsRef = useScrollReveal<HTMLDivElement>({ stagger: 0.1 });
-  const layoutRef = useScrollReveal<HTMLDivElement>({ stagger: 0.12 });
 
   const attempts = Object.entries(state.predictions)
     .map(([key, prediction]) => {
@@ -85,6 +82,7 @@ export default function Progress() {
   return (
     <>
       <PageHeading
+        className="progress-page-heading"
         eyebrow="MY PROGRESS"
         title="Understanding is built, one connection at a time."
         description="A record of what you explored, what you explained, and what deserves another look."
@@ -94,7 +92,7 @@ export default function Progress() {
           </Button>
         }
       />
-      <div ref={metricsRef} className="progress-summary-grid">
+      <div className="progress-summary-grid">
         {[
           {
             icon: Compass,
@@ -137,7 +135,7 @@ export default function Progress() {
           </TiltCard>
         ))}
       </div>
-      <div ref={layoutRef} className="progress-layout">
+      <div className="progress-layout">
         <div className="stack-20">
           <TiltCard className="panel" maxTilt={3}>
             <PanelHeading icon={BookOpen} title="What you can now connect">

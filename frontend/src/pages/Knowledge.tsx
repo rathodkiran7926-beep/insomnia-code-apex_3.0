@@ -13,7 +13,6 @@ import {
   ShieldCheck,
   UserRound,
 } from 'lucide-react';
-import { useScrollReveal } from '../animations/gsapHooks';
 import { BlueprintPattern } from '../components/BlueprintPattern';
 import {
   Badge,
@@ -48,11 +47,11 @@ export default function Knowledge() {
     (filter === 'questions' && !['published', 'superseded'].includes(status)) ||
     (filter === 'published' && status === 'published');
 
-  const layoutRef = useScrollReveal<HTMLDivElement>({ stagger: 0.1 });
 
   return (
     <>
       <PageHeading
+        className="knowledge-page-heading"
         eyebrow="TEAM KNOWLEDGE"
         title="The code tells you what. People explain why."
         description="Capture source-linked rationale, review it explicitly, and keep it current as the code changes."
@@ -90,7 +89,7 @@ export default function Knowledge() {
         </div>
         <DemoNote>No external messages are sent</DemoNote>
       </div>
-      <div ref={layoutRef} className="knowledge-layout">
+      <div className="knowledge-layout">
         <aside className="knowledge-inbox">
           <div className="inbox-label">
             <Inbox size={14} />

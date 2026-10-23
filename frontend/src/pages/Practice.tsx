@@ -15,7 +15,6 @@ import {
   WandSparkles,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useScrollReveal } from '../animations/gsapHooks';
 import { CodeViewer } from '../components/CodeViewer';
 import {
   Badge,
@@ -43,7 +42,6 @@ export default function Practice() {
   const unsupported = state.practiceResult === 'unsupported';
   const report = state.practiceResult ? runPracticeChecks(state.practiceCode) : null;
   const mounted = useRef(true);
-  const layoutRef = useScrollReveal<HTMLDivElement>({ stagger: 0.1 });
 
   useEffect(() => {
     mounted.current = true;
@@ -66,6 +64,7 @@ export default function Practice() {
   return (
     <>
       <PageHeading
+        className="practice-page-heading"
         eyebrow="PRACTICE / YOUR FIRST CONTRIBUTION"
         title="Small change. Real understanding."
         description="Apply what you learned to the same signup flow, with guidance when you need it."
@@ -82,7 +81,7 @@ export default function Practice() {
           </Button>
         }
       />
-      <div ref={layoutRef} className="practice-layout">
+      <div className="practice-layout">
         <TiltCard className="panel practice-brief" maxTilt={4}>
           <div className="row between">
             <Badge tone="green">Starter exercise</Badge>

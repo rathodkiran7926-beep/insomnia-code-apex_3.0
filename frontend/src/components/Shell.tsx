@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState } from 'react';
 import '../styles/workspace-header.css';
+import { usePageCardReveal } from '../animations/gsapHooks';
 import {
   ArrowRight,
   Bell,
@@ -13,9 +14,10 @@ import {
   FlaskConical,
   GitBranch,
   GitPullRequest,
-  Globe2,
   LayoutGrid,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   MessageSquareText,
   Search,
   Settings2,
@@ -31,13 +33,12 @@ import { useRepositoryAnalysis } from '../state/RepositoryAnalysisContext';
 import { Badge, Button, IconButton, Modal, ProgressBar } from './UI';
 
 const navigation = [
-  { path: '/', label: 'Overview & Home', icon: Globe2 },
   { path: '/workspace', label: 'Mentor workspace', icon: LayoutGrid },
   { path: '/repository', label: 'Repository', icon: Code2 },
+  { path: '/changes', label: 'Changes', icon: GitPullRequest, count: '2' },
   { path: '/journeys', label: 'Code journeys', icon: Compass, count: '2' },
   { path: '/learn', label: 'My learning path', icon: BookOpen },
   { path: '/practice', label: 'Practice', icon: FlaskConical },
-  { path: '/changes', label: 'Changes', icon: GitPullRequest, count: '2' },
   { path: '/agent-context', label: 'Agent Context Bridge', icon: Bot },
   { path: '/progress', label: 'My progress', icon: TrendingUp },
 ];
@@ -47,12 +48,56 @@ export function Shell() {
   const { state, patch, notice, startJourney, selectNode, notify } = useWorkspace();
   const location = useLocation();
   const go = useNavigate();
+  const contentRef = usePageCardReveal(location.pathname);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('codebase-mentor.sidebar-collapsed') === 'true'; }
+    catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('codebase-mentor.sidebar-collapsed', String(sidebarCollapsed)); }
+    catch { /* The toggle still works when storage is unavailable. */ }
+  }, [sidebarCollapsed]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [updatesOpen, setUpdatesOpen] = useState(false);
+  const [progressNotification, setProgressNotification] = useState<'unseen' | 'pending' | 'dismissed'>(() => {
+    try {
+      const saved = localStorage.getItem('codebase-mentor.daily-progress.v1');
+      return saved === 'pending' || saved === 'dismissed' ? saved : 'unseen';
+    } catch {
+      return 'unseen';
+    }
+  });
+  const [progressPopupOpen, setProgressPopupOpen] = useState(false);
+
+  useEffect(() => {
+    if (location.pathname === '/learn' && progressNotification === 'unseen') {
+      setProgressNotification('pending');
+      setProgressPopupOpen(true);
+    }
+  }, [location.pathname, progressNotification]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('codebase-mentor.daily-progress.v1', progressNotification);
+    } catch {
+      // Keep notifications working for this session when storage is unavailable.
+    }
+  }, [progressNotification]);
+
+  useEffect(() => {
+    if (!progressPopupOpen) return;
+    const timeout = window.setTimeout(() => setProgressPopupOpen(false), 6000);
+    return () => window.clearTimeout(timeout);
+  }, [progressPopupOpen]);
+
+  const dismissProgressNotification = () => {
+    setProgressNotification('dismissed');
+    setProgressPopupOpen(false);
+  };
   const current =
     location.pathname === '/demo-workspace'
       ? 'Demo workspace'
@@ -123,8 +168,12 @@ export function Shell() {
     .slice(0, 9);
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar refreshed-sidebar" aria-label="Workspace sidebar">
+    <div className={`app-shell${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
+      <a className="shell-skip-link" href="#main-content" onClick={(event) => {
+        event.preventDefault();
+        document.getElementById('main-content')?.focus();
+      }}>Skip to main content</a>
+      <aside id="workspace-sidebar" className="sidebar refreshed-sidebar" aria-label="Workspace sidebar">
         <NavLink to="/" className="brand" aria-label="Codebase Mentor home">
           <span className="brand-symbol">
             <Code2 size={20} strokeWidth={2.2} />
@@ -135,31 +184,15 @@ export function Shell() {
           <Badge tone="violet">beta</Badge>
         </NavLink>
         <div className="sidebar-navigation">
-          {!analyzingRepository && (
-            <button
-              className="workspace-switcher"
-              onClick={() => go('/repository')}
-              title="Switch repository or inspect workspace"
-            >
-              <span className="repo-avatar">
-                r<span>↗</span>
-              </span>
-              <span>
-                <strong>{analyzingRepository ? 'Repository analysis' : 'Relay workspace'}</strong>
-                <small>
-                  {analyzingRepository ? 'Public GitHub repositories' : 'acme / relay-api (demo)'}
-                </small>
-              </span>
-              <ChevronDown size={14} />
-            </button>
-          )}
           <nav aria-label="Main navigation">
             {navigation.map(({ path, label, icon: Icon, count }) => (
               <Fragment key={path}>
-                {path === '/' && <div className="nav-label">Workspace</div>}
+                {path === '/workspace' && <div className="nav-label">Workspace</div>}
                 {path === '/journeys' && <div className="nav-label">Learn & explore</div>}
                 <NavLink
                   to={path}
+                  aria-label={label}
+                  title={sidebarCollapsed ? label : undefined}
                   end={path === '/'}
                   className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
                 >
@@ -174,6 +207,8 @@ export function Shell() {
             <div className="nav-label">Team knowledge</div>
             <NavLink
               to="/knowledge"
+              aria-label="Knowledge & decisions"
+              title={sidebarCollapsed ? 'Knowledge & decisions' : undefined}
               className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
             >
               <MessageSquareText size={17} strokeWidth={1.7} />
@@ -184,21 +219,8 @@ export function Shell() {
         </div>
         <div className="sidebar-bottom">
           {!analyzingRepository && (
-            <div className="next-step-card">
-              <div className="row between">
-                <span className="tiny-label">DAILY PROGRESS</span>
-                <Sparkles size={13} className="text-primary" />
-              </div>
-              <strong>Your first contribution starts here.</strong>
-              <ProgressBar value={routeProgress} />
-              <button onClick={() => go('/learn')}>
-                Continue learning path <ArrowRight size={13} />
-              </button>
-            </div>
-          )}
-          {!analyzingRepository && (
-            <button className="sidebar-setting" onClick={() => setSettingsOpen(true)}>
-              <Settings2 size={15} /> Preferences <span>⌘ ,</span>
+            <button className="sidebar-setting" aria-label="Preferences" title={sidebarCollapsed ? 'Preferences' : undefined} onClick={() => setSettingsOpen(true)}>
+              <Settings2 size={15} /> <span className="preferences-label">Preferences</span> <span>⌘ ,</span>
             </button>
           )}
           <div className="sidebar-footer">
@@ -211,6 +233,14 @@ export function Shell() {
       <div className="main-shell">
         <header className="topbar">
           <div className="row gap-12 workspace-header-context">
+            <IconButton
+              icon={sidebarCollapsed ? PanelLeftOpen : PanelLeftClose}
+              label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className="sidebar-toggle"
+              aria-expanded={!sidebarCollapsed}
+              aria-controls="workspace-sidebar"
+              onClick={() => setSidebarCollapsed((value) => !value)}
+            />
             <IconButton
               icon={Menu}
               label="Open navigation"
@@ -270,7 +300,10 @@ export function Shell() {
               <IconButton
                 icon={Bell}
                 label="Learning updates"
-                onClick={() => setUpdatesOpen(true)}
+                onClick={() => {
+                  setProgressPopupOpen(false);
+                  setUpdatesOpen(true);
+                }}
               />
               <button
                 className="user-avatar"
@@ -282,10 +315,24 @@ export function Shell() {
             </div>
           )}
         </header>
-        <main id="main-content" tabIndex={-1} key={location.pathname} className="main-content">
+        <main ref={contentRef} id="main-content" tabIndex={-1} key={location.pathname} className="main-content">
           <Outlet />
         </main>
       </div>
+      {progressPopupOpen && progressNotification === 'pending' && (
+        <div className="daily-progress-popup" role="status" aria-live="polite">
+          <div className="row between">
+            <span className="tiny-label"><Sparkles size={14} /> DAILY PROGRESS</span>
+            <IconButton icon={X} label="Dismiss daily progress notification" onClick={dismissProgressNotification} />
+          </div>
+          <strong>Your first contribution starts here.</strong>
+          <ProgressBar value={routeProgress} />
+          <Button variant="ghost" icon={Bell} onClick={() => {
+            setProgressPopupOpen(false);
+            setUpdatesOpen(true);
+          }}>View notification</Button>
+        </div>
+      )}
       {notice && (
         <div className="toast" role="status">
           <span className="status-dot" />
@@ -497,10 +544,24 @@ export function Shell() {
       <Modal
         open={updatesOpen}
         onOpenChange={setUpdatesOpen}
-        title="Keep your understanding current"
-        description="Learning updates are tied to specific source changes."
+        title="Notifications"
+        description="Your learning progress and source changes."
       >
         <div className="dialog-body stack-20">
+          {progressNotification === 'pending' && (
+            <section className="daily-progress-notification" aria-label="Daily progress notification">
+              <div className="row between">
+                <span className="tiny-label"><Sparkles size={14} /> DAILY PROGRESS</span>
+                <IconButton icon={X} label="Remove daily progress notification" onClick={dismissProgressNotification} />
+              </div>
+              <strong>Your first contribution starts here.</strong>
+              <ProgressBar value={routeProgress} />
+              <Button variant="ghost" icon={ArrowRight} onClick={() => {
+                go('/learn');
+                setUpdatesOpen(false);
+              }}>Continue learning path</Button>
+            </section>
+          )}
           <Badge tone="violet">Prepared change · PR #402</Badge>
           <h3>Email verification changes the account lifecycle</h3>
           <p>
