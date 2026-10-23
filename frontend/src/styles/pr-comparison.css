@@ -277,6 +277,169 @@
   font-weight: 600;
   color: #7652be !important;
 }
+.pr-picker-heading {
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.pr-picker-heading label {
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+.pr-picker-heading p {
+  margin: 0;
+  color: #8b789c;
+  font-size: 13px;
+}
+.pr-picker-heading a,
+.pr-empty-actions a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #7551bc;
+}
+.pr-input .pr-discovery-toolbar {
+  align-items: end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin: 20px 0 12px;
+}
+.pr-discovery-toolbar label {
+  flex: 1 1 280px;
+  margin: 0;
+  max-width: 500px;
+}
+.pr-discovery-toolbar input {
+  display: block;
+  width: 100%;
+  margin-top: 7px;
+}
+.pr-discovery-toolbar > span {
+  font-size: 12px;
+  color: #8b789c;
+  padding-bottom: 12px;
+}
+.pr-input .pr-discovery-list {
+  display: grid;
+  gap: 9px;
+  max-height: 390px;
+  overflow-y: auto;
+  margin-bottom: 18px;
+  padding: 3px;
+}
+.pr-input .pr-discovery-card {
+  display: flex;
+  text-align: left;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 16px;
+  border: 1px solid #e5ddf1;
+  background: #fdfbff;
+  border-radius: 10px;
+  color: #655077;
+}
+.pr-input .pr-discovery-card:hover {
+  background: #f7f2ff;
+  border-color: #c6afea;
+}
+.pr-input .pr-discovery-card.selected {
+  background: #f2ebff;
+  border-color: #a78ae7;
+  box-shadow: inset 3px 0 #8660d6;
+}
+.pr-discovery-card > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.pr-card-copy {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  overflow-wrap: anywhere;
+}
+.pr-card-copy strong {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #4e3c63;
+}
+.pr-card-copy > span,
+.pr-card-copy small {
+  font-size: 12px;
+  color: #8a729e;
+  font-weight: 400;
+}
+.pr-state-badge {
+  display: inline-flex;
+  padding: 4px 9px;
+  border-radius: 20px;
+  background: #e8f5eb;
+  color: #318453;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.pr-state-badge.merged {
+  background: #eae0fd;
+  color: #8051c7;
+}
+.pr-state-badge.closed {
+  background: #fce8eb;
+  color: #b1576c;
+}
+.pr-state-badge.draft {
+  background: #eeecf2;
+  color: #85798e;
+}
+.pr-input .pr-discovery-empty {
+  margin: 16px 0;
+  padding: 24px;
+  background: #faf7ff;
+  border: 1px dashed #d9caed;
+  border-radius: 12px;
+  align-items: flex-start;
+}
+.pr-discovery-empty > svg {
+  flex-shrink: 0;
+  color: #9a7ac3;
+}
+.pr-discovery-empty strong {
+  color: #68517d;
+  font-size: 15px;
+}
+.pr-discovery-empty p {
+  line-height: 1.7;
+  font-size: 13px;
+  color: #8b789c;
+}
+.pr-empty-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.pr-input .pr-fetch-caption {
+  font-size: 11px;
+  color: #9a86aa;
+  margin: 14px 0 0;
+}
+@media (max-width: 600px) {
+  .pr-input .pr-discovery-card {
+    padding: 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .pr-card-copy {
+    flex-basis: calc(100% - 30px);
+  }
+  .pr-state-badge {
+    margin-left: 27px;
+  }
+  .pr-input .pr-discovery-empty {
+    padding: 16px;
+  }
+}
 .pr-list-pagination {
   display: flex;
   gap: 12px;

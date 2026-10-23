@@ -131,7 +131,7 @@ try {
       returnByValue: true,
       awaitPromise: true,
     });
-    if (r.exceptionDetails) throw new Error(r.exceptionDetails.text);
+    if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
     return r.result.value;
   };
   const wait = (expression) =>
@@ -152,7 +152,7 @@ try {
     mobile: false,
   });
   await evaluate(
-    `localStorage.setItem('mentor-analysis-job','pr-ui-active-repository');localStorage.setItem('mentor-pr-job','pr-ui-interrupted');location.hash='/changes';location.reload()`,
+    `localStorage.setItem('mentor-analysis-job','pr-ui-active-repository');localStorage.removeItem('mentor-repository-url');localStorage.setItem('mentor-pr-job','pr-ui-interrupted');location.hash='/changes';location.reload()`,
   );
   await wait("document.querySelector('.pr-interrupted')");
   assert.equal(
@@ -185,6 +185,24 @@ try {
     await evaluate("!document.querySelector('#pr-url')"),
     "PR URL input must be replaced by repository picker",
   );
+  await wait("document.querySelector('.pr-discovery-card')");
+  assert(await evaluate("Array.from(document.querySelectorAll('.pr-input button')).find(b=>b.textContent==='All PRs')?.getAttribute('aria-pressed')==='true'"), "All PRs should be the default");
+  await evaluate("Array.from(document.querySelectorAll('.pr-input button')).find(b=>b.textContent==='Open PRs').click()");
+  await wait("document.querySelector('.pr-discovery-empty')");
+  assert(await evaluate("!document.querySelector('#pr-select-live')"), "Empty results should not leave a disabled picker");
+  assert(await evaluate("document.querySelector('.pr-empty-actions a')?.href.endsWith('/compare')"), "Empty state should link to creating a real PR");
+  const emptyImage = await send('Page.captureScreenshot', { format: 'png' });
+  writeFileSync(root + '/data/ui-pr-discovery-empty.png', Buffer.from(emptyImage.data, 'base64'));
+  await evaluate("Array.from(document.querySelectorAll('.pr-input button')).find(b=>b.textContent==='Show all PRs').click()");
+  await wait("document.querySelector('.pr-discovery-card')");
+  await evaluate("(()=>{const input=document.querySelector('#pr-search-live');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'missing-pr-search-xyz');input.dispatchEvent(new Event('input',{bubbles:true}));})()");
+  await wait("!document.querySelector('.pr-discovery-card')");
+  await evaluate("Array.from(document.querySelectorAll('.pr-input button')).find(b=>b.textContent==='Clear search').click()");
+  await wait("document.querySelector('.pr-discovery-card')");
+  await evaluate("document.querySelector('.pr-discovery-card').click()");
+  assert(await evaluate("document.querySelector('.pr-discovery-card').getAttribute('aria-pressed')==='true'"));
+  const discoveryImage = await send('Page.captureScreenshot', { format: 'png' });
+  writeFileSync(root + '/data/ui-pr-discovery.png', Buffer.from(discoveryImage.data, 'base64'));
   await evaluate(
     "Array.from(document.querySelectorAll('.pr-input button')).find(b=>b.textContent==='Closed / merged').click()",
   );
@@ -209,6 +227,26 @@ try {
     );
     await pause(200);
   };
+  await tab("Change impact");
+  await wait("document.querySelector('.change-impact')");
+  assert(await evaluate("document.querySelector('.change-impact').textContent.includes('commit')"));
+  await evaluate("document.querySelector('.change-impact select').value='component';document.querySelector('.change-impact select').dispatchEvent(new Event('change',{bubbles:true}))");
+  const impactSeed = await evaluate(`(async()=>{const s=await(await fetch('/api/snapshots/${comparison.afterSnapshotId}')).json();return s.relationships.find(e=>e.type==='calls'&&e.source!==e.target)?.target})()`);
+  assert(impactSeed, "Real snapshot must contain an incoming call to explore");
+  await evaluate(`(()=>{const el=document.querySelectorAll('.change-impact select')[1];el.value=${JSON.stringify(impactSeed)};el.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await wait("document.querySelector('.impact-result')");
+  await evaluate("document.querySelector('.impact-result summary').click()");
+  assert(await evaluate("document.querySelector('.impact-path a')?.href.includes('github.com')"), "Impact paths must link to recorded evidence");
+  await evaluate("document.querySelector('.change-impact').scrollIntoView({block:'start'})");
+  const impactImage = await send("Page.captureScreenshot", { format: "png" });
+  writeFileSync(root + "/data/ui-change-impact.png", Buffer.from(impactImage.data, "base64"));
+  await evaluate("(()=>{const input=document.querySelector('.change-impact input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'no-matching-component-xyz');input.dispatchEvent(new Event('input',{bubbles:true}));})()");
+  await wait("document.querySelector('.impact-empty')?.textContent.includes('No results match')");
+  await evaluate("document.querySelector('[aria-label=\"Impact source version\"] button').click()");
+  await wait(`document.querySelector('.impact-version')?.textContent.includes('${comparison.pr.baseCommit.slice(0, 12)}')`);
+  await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  assert(await evaluate("document.documentElement.scrollWidth<=innerWidth+1"), "Impact explorer must fit mobile width");
+  await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await tab("Architecture");
   await wait("document.querySelector('.react-flow')");
   await evaluate("document.querySelector('.pr-version-tabs button').click()");
@@ -293,13 +331,33 @@ try {
   );
   await send("Page.reload");
   await wait("document.querySelector('.pr-summary-live')");
+  await evaluate("location.hash='/workspace'");
+  await wait("document.querySelector('.mentor-selection')");
+  await evaluate("Array.from(document.querySelectorAll('.mentor-selection button')).find(b=>b.textContent==='Change impact').click()");
+  await wait("document.querySelector('.impact-dialog .change-impact')");
+  assert(await evaluate("document.querySelector('.impact-dialog').textContent.includes('Explore change impact')"));
+  await evaluate("document.querySelector('.impact-dialog [aria-label=\"Close dialog\"]').click();location.hash='/repository'");
+  await wait("document.querySelector('[aria-label=\"Public GitHub repository\"]')");
+  await evaluate("(()=>{const el=document.querySelector('[aria-label=\"Public GitHub repository\"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,'https://github.com/example/new-selection.git');el.dispatchEvent(new Event('input',{bubbles:true}));})()");
+  await evaluate("window.__selectionFetch=fetch;window.fetch=(input,options)=>{if(typeof input==='string'&&input.startsWith('/api/pr/pulls?'))window.__selectedRepositoryQuery=new URL(input,location.origin).searchParams.get('repository');return window.__selectionFetch(input,options)};location.hash='/changes'");
+  await wait("window.__selectedRepositoryQuery==='https://github.com/example/new-selection'");
+  assert(await evaluate("document.querySelector('.pr-selected-repository')?.textContent.includes('example/new-selection')"), "Picker must use the URL from Repository rather than the saved comparison");
+  await evaluate("localStorage.removeItem('mentor-analysis-job');location.reload()");
+  await wait("document.querySelector('.pr-discovery-card')");
+  assert(await evaluate("document.querySelector('.pr-selected-repository')?.textContent.includes('example/new-selection')"), "Selected URL must load PRs after reload without an analysis snapshot");
+  assert.equal(await evaluate("(async()=>{const r=await fetch(new Request(location.origin+'/api/pr/pulls?repository=https%3A%2F%2Fevil.example%2Fx%2Fy'));return r.status})()"), 400, "PR endpoint must reject unsupported repository URLs");
+  assert.equal(await evaluate("(async()=>{const r=await fetch(new Request(location.origin+'/api/pr/pulls?repository=https%3A%2F%2Fgithub.com%2Fx%2Fy&snapshotId=unexpected'));return r.status})()"), 400, "PR endpoint must reject ambiguous repository selection");
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify({
       checks: [
         "real saved PR restored",
-        "five tabs",
+        "all PRs default, selectable cards, page search and empty state recovery",
+        "comparison tabs",
         "before/after graphs",
+        "change impact paths with source evidence, filters, version switch and mobile layout",
+        "workspace change impact dialog",
+        "Repository URL changes propagate to PR discovery and survive reload without a snapshot",
         "real unified diff",
         "dependency setup change",
         "reload persistence",

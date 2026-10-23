@@ -197,11 +197,26 @@ test("Gemini authentication failures are not retried", async () => {
       return new Response("", { status: 401 });
     },
     async () => {
-      await assert.rejects(discussionTurn(view.id, "Explain"), /credentials/);
+      await assert.rejects(discussionTurn(view.id, "Explain"), /HTTP 401.*replacement.*restart/);
       assert.equal(attempts, 1);
       assert.equal(sessionView(discussion(view.id)).messages.length, 0);
     },
   );
+});
+
+test("Gemini permission and network failures have distinct recovery instructions", async () => {
+  for (const [response, expected] of [
+    [() => new Response("", { status: 403 }), /HTTP 403.*restrictions/],
+    [() => { throw Object.assign(new Error("blocked"), { cause: { code: "EACCES" } }); }, /Network access to Gemini was blocked/],
+  ]) {
+    const view = startDiscussion(graph, component.id);
+    let attempts = 0;
+    await fakeGemini(async () => { attempts++; return response(); }, async () => {
+      await assert.rejects(discussionTurn(view.id, "Explain"), expected);
+      assert.equal(attempts, 1);
+      assert.equal(sessionView(discussion(view.id)).messages.length, 0);
+    });
+  }
 });
 
 test("ending a discussion request cancels a pending overload retry", async () => {

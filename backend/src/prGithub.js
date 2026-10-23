@@ -2,7 +2,7 @@ import { boundedFetch, parseRepository } from "./github.js";
 
 export async function listPullRequests(
   repository,
-  state = "open",
+  state = "all",
   page = 1,
   signal,
 ) {
@@ -21,13 +21,23 @@ export async function listPullRequests(
       ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
       : {}),
   };
-  const get = async (path) =>
-    JSON.parse(
-      await boundedFetch(
+  const get = async (path) => {
+    try {
+      return JSON.parse(await boundedFetch(
         `https://api.github.com/repos/${repo.owner}/${repo.name}${path}`,
         { headers, signal },
-      ),
-    );
+      ));
+    } catch (error) {
+      const messages = {
+        401: 'GitHub rejected GITHUB_TOKEN. Update it in backend/.env and restart the backend, or remove it for public access.',
+        403: 'GitHub denied access or its API quota was reached. Check token permissions and GitHub API usage, then retry.',
+        404: 'Repository not found or unavailable. Select an accessible public GitHub repository.',
+        429: 'GitHub rate limit reached. Wait before refreshing pull requests.',
+      };
+      if (messages[error.remoteStatus]) error.message = messages[error.remoteStatus];
+      throw error;
+    }
+  };
   const metadata = await get("");
   if (metadata.private)
     throw Object.assign(new Error("Only public repositories are supported"), {
@@ -42,6 +52,7 @@ export async function listPullRequests(
     repository: repo.url,
     state,
     page,
+    fetchedAt: new Date().toISOString(),
     hasMore: rows.length === 30,
     pullRequests: rows.map((p) => ({
       number: p.number,
@@ -53,6 +64,7 @@ export async function listPullRequests(
       head: p.head?.ref || "",
       base: p.base?.ref || "",
       updatedAt: p.updated_at,
+      author: String(p.user?.login || '').slice(0, 100),
     })),
   };
 }

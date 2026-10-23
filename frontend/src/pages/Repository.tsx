@@ -89,8 +89,15 @@ function FolderGroup({ data }: { data: { label?: string } }) {
 }
 const analysisNodeTypes = { folderGroup: FolderGroup };
 export default function Repository() {
-  const { snapshot, job, loading, error: analysisError, setActiveJob } = useRepositoryAnalysis();
-  const [url, setUrl] = useState(snapshot?.repository || '');
+  const {
+    snapshot,
+    job,
+    loading,
+    error: analysisError,
+    setActiveJob,
+    repositoryUrl: url,
+    setRepositoryUrl: setUrl,
+  } = useRepositoryAnalysis();
   const [revision, setRevision] = useState('');
   const [error, setError] = useState('');
   const [starting, setStarting] = useState(false);
@@ -104,7 +111,6 @@ export default function Repository() {
   const busy = starting || loading || job?.status === 'running';
   useEffect(() => {
     if (snapshot) {
-      setUrl(snapshot.repository);
       setView('system');
     }
   }, [snapshot]);
