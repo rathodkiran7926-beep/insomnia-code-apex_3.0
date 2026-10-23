@@ -294,7 +294,7 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
             onClick={() => {
               setMentor(true);
               setDiscussing(true);
-              setCenteredConversation(true);
+              setCenteredConversation(false);
             }}
           >
             <Mic size={17} />
@@ -302,8 +302,13 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
           </button>
           <button
             aria-controls="workspace-mentor"
-            aria-pressed={mentor}
-            onClick={() => setMentor(!mentor)}
+            aria-pressed={mentor && !discussing}
+            title={discussing ? 'Return to text mentor' : 'Show or hide text mentor'}
+            onClick={() => {
+              setCenteredConversation(false);
+              setDiscussing(false);
+              setMentor(discussing || !mentor);
+            }}
           >
             <PanelRight size={15} />
             Mentor

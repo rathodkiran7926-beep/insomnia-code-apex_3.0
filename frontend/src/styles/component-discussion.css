@@ -465,12 +465,8 @@
   font-size: 9px;
   line-height: 1.8;
 }
-.code-workspace-body.has-mentor.has-discussion {
-  grid-template-columns: minmax(0, 1fr) 400px;
-}
-.code-workspace-body.has-explorer.has-mentor.has-discussion {
-  grid-template-columns: 230px minmax(0, 1fr) 400px;
-}
+/* Pane columns and responsive positioning belong to mentor-workspace.css,
+   which includes the resize handles between the editor and side panels. */
 .discussion-spinner {
   animation: discussion-spin 1s linear infinite;
   color: #b496c9;
@@ -488,20 +484,7 @@
     animation: none;
   }
 }
-@media (max-width: 1150px) {
-  .code-workspace-body.has-explorer.has-mentor.has-discussion {
-    grid-template-columns: 180px minmax(0, 1fr) 340px;
-  }
-  .code-workspace-body.has-mentor.has-discussion {
-    grid-template-columns: minmax(0, 1fr) 340px;
-  }
-}
 @media (max-width: 850px) {
-  .code-workspace-body.has-mentor.has-discussion,
-  .code-workspace-body.has-explorer.has-mentor.has-discussion {
-    display: flex;
-    flex-direction: column;
-  }
   .discussion-voice summary small {
     white-space: normal;
   }

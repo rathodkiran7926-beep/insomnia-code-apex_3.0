@@ -175,11 +175,11 @@ export function Shell() {
       }}>Skip to main content</a>
       <aside id="workspace-sidebar" className="sidebar refreshed-sidebar" aria-label="Workspace sidebar">
         <NavLink to="/" className="brand" aria-label="Codebase Mentor home">
-          <span className="brand-symbol">
-            <Code2 size={20} strokeWidth={2.2} />
+          <span className="brand-symbol mascot-icon">
+            <img src="/codebase_mentor_logo_transparent.svg" alt="" width={36} height={36} />
           </span>
-          <span>
-            Codebase<span className="brand-light">Mentor</span>
+          <span className="sidebar-full-logo">
+            <img src="/codebase_mentor_full_logo.svg" alt="" width={140} height={56} />
           </span>
           <Badge tone="violet">beta</Badge>
         </NavLink>

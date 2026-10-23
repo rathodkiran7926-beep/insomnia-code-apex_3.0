@@ -7,7 +7,6 @@ import {
   ArrowRight,
   ArrowUpRight,
   ChevronDown,
-  Code2,
   Compass,
   FlaskConical,
   Layers3,
@@ -92,12 +91,7 @@ export default function Home() {
             className="sym-brand"
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           >
-            <span className="sym-brand-logo">
-              <Code2 size={24} strokeWidth={2.4} />
-            </span>
-            <span className="sym-brand-text">
-              CODEBASE<strong>MENTOR</strong>
-            </span>
+            <img className="home-full-logo" src="/codebase_mentor_full_logo.svg" alt="Codebase Mentor" width={200} height={80} />
           </div>
 
           <nav className="sym-nav-menu">
@@ -419,14 +413,9 @@ export default function Home() {
           <div className="home-footer-inner">
             <div className="home-footer-left">
               <div className="footer-brand-meta">
-                <Code2 size={28} strokeWidth={2} />
                 <Badge tone="violet">v0.1</Badge>
               </div>
-              <div className="footer-wordmark">
-                Codebase
-                <br />
-                Mentor<span className="footer-brand-dot">.</span>
-              </div>
+              <img className="footer-full-logo" src="/codebase_mentor_full_logo.svg" alt="Codebase Mentor" width={440} height={176} />
             </div>
             <div className="footer-intro">
               <p className="home-footer-tagline">

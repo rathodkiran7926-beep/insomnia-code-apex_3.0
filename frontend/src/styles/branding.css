@@ -1,0 +1,51 @@
+/* The supplied SVG is already cropped and transparent outside the mascot tile. */
+.mascot-icon {
+  display: inline-block;
+  overflow: hidden;
+  flex-shrink: 0;
+  border-radius: 10px;
+}
+.mascot-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.brand-symbol.mascot-icon {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.refreshed-sidebar .brand-symbol {
+  display: none;
+}
+.sidebar-full-logo {
+  display: block;
+  min-width: 0;
+}
+.sidebar-full-logo img {
+  display: block;
+  width: 140px;
+  max-width: 100%;
+  height: auto;
+}
+.home-full-logo {
+  display: block;
+  width: 200px;
+  height: auto;
+}
+.footer-full-logo {
+  display: block;
+  width: 440px;
+  max-width: 100%;
+  height: auto;
+}
+@media (min-width: 821px) {
+  .sidebar-collapsed .refreshed-sidebar .brand-symbol {
+    display: grid;
+  }
+}
+@media (max-width: 600px) {
+  .home-full-logo {
+    width: 150px;
+  }
+}
