@@ -8,6 +8,8 @@ const Context = createContext<{
   loading: boolean;
   error: string;
   setActiveJob: (id: string) => void;
+  repositoryUrl: string;
+  setRepositoryUrl: (url: string) => void;
 } | null>(null);
 export function RepositoryAnalysisProvider({ children }: { children: ReactNode }) {
   const [id, setId] = useState(() => localStorage.getItem('mentor-analysis-job') || '');
@@ -15,6 +17,13 @@ export function RepositoryAnalysisProvider({ children }: { children: ReactNode }
   const [job, setJob] = useState<AnalysisJob | null>(null);
   const [loading, setLoading] = useState(Boolean(id));
   const [error, setError] = useState('');
+  const [repositoryUrl, updateRepositoryUrl] = useState(
+    () => localStorage.getItem('mentor-repository-url') || '',
+  );
+  function setRepositoryUrl(url: string) {
+    localStorage.setItem('mentor-repository-url', url);
+    updateRepositoryUrl(url);
+  }
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -37,6 +46,11 @@ export function RepositoryAnalysisProvider({ children }: { children: ReactNode }
               'Analysis and documentation versions do not match. Please analyze the repository again.',
             );
           setSnapshot(result);
+          updateRepositoryUrl((current) => {
+            if (current) return current;
+            localStorage.setItem('mentor-repository-url', result.repository);
+            return result.repository;
+          });
           setError('');
           setLoading(false);
         } else if (next.status === 'failed') {
@@ -69,7 +83,9 @@ export function RepositoryAnalysisProvider({ children }: { children: ReactNode }
     setId(next);
   }
   return (
-    <Context.Provider value={{ snapshot, job, loading, error, setActiveJob }}>
+    <Context.Provider
+      value={{ snapshot, job, loading, error, setActiveJob, repositoryUrl, setRepositoryUrl }}
+    >
       {children}
     </Context.Provider>
   );

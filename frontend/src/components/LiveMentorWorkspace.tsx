@@ -27,6 +27,8 @@ import { WorkspaceConnectionMap as ConnectionMap } from './WorkspaceConnectionMa
 import { WorkspaceMentorOverview } from './WorkspaceMentorOverview';
 import { WorkspaceOptions } from './WorkspaceOptions';
 import { WorkspaceSplitter } from './WorkspaceSplitter';
+import { ChangeImpactExplorer } from './ChangeImpactExplorer';
+import { Modal } from './UI';
 import {
   automaticWorkspaceMode,
   componentForCitation,
@@ -97,6 +99,7 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
   const [mentorWidth, setMentorWidth] = useState(320);
   const [manualGraphShare, setManualGraphShare] = useState<number | null>(null);
   const [selectionDetailsOpen, setSelectionDetailsOpen] = useState(false);
+  const [impactOpen, setImpactOpen] = useState(false);
   const [sourceCollapsed, setSourceCollapsed] = useState(false);
   const [explorer, setExplorer] = useState(true);
   const [mentor, setMentor] = useState(
@@ -432,6 +435,12 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
                     >
                       {selectionDetailsOpen ? 'Less details' : 'Details'}
                     </button>
+                    <button
+                      className="selection-details-toggle"
+                      onClick={() => setImpactOpen(true)}
+                    >
+                      Change impact
+                    </button>
                   </div>
                   {view !== 'connections' && (!sourceCollapsed || view === 'code') && (
                     <div className="mentor-edit-toolbar combined-source-toolbar">
@@ -738,7 +747,24 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
           </aside>
         )}
       </div>
-
+      <Modal
+        open={impactOpen}
+        onOpenChange={setImpactOpen}
+        title="Explore change impact"
+        description="Find callers and HTTP routes connected to the code you plan to change."
+        className="impact-dialog"
+      >
+        {impactOpen && (
+          <ChangeImpactExplorer
+            snapshot={snapshot}
+            initialComponentId={selectedId}
+            onInspect={(id) => {
+              select(id);
+              setImpactOpen(false);
+            }}
+          />
+        )}
+      </Modal>
     </div>
   );
 }

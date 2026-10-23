@@ -23,6 +23,7 @@ test("repository PR discovery supports filters and pagination without accepting 
                 html_url: "https://evil.example/",
                 state: "closed",
                 merged_at: "2026-01-01",
+                user: { login: "contributor" },
                 head: { ref: "feature" },
                 base: { ref: "main" },
               },
@@ -42,6 +43,8 @@ test("repository PR discovery supports filters and pagination without accepting 
       "https://github.com/example/project/pull/7",
     );
     assert.equal(list.pullRequests[0].merged, true);
+    assert.equal(list.pullRequests[0].author, "contributor");
+    assert(!Number.isNaN(Date.parse(list.fetchedAt)));
     assert.equal(list.hasMore, false);
     assert(
       urls.some(
@@ -76,6 +79,21 @@ test("PR discovery rejects private repositories and preserves GitHub errors", as
   } finally {
     globalThis.fetch = original;
   }
+});
+test("PR discovery defaults to all PRs and preserves an empty GitHub result", async () => {
+  const original = globalThis.fetch;
+  const urls = [];
+  globalThis.fetch = async url => {
+    urls.push(String(url));
+    return new Response(JSON.stringify(String(url).includes('/pulls?') ? [] : { private: false }));
+  };
+  try {
+    const result = await listPullRequests('https://github.com/example/project');
+    assert.equal(result.state, 'all');
+    assert.deepEqual(result.pullRequests, []);
+    assert.equal(result.hasMore, false);
+    assert(urls.some(url => url.includes('state=all')));
+  } finally { globalThis.fetch = original; }
 });
 const repository = "https://github.com/example/project";
 const input = (files, commit) => ({

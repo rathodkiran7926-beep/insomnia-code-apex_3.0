@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { GitPullRequest, LoaderCircle, ArrowUpRight, RefreshCw, Download } from 'lucide-react';
 import { analysisApi } from '../services/analysisApi';
+import { canonicalRepositoryUrl } from '../domain/repositoryUrl';
 import type { RepositorySnapshot } from '../domain/analysisTypes';
 import { BackendArchitecture } from './BackendArchitecture';
 import { ComponentDiscussion } from './ComponentDiscussion';
 import { PRMergeSimulator } from './PRMergeSimulator';
+import { ChangeImpactExplorer } from './ChangeImpactExplorer';
 import { Modal } from './UI';
 import { Link } from 'react-router-dom';
 import { useRepositoryAnalysis } from '../state/RepositoryAnalysisContext';
@@ -92,9 +94,10 @@ const tabs = [
   'Changed files & diff',
   'Setup & run guide',
   'Merge simulator',
+  'Change impact',
 ];
 export function PullRequestChanges({ onDemo }: { onDemo: () => void }) {
-  const { snapshot: activeRepository, loading: repositoryLoading } = useRepositoryAnalysis();
+  const { loading: repositoryLoading, repositoryUrl } = useRepositoryAnalysis();
   const [url, setUrl] = useState('');
   const [pulls, setPulls] = useState<
     {
@@ -105,9 +108,14 @@ export function PullRequestChanges({ onDemo }: { onDemo: () => void }) {
       merged: boolean;
       head: string;
       base: string;
+      state: string;
+      author?: string;
+      updatedAt?: string;
     }[]
   >([]);
-  const [pullState, setPullState] = useState<'open' | 'closed' | 'all'>('open');
+  const [pullState, setPullState] = useState<'open' | 'closed' | 'all'>('all');
+  const [pullSearch, setPullSearch] = useState('');
+  const [pullFetchedAt, setPullFetchedAt] = useState('');
   const [pullPage, setPullPage] = useState(1),
     [pullRefresh, setPullRefresh] = useState(0);
   const [pullLoading, setPullLoading] = useState(false),
@@ -125,22 +133,23 @@ export function PullRequestChanges({ onDemo }: { onDemo: () => void }) {
   const [mode, setMode] = useState<'system' | 'request' | 'services'>('system');
   const [discuss, setDiscuss] = useState<{ side: Side; id: string } | null>(null);
   const [version, setVersion] = useState<Side>('after');
-  const repositoryId = activeRepository?.snapshotId || result?.beforeSnapshotId || '';
-  const repositoryName = activeRepository?.repository || result?.pr.baseRepository || '';
+  const repositoryName = canonicalRepositoryUrl(repositoryUrl);
   useEffect(() => {
     setPullPage(1);
     setUrl('');
-  }, [repositoryId, pullState]);
+    setPullSearch('');
+  }, [repositoryName, pullState]);
   useEffect(() => {
-    if (!repositoryId || repositoryLoading) return;
+    if (!repositoryName) return;
     const controller = new AbortController();
     setPullLoading(true);
     setHasMore(false);
     setPullError('');
     setPulls([]);
     setUrl('');
-    analysisApi<{ pullRequests: typeof pulls; hasMore: boolean }>(
-      `/api/pr/pulls?snapshotId=${encodeURIComponent(repositoryId)}&state=${pullState}&page=${pullPage}`,
+    setPullFetchedAt('');
+    analysisApi<{ pullRequests: typeof pulls; hasMore: boolean; fetchedAt?: string }>(
+      `/api/pr/pulls?repository=${encodeURIComponent(repositoryName)}&state=${pullState}&page=${pullPage}`,
       { signal: controller.signal },
     )
       .then((value) => {
@@ -148,6 +157,7 @@ export function PullRequestChanges({ onDemo }: { onDemo: () => void }) {
           setPulls(value.pullRequests);
           setHasMore(value.hasMore);
           setUrl(value.pullRequests[0]?.url || '');
+          setPullFetchedAt(value.fetchedAt || new Date().toISOString());
         }
       })
       .catch((e) => {
@@ -157,7 +167,7 @@ export function PullRequestChanges({ onDemo }: { onDemo: () => void }) {
         if (!controller.signal.aborted) setPullLoading(false);
       });
     return () => controller.abort();
-  }, [repositoryId, repositoryLoading, pullState, pullPage, pullRefresh]);
+  }, [repositoryName, pullState, pullPage, pullRefresh]);
   useEffect(() => {
     if (!jobId) return;
     const controller = new AbortController();
@@ -240,6 +250,11 @@ export function PullRequestChanges({ onDemo }: { onDemo: () => void }) {
     }
   }
   const file = result?.pr.files.find((f) => f.path === path);
+  const visiblePulls = pulls.filter((pr) =>
+    `${pr.number} ${pr.title} ${pr.author || ''} ${pr.head} ${pr.base}`
+      .toLowerCase()
+      .includes(pullSearch.toLowerCase()),
+  );
   function sourceUrl(side: Side, filePath: string) {
     if (!result) return '#';
     return `${side === 'before' ? result.pr.baseRepository : result.pr.headRepository}/blob/${side === 'before' ? result.pr.baseCommit : result.pr.headCommit}/${filePath.split('/').map(encodeURIComponent).join('/')}`;
@@ -286,33 +301,46 @@ export function PullRequestChanges({ onDemo }: { onDemo: () => void }) {
           void start();
         }}
       >
-        <label htmlFor="pr-select-live">Pull requests from your repository</label>
+        <div className="pr-picker-heading">
+          <div>
+            <label htmlFor="pr-select-live">Pull requests from your repository</label>
+            <p>Pick a change to explore its code, callers, and affected routes.</p>
+          </div>
+          {repositoryName && (
+            <a href={`${repositoryName}/pulls`} target="_blank" rel="noreferrer">
+              View on GitHub <ArrowUpRight size={14} />
+            </a>
+          )}
+        </div>
         {repositoryName && (
           <p className="pr-selected-repository">
             {repositoryName.replace('https://github.com/', '')}
           </p>
         )}
-        {(repositoryLoading || pullLoading) && (
+        {((repositoryLoading && !repositoryName) || pullLoading) && (
           <p role="status">
             <LoaderCircle size={14} className="mentor-spin" /> Loading repository pull requests…
           </p>
         )}
-        {!repositoryId && !repositoryLoading && (
+        {!repositoryName && !repositoryLoading && (
           <p>
-            Analyze a repository first, then its PRs will appear here automatically.{' '}
-            <Link to="/repository">Choose repository →</Link>
+            Select a public GitHub repository in the Repository section. Its PRs will load here
+            automatically. <Link to="/repository">Choose repository →</Link>
           </p>
         )}
-        {repositoryId && (
+        {repositoryName && (
           <>
             <div className="pr-version-tabs">
-              {(['open', 'closed', 'all'] as const).map((state) => (
+              {(['all', 'open', 'closed'] as const).map((state) => (
                 <button
                   type="button"
                   key={state}
                   aria-pressed={pullState === state}
                   disabled={pending}
-                  onClick={() => setPullState(state)}
+                  onClick={() => {
+                    setPullPage(1);
+                    setPullState(state);
+                  }}
                 >
                   {state === 'all'
                     ? 'All PRs'
@@ -335,47 +363,144 @@ export function PullRequestChanges({ onDemo }: { onDemo: () => void }) {
               </p>
             )}
             {!pullLoading && !pullError && !pulls.length && (
-              <p>
-                No {pullState === 'all' ? '' : pullState} pull requests found.{' '}
-                {pullState === 'open' && (
-                  <button type="button" onClick={() => setPullState('closed')}>
-                    Show closed / merged PRs
-                  </button>
-                )}
-              </p>
+              <div className="pr-discovery-empty" role="status">
+                <GitPullRequest size={28} />
+                <div>
+                  <strong>
+                    {pullPage > 1
+                      ? 'No more pull requests on this page'
+                      : pullState === 'all'
+                        ? 'No pull requests yet'
+                        : `No ${pullState} pull requests`}
+                  </strong>
+                  <p>
+                    {pullState === 'all'
+                      ? 'GitHub returned no pull requests for this repository. Push a change on a branch and open a PR to compare it here.'
+                      : 'Try All PRs to include open, closed, and merged changes.'}
+                  </p>
+                  <div className="pr-empty-actions">
+                    {pullState !== 'all' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPullPage(1);
+                          setPullState('all');
+                        }}
+                      >
+                        Show all PRs
+                      </button>
+                    )}
+                    <a href={`${repositoryName}/compare`} target="_blank" rel="noreferrer">
+                      Create a PR on GitHub <ArrowUpRight size={14} />
+                    </a>
+                    <Link to="/repository">Choose another repository</Link>
+                  </div>
+                </div>
+              </div>
             )}
-            <div className="pr-picker-row">
-              <select
-                id="pr-select-live"
-                aria-label="Repository pull request"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                disabled={pending || repositoryLoading || pullLoading || !pulls.length}
-              >
-                <option value="">Choose a pull request</option>
-                {pulls.map((pr) => (
-                  <option key={pr.number} value={pr.url}>
-                    #{pr.number} {pr.title}
-                    {pr.draft ? ' · Draft' : pr.merged ? ' · Merged' : ''}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="pr-analyze-button"
-                disabled={pending || repositoryLoading || pullLoading || !url.trim()}
-              >
-                {pending ? (
-                  <LoaderCircle size={16} className="mentor-spin" />
-                ) : (
-                  <GitPullRequest size={16} />
-                )}{' '}
-                {pending ? 'Analyzing…' : 'Analyze PR'}
-              </button>
-            </div>
-            {pulls.find((p) => p.url === url) && (
-              <small>
-                {pulls.find((p) => p.url === url)?.head} → {pulls.find((p) => p.url === url)?.base}
-              </small>
+            {!!pulls.length && (
+              <>
+                <div className="pr-discovery-toolbar">
+                  <label htmlFor="pr-search-live">
+                    Search this page
+                    <input
+                      id="pr-search-live"
+                      type="search"
+                      value={pullSearch}
+                      onChange={(e) => setPullSearch(e.target.value)}
+                      placeholder="Title, PR number, author, or branch"
+                    />
+                  </label>
+                  <span>
+                    {visiblePulls.length} of {pulls.length} PRs · newest updates first
+                  </span>
+                </div>
+                <div className="pr-discovery-list" aria-label="Available pull requests">
+                  {visiblePulls.map((pr) => (
+                    <button
+                      type="button"
+                      className={`pr-discovery-card ${url === pr.url ? 'selected' : ''}`}
+                      key={pr.number}
+                      aria-pressed={url === pr.url}
+                      disabled={pending}
+                      onClick={() => setUrl(pr.url)}
+                    >
+                      <GitPullRequest size={19} />
+                      <span className="pr-card-copy">
+                        <strong>
+                          #{pr.number} {pr.title}
+                        </strong>
+                        <span>
+                          {pr.author ? `${pr.author} · ` : ''}
+                          {pr.head} → {pr.base}
+                        </span>
+                        {pr.updatedAt && (
+                          <small>Updated {new Date(pr.updatedAt).toLocaleDateString()}</small>
+                        )}
+                      </span>
+                      <span
+                        className={`pr-state-badge ${pr.merged ? 'merged' : pr.draft ? 'draft' : pr.state}`}
+                      >
+                        {pr.merged
+                          ? 'Merged'
+                          : pr.draft
+                            ? 'Draft'
+                            : pr.state === 'closed'
+                              ? 'Closed'
+                              : 'Open'}
+                      </span>
+                    </button>
+                  ))}
+                  {!visiblePulls.length && (
+                    <p role="status">
+                      No PRs match this search on the current page.{' '}
+                      <button type="button" onClick={() => setPullSearch('')}>
+                        Clear search
+                      </button>
+                    </p>
+                  )}
+                </div>
+                <div className="pr-picker-row">
+                  <select
+                    id="pr-select-live"
+                    aria-label="Repository pull request"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    disabled={pending || pullLoading || !pulls.length}
+                  >
+                    <option value="">Choose a pull request</option>
+                    {pulls.map((pr) => (
+                      <option key={pr.number} value={pr.url}>
+                        #{pr.number} {pr.title}
+                        {pr.draft ? ' · Draft' : pr.merged ? ' · Merged' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="pr-analyze-button"
+                    disabled={pending || pullLoading || !url.trim()}
+                  >
+                    {pending ? (
+                      <LoaderCircle size={16} className="mentor-spin" />
+                    ) : (
+                      <GitPullRequest size={16} />
+                    )}{' '}
+                    {pending ? 'Analyzing…' : 'Analyze PR'}
+                  </button>
+                </div>
+                {pulls.find((p) => p.url === url) && (
+                  <small>
+                    {pulls.find((p) => p.url === url)?.head} →{' '}
+                    {pulls.find((p) => p.url === url)?.base}
+                  </small>
+                )}
+              </>
+            )}
+            {!pullLoading && !pullError && pullFetchedAt && (
+              <p className="pr-fetch-caption" role="status">
+                Fetched from GitHub at {new Date(pullFetchedAt).toLocaleTimeString()}. Refresh to
+                check for new PRs.
+              </p>
             )}
             {(pullPage > 1 || hasMore) && (
               <div className="pr-list-pagination">
@@ -457,13 +582,12 @@ export function PullRequestChanges({ onDemo }: { onDemo: () => void }) {
       )}
       {result && snapshots && (
         <>
-          {activeRepository &&
-            activeRepository.repository.toLowerCase() !==
-              result.pr.baseRepository.toLowerCase() && (
+          {repositoryName &&
+            repositoryName.toLowerCase() !== result.pr.baseRepository.toLowerCase() && (
               <p className="pr-warning">
                 The saved result below belongs to{' '}
                 {result.pr.baseRepository.replace('https://github.com/', '')}. The PR picker uses
-                your currently analyzed repository.
+                the repository URL selected in Repository.
               </p>
             )}
           <div className="pr-summary-live">
@@ -520,6 +644,29 @@ export function PullRequestChanges({ onDemo }: { onDemo: () => void }) {
             ))}
           </div>
           <section id="pr-results" role="tabpanel" aria-labelledby={'pr-tab-' + tabs.indexOf(tab)}>
+            {tab === 'Change impact' && (
+              <>
+                <div className="pr-version-tabs" aria-label="Impact source version">
+                  {(['before', 'after'] as const).map((side) => (
+                    <button
+                      key={side}
+                      aria-pressed={version === side}
+                      onClick={() => setVersion(side)}
+                    >
+                      {side} · {snapshots[side].commit.slice(0, 12)}
+                    </button>
+                  ))}
+                </div>
+                <ChangeImpactExplorer
+                  key={result.id + version}
+                  snapshot={snapshots[version]}
+                  changedIds={result.components.flatMap((c) =>
+                    c[version] ? [c[version]!.id] : [],
+                  )}
+                  onInspect={(id) => inspect(version, id)}
+                />
+              </>
+            )}
             <div hidden={tab !== tabs[5]}>
               <PRMergeSimulator key={result.id} comparison={result} />
             </div>
@@ -565,6 +712,9 @@ export function PullRequestChanges({ onDemo }: { onDemo: () => void }) {
                   </section>
                   <section className="pr-card">
                     <h2>Possible downstream impact</h2>
+                    <button onClick={() => setTab('Change impact')}>
+                      Open change impact explorer
+                    </button>
                     <p>
                       Incoming static connections, up to three hops. These are places to review, not
                       detected bugs.

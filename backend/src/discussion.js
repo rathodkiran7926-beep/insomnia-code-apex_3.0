@@ -301,9 +301,13 @@ async function reason(messages, signal) {
       ? `Gemini is temporarily unavailable (HTTP ${error.remoteStatus}) after an automatic retry. Your question has not been answered; retry shortly.`
       : error.remoteStatus === 429
         ? "Gemini rate limit or quota reached. Wait and retry, or check your provider quota."
-        : [401, 403].includes(error.remoteStatus)
-          ? "Gemini rejected the configured credentials. Check LLM_API_KEY in backend/.env."
-          : "Gemini could not answer. Check your configured model, credentials, quota, or network and retry.";
+        : error.remoteStatus === 401
+          ? "Gemini rejected LLM_API_KEY (HTTP 401). Create a replacement Gemini API key in Google AI Studio, update backend/.env, and restart the backend. Run npm.cmd run check:llm in backend to verify it."
+          : error.remoteStatus === 403
+            ? "Gemini denied access (HTTP 403). Check the key's API restrictions, project permissions, and regional availability in Google AI Studio. Run npm.cmd run check:llm in backend for the provider's details."
+            : ["EACCES", "EPERM"].includes(error.code)
+              ? "Network access to Gemini was blocked. Restart the backend from a normal terminal and check firewall or proxy settings."
+              : "Gemini could not answer. Check your configured model, credentials, quota, or network and retry.";
     throw Object.assign(fail(message, 502), { cause: error });
   }
 }

@@ -27,22 +27,31 @@ prRoutes.get("/pulls", async (req, res, next) => {
   try {
     const query = z
       .object({
-        snapshotId: z.string().min(1).max(150),
-        state: z.enum(["open", "closed", "all"]).default("open"),
+        snapshotId: z.string().min(1).max(150).optional(),
+        repository: z.string().trim().min(1).max(400).optional(),
+        state: z.enum(["open", "closed", "all"]).default("all"),
         page: z.coerce.number().int().min(1).max(100).default(1),
       })
       .strict()
+      .refine(
+        (query) => !!query.repository !== !!query.snapshotId,
+        "Provide a repository URL or snapshot ID",
+      )
       .parse(req.query);
-    const snapshot = db
-      .prepare("SELECT graph_json FROM snapshots WHERE id=?")
-      .get(query.snapshotId);
-    if (!snapshot)
-      return res.status(404).json({
-        error: "Analyze a repository first to load its pull requests.",
-      });
+    let repository = query.repository;
+    if (!repository) {
+      const snapshot = db
+        .prepare("SELECT graph_json FROM snapshots WHERE id=?")
+        .get(query.snapshotId);
+      if (!snapshot)
+        return res.status(404).json({
+          error: "Analyze a repository first to load its pull requests.",
+        });
+      repository = JSON.parse(snapshot.graph_json).repository;
+    }
     res.json(
       await listPullRequests(
-        JSON.parse(snapshot.graph_json).repository,
+        repository,
         query.state,
         query.page,
         controller.signal,
