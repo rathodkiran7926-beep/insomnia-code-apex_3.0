@@ -14,8 +14,60 @@
   box-shadow: 0 8px 32px #41366708;
   color: #39354c;
 }
+/* Keep panels scrollable without the visible scrollbar tracks and arrows. */
+.code-workspace,
+.code-workspace * {
+  scrollbar-width: none;
+}
+.code-workspace::-webkit-scrollbar,
+.code-workspace *::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
 .code-workspace button {
   cursor: pointer;
+}
+.mentor-status {
+  position: relative;
+  min-height: 52px;
+}
+.mentor-bottom-talk {
+  position: fixed;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  z-index: 60;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d6c7f3;
+  border-radius: 22px;
+  background: #6b51dc;
+  color: #fff;
+  padding: 9px 18px;
+  white-space: nowrap;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 3px 10px #6550df20;
+  cursor: pointer;
+}
+.mentor-bottom-talk:hover:not(:disabled) {
+  background: #5840c0;
+}
+.mentor-bottom-talk:focus-visible { outline: 3px solid #b8a2f1; outline-offset: 3px; }
+.mentor-bottom-talk:disabled { opacity: .5; cursor: not-allowed; }
+@media (max-width: 850px) {
+  .mentor-status:has(.mentor-bottom-talk) {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px;
+  }
+  .mentor-status:has(.mentor-bottom-talk) > span {
+    display: none;
+  }
 }
 .code-workspace button:disabled {
   opacity: 0.45;
@@ -105,6 +157,25 @@
   grid-template-columns: minmax(0, 1fr);
   flex: 1;
   min-height: 0;
+}
+.mentor-layout-buttons .mentor-voice-launch {
+  background: #6550df;
+  color: white;
+  border-radius: 8px;
+  padding: 9px 12px;
+  box-shadow: 0 3px 10px #6550df24;
+  cursor: pointer;
+}
+.mentor-layout-buttons .mentor-voice-launch:hover:not(:disabled) {
+  background: #5540ca;
+}
+.mentor-layout-buttons .mentor-voice-launch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.mentor-voice-launch:focus-visible {
+  outline: 3px solid #b9aafa;
+  outline-offset: 3px;
 }
 .code-workspace-body.has-explorer {
   grid-template-columns: 245px minmax(0, 1fr);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import '../styles/workspace-header.css';
 import {
   ArrowRight,
@@ -58,7 +58,9 @@ export function Shell() {
       ? 'Demo workspace'
       : (navigation.find((x) => x.path === location.pathname)?.label ?? 'Team knowledge');
   const analyzingRepository =
-    location.pathname === '/repository' || location.pathname === '/workspace';
+    location.pathname === '/repository' ||
+    location.pathname === '/workspace' ||
+    location.pathname === '/changes';
   const learningRoute = getRoute(
     state.personalized ? state.profile : 'beginner',
     state.personalized ? state.goal : 'contribute',
@@ -122,7 +124,7 @@ export function Shell() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      <aside className="sidebar refreshed-sidebar" aria-label="Workspace sidebar">
         <NavLink to="/" className="brand" aria-label="Codebase Mentor home">
           <span className="brand-symbol">
             <Code2 size={20} strokeWidth={2.2} />
@@ -132,48 +134,53 @@ export function Shell() {
           </span>
           <Badge tone="violet">beta</Badge>
         </NavLink>
-        {!analyzingRepository && (
-          <button
-            className="workspace-switcher"
-            onClick={() => go('/repository')}
-            title="Switch repository or inspect workspace"
-          >
-            <span className="repo-avatar">
-              r<span>↗</span>
-            </span>
-            <span>
-              <strong>{analyzingRepository ? 'Repository analysis' : 'Relay workspace'}</strong>
-              <small>
-                {analyzingRepository ? 'Public GitHub repositories' : 'acme / relay-api (demo)'}
-              </small>
-            </span>
-            <ChevronDown size={14} />
-          </button>
-        )}
-        <div className="nav-label">WORKSPACE</div>
-        <nav aria-label="Main navigation">
-          {navigation.map(({ path, label, icon: Icon, count }) => (
+        <div className="sidebar-navigation">
+          {!analyzingRepository && (
+            <button
+              className="workspace-switcher"
+              onClick={() => go('/repository')}
+              title="Switch repository or inspect workspace"
+            >
+              <span className="repo-avatar">
+                r<span>↗</span>
+              </span>
+              <span>
+                <strong>{analyzingRepository ? 'Repository analysis' : 'Relay workspace'}</strong>
+                <small>
+                  {analyzingRepository ? 'Public GitHub repositories' : 'acme / relay-api (demo)'}
+                </small>
+              </span>
+              <ChevronDown size={14} />
+            </button>
+          )}
+          <nav aria-label="Main navigation">
+            {navigation.map(({ path, label, icon: Icon, count }) => (
+              <Fragment key={path}>
+                {path === '/' && <div className="nav-label">Workspace</div>}
+                {path === '/journeys' && <div className="nav-label">Learn & explore</div>}
+                <NavLink
+                  to={path}
+                  end={path === '/'}
+                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                >
+                  <Icon size={17} strokeWidth={1.7} />
+                  <span>{label}</span>
+                  {count && !analyzingRepository && <span className="nav-count">{count}</span>}
+                </NavLink>
+              </Fragment>
+            ))}
+          </nav>
+          <div className="team-nav">
+            <div className="nav-label">Team knowledge</div>
             <NavLink
-              key={path}
-              to={path}
+              to="/knowledge"
               className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
             >
-              <Icon size={17} strokeWidth={1.7} />
-              <span>{label}</span>
-              {count && !analyzingRepository && <span className="nav-count">{count}</span>}
+              <MessageSquareText size={17} strokeWidth={1.7} />
+              <span>Knowledge & decisions</span>
+              {!analyzingRepository && state.decision === 'open' && <span className="small-dot" />}
             </NavLink>
-          ))}
-        </nav>
-        <div className="team-nav">
-          <div className="nav-label">TEAM</div>
-          <NavLink
-            to="/knowledge"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <MessageSquareText size={17} strokeWidth={1.7} />
-            <span>Knowledge & decisions</span>
-            {!analyzingRepository && state.decision === 'open' && <span className="small-dot" />}
-          </NavLink>
+          </div>
         </div>
         <div className="sidebar-bottom">
           {!analyzingRepository && (
@@ -214,9 +221,11 @@ export function Shell() {
               {analyzingRepository ? (
                 <span className="breadcrumb-repo">
                   <GitBranch size={13} />{' '}
-                  {activeRepository
-                    ? activeRepository.repository.replace('https://github.com/', '')
-                    : 'Select a repository'}
+                  {location.pathname === '/changes'
+                    ? 'Pull request analysis'
+                    : activeRepository
+                      ? activeRepository.repository.replace('https://github.com/', '')
+                      : 'Select a repository'}
                 </span>
               ) : (
                 <button

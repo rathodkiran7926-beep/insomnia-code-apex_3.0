@@ -745,6 +745,12 @@ export default function Repository() {
                             {roleLabels[component.role] || component.role}
                             {component.inferred ? ' · inferred' : ''}
                           </Badge>
+                          <Link
+                            className="component-discuss-link"
+                            to={`/workspace?component=${encodeURIComponent(component.id)}&discuss=1`}
+                          >
+                            Discuss this component <ArrowRight size={13} />
+                          </Link>
                           <p className="analysis-component-description">
                             {component.evidence.join('. ') ||
                               `A ${component.role} declaration found in the source. Open the code below to inspect its implementation.`}

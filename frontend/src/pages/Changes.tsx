@@ -32,6 +32,7 @@ import {
 } from '../components/UI';
 import { files, pullRequests, versions } from '../data/fixtures';
 import { useWorkspace } from '../state/WorkspaceContext';
+import { PullRequestChanges } from '../components/PullRequestChanges';
 
 const changedSteps = [
   {
@@ -69,6 +70,19 @@ const changedSteps = [
 ];
 
 export default function Changes() {
+  const [demo, setDemo] = useState(false);
+  return demo ? (
+    <>
+      <button className="pr-back-live" onClick={() => setDemo(false)}>
+        ← Analyze a real PR
+      </button>
+      <PreparedChanges />
+    </>
+  ) : (
+    <PullRequestChanges onDemo={() => setDemo(true)} />
+  );
+}
+function PreparedChanges() {
   const { setSnapshot, openSource, notify } = useWorkspace();
   const go = useNavigate();
   const [prId, setPrId] = useState('verification');

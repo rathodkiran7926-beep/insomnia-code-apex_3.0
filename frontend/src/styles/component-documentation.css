@@ -6,6 +6,19 @@
   overflow: hidden;
   color: #756084;
 }
+.analysis-details .component-discuss-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: 10px;
+  border: 1px solid #e2d4ef;
+  background: #f7f0fe;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 10px;
+  color: #a381bd;
+  text-decoration: none;
+}
 .component-documentation > summary {
   display: flex;
   align-items: center;

@@ -1,5 +1,13 @@
 # Codebase Mentor
 
+## Real pull request comparison
+
+Analyze your repository once in Repository, then open `/#/changes`. PRs load automatically from that repository: choose an open or closed/merged PR and select **Analyze PR**. No pasted PR link is needed. The page now reads actual PR metadata and patches, pins the common-ancestor/head commits, analyzes both source snapshots, and persists the comparison. Its five tabs show an overview, before/after architecture, source-derived request paths, real unified diffs, and manifest-derived setup recipes. The old prepared example is available only through **View prepared demo**. A **Merge simulator** tab previews per-file integration of captured target-branch and PR changes, shows conflicts, and supports local draft editing/export. Git on the backend PATH is required for three-way text merges. It never applies the preview to a branch or creates/merges a GitHub PR.
+
+PR discovery uses `GET /api/pr/pulls?snapshotId=...&state=open&page=1` with the active repository snapshot, filters, refresh and 30-item pagination. The comparison endpoints are `POST /api/pr/analyses` (`{url}`), `GET /api/pr/analyses/:id`, and `GET /api/pr/comparisons/:id`. Jobs, progress and results use SQLite; the browser restores the latest job. Public GitHub access is required. Core comparison does not use Gemini or execute project scripts. Component discussion reuses the existing mentor with one selected version at a time.
+
+Run `npm.cmd run verify:pr` in `backend` for read-only verification against a real public PR, then `npm.cmd run verify:pr-ui` for the Chrome/Edge smoke check. Tests use an isolated database under ignored `backend/data/`. See [the implementation and setup guide](docs/pr-impact-and-setup-guide.md) for code ownership, actual APIs/tables, setup, and limitations. Webhooks, combined two-version AI context, semantic delta walkthroughs and execution-verified setup are not implemented.
+
 The React/Vite app has a Node.js/Express backend for public repository analysis. Open **Repository** (`/#/repository`) to analyze a repository, then **Mentor workspace** (`/#/workspace`) to inspect real files and components in a separate editor workspace, follow callers and dependencies, ask source-grounded questions, and download local code drafts. Architecture and documentation stay on the Repository page. Both pages share one analysis session; the workspace restores it after reload and never substitutes demo data. Existing bundled learning/practice workflows use an explicit `/#/demo-workspace` route.
 
 Requires Node.js 24 or newer. On Windows PowerShell, use `npm.cmd` if script execution policy blocks `npm`.

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { createPortal } from 'react-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
   Code2,
@@ -9,6 +10,7 @@ import {
   GitCommitHorizontal,
   LoaderCircle,
   MessageCircle,
+  Mic,
   Network,
   PanelLeft,
   PanelRight,
@@ -22,6 +24,7 @@ import { analysisApi } from '../services/analysisApi';
 import type { RepositorySnapshot } from '../domain/analysisTypes';
 import { RepositorySource } from './RepositorySource';
 import { ComponentDocumentation } from './ComponentDocumentation';
+import { ComponentDiscussion } from './ComponentDiscussion';
 import { clearConnections, clearEdgeTypes, withConnectionBounds } from './GraphConnections';
 import { directedLayout } from '../domain/graphLayout';
 import '../styles/repository-source.css';
@@ -66,19 +69,25 @@ export default function LiveMentorWorkspace() {
 }
 
 function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
+  const [searchParams] = useSearchParams();
   const refs = useMemo(() => new Map(snapshot.references.map((r) => [r.id, r])), [snapshot]);
   const components = useMemo(
     () => snapshot.components.filter((c) => refs.has(c.referenceId)),
     [snapshot, refs],
   );
   const [selectedId, setSelectedId] = useState(
-    components.find((c) => c.role !== 'module')?.id || components[0]?.id || '',
+    components.find((c) => c.id === searchParams.get('component'))?.id ||
+      components.find((c) => c.role !== 'module')?.id ||
+      components[0]?.id ||
+      '',
   );
   const selected = components.find((c) => c.id === selectedId);
   const reference = selected ? refs.get(selected.referenceId) : undefined;
   const [view, setView] = useState<'code' | 'split' | 'connections'>('split');
   const [explorer, setExplorer] = useState(true);
   const [mentor, setMentor] = useState(true);
+  const [discussing, setDiscussing] = useState(searchParams.get('discuss') === '1');
+  const [centeredConversation, setCenteredConversation] = useState(false);
   const [search, setSearch] = useState('');
   const [fullSource, setFullSource] = useState<Source | null>(null);
   const [sourceLoading, setSourceLoading] = useState(false);
@@ -225,6 +234,21 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
         </div>
         <p>Choose a component. Follow connections. Ask about the code.</p>
         <div className="mentor-layout-buttons">
+          <button
+            className="mentor-voice-launch"
+            aria-label="Discuss this component"
+            title="Open voice and text discussion about the selected component"
+            disabled={!selected}
+            aria-pressed={discussing && mentor}
+            onClick={() => {
+              setMentor(true);
+              setDiscussing(true);
+              setCenteredConversation(true);
+            }}
+          >
+            <Mic size={17} />
+            Talk with mentor
+          </button>
           <button aria-pressed={explorer} onClick={() => setExplorer(!explorer)}>
             <PanelLeft size={15} />
             Files
@@ -236,7 +260,7 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
         </div>
       </div>
       <div
-        className={`code-workspace-body ${explorer ? 'has-explorer' : ''} ${mentor ? 'has-mentor' : ''}`}
+        className={`code-workspace-body ${explorer ? 'has-explorer' : ''} ${mentor && !centeredConversation ? 'has-mentor' : ''} ${discussing ? 'has-discussion' : ''}`}
       >
         {explorer && (
           <aside className="mentor-explorer">
@@ -451,80 +475,95 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
           )}
         </main>
         {mentor && (
-          <aside className="real-mentor-panel">
-            <div className="mentor-panel-heading">
-              <MessageCircle size={15} />
-              YOUR MENTOR <span className="mentor-live-dot" />
-            </div>
-            {selected && (
+          <aside
+            className={`real-mentor-panel ${centeredConversation ? 'conversation-centered' : ''}`}
+          >
+            {discussing ? (
+              <ComponentDiscussion
+                snapshot={snapshot}
+                componentId={selectedId}
+                centered={centeredConversation}
+                onCenteredChange={setCenteredConversation}
+              />
+            ) : (
               <>
-                <ComponentDocumentation
-                  defaultOpen={false}
-                  key={selectedId}
-                  snapshot={snapshot}
-                  componentId={selectedId}
-                  onInspect={select}
-                />
-                <div className="mentor-conversation" aria-live="polite">
-                  {turns
-                    .filter((t) => t.componentId === selectedId)
-                    .map((t, i) => (
-                      <article className="mentor-turn" key={i}>
-                        <h3>{t.question}</h3>
-                        <p>{t.answer}</p>
-                        <small>{t.notice}</small>
-                        <div className="mentor-citations">
-                          {t.citations.map((c) => (
-                            <a key={c.id} href={c.url} target="_blank" rel="noreferrer">
-                              {c.file.split('/').pop()}:{c.startLine}–{c.endLine}
-                            </a>
-                          ))}
-                        </div>
-                      </article>
-                    ))}
-                  {asking && (
-                    <p role="status">
-                      <LoaderCircle size={14} className="mentor-spin" />
-                      Reading saved source…
-                    </p>
-                  )}
-                  {questionError && <p role="alert">{questionError}</p>}
+                <div className="mentor-panel-heading">
+                  <MessageCircle size={15} />
+                  YOUR MENTOR <span className="mentor-live-dot" />
                 </div>
-                <div className="mentor-question-suggestions">
-                  <small>ASK ABOUT THE SELECTED CODE</small>
-                  {[
-                    'What does this component do?',
-                    'What calls this and what does it use?',
-                    'What should I check before changing this?',
-                  ].map((q) => (
-                    <button key={q} disabled={asking} onClick={() => void ask(q)}>
-                      {q}
-                      <ArrowRight size={13} />
-                    </button>
-                  ))}
-                </div>
-                <form
-                  className="mentor-question-form"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void ask(question);
-                  }}
-                >
-                  <label htmlFor="mentor-code-question">Ask about {selected.name}</label>
-                  <div>
-                    <textarea
-                      id="mentor-code-question"
-                      maxLength={1500}
-                      placeholder="Why does this code work this way?"
-                      value={question}
-                      onChange={(e) => setQuestion(e.target.value)}
+                {selected && (
+                  <>
+                    <ComponentDocumentation
+                      defaultOpen={false}
+                      key={selectedId}
+                      snapshot={snapshot}
+                      componentId={selectedId}
+                      onInspect={select}
                     />
-                    <button aria-label="Ask mentor" disabled={asking || !question.trim()}>
-                      <Send size={16} />
-                    </button>
-                  </div>
-                  <small>Answers use this commit’s saved source. Local drafts are separate.</small>
-                </form>
+                    <div className="mentor-conversation" aria-live="polite">
+                      {turns
+                        .filter((t) => t.componentId === selectedId)
+                        .map((t, i) => (
+                          <article className="mentor-turn" key={i}>
+                            <h3>{t.question}</h3>
+                            <p>{t.answer}</p>
+                            <small>{t.notice}</small>
+                            <div className="mentor-citations">
+                              {t.citations.map((c) => (
+                                <a key={c.id} href={c.url} target="_blank" rel="noreferrer">
+                                  {c.file.split('/').pop()}:{c.startLine}–{c.endLine}
+                                </a>
+                              ))}
+                            </div>
+                          </article>
+                        ))}
+                      {asking && (
+                        <p role="status">
+                          <LoaderCircle size={14} className="mentor-spin" />
+                          Reading saved source…
+                        </p>
+                      )}
+                      {questionError && <p role="alert">{questionError}</p>}
+                    </div>
+                    <div className="mentor-question-suggestions">
+                      <small>ASK ABOUT THE SELECTED CODE</small>
+                      {[
+                        'What does this component do?',
+                        'What calls this and what does it use?',
+                        'What should I check before changing this?',
+                      ].map((q) => (
+                        <button key={q} disabled={asking} onClick={() => void ask(q)}>
+                          {q}
+                          <ArrowRight size={13} />
+                        </button>
+                      ))}
+                    </div>
+                    <form
+                      className="mentor-question-form"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void ask(question);
+                      }}
+                    >
+                      <label htmlFor="mentor-code-question">Ask about {selected.name}</label>
+                      <div>
+                        <textarea
+                          id="mentor-code-question"
+                          maxLength={1500}
+                          placeholder="Why does this code work this way?"
+                          value={question}
+                          onChange={(e) => setQuestion(e.target.value)}
+                        />
+                        <button aria-label="Ask mentor" disabled={asking || !question.trim()}>
+                          <Send size={16} />
+                        </button>
+                      </div>
+                      <small>
+                        Answers use this commit’s saved source. Local drafts are separate.
+                      </small>
+                    </form>
+                  </>
+                )}
               </>
             )}
           </aside>
@@ -535,6 +574,17 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
           <GitCommitHorizontal size={13} />
           {snapshot.commit.slice(0, 12)} · Analyzed snapshot
         </span>
+        {createPortal(<button
+          className="mentor-bottom-talk"
+          disabled={!selected}
+          onClick={() => {
+            setMentor(true);
+            setDiscussing(true);
+            setCenteredConversation(true);
+          }}
+        >
+          <Mic size={16} /> Talk with mentor
+        </button>, document.body)}
         <span>
           {Object.keys(drafts).length} local drafts · {components.length} components
         </span>
