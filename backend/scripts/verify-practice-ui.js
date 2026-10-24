@@ -140,6 +140,11 @@ try {
   assert(await evaluate(`Boolean(document.body.innerText.includes('Guided sample') && document.querySelector('.practice-layout:not([hidden])'))`));
   await click('Repository practice');
   await wait(`document.body.innerText.includes('Analyze a repository on the Repository page')`, 'Missing-repository state missing');
+  await evaluate("location.hash='/agent-context'");
+  await wait("document.querySelector('.agent-vscode-snapshot')", 'VS Code snapshot card missing');
+  assert(!await evaluate("Boolean(document.querySelector('#vscode-snapshot-id'))"), 'No repository should not show a fabricated snapshot ID');
+  await evaluate("location.hash='/practice'");
+  await wait("document.querySelector('.practice-feature-tabs')", 'Practice did not reopen');
   await evaluate(`localStorage.setItem('mentor-analysis-job','practice-ui-job')`);
   await send('Page.reload');
   await wait(`document.querySelector('.practice-feature-tabs')`, 'Practice reload failed');
@@ -185,6 +190,15 @@ try {
   assert(latest.snapshotId && latest.commit==='d'.repeat(40), 'Merged latest snapshot endpoint failed');
   await evaluate(`location.hash='/agent-context'`);
   await wait(`document.querySelector('.context-controls textarea')`, 'Merged Agent Context page missing');
+  await wait("document.querySelector('#vscode-snapshot-id')", 'Actual VS Code snapshot ID missing');
+  assert.equal(await evaluate("document.querySelector('#vscode-snapshot-id').textContent"),latest.snapshotId,'VS Code must use the selected repository snapshot');
+  await evaluate("Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{window.__copiedSnapshotId=value;}}})");
+  await click('Copy snapshot ID');
+  await wait("document.querySelector('.agent-snapshot-copy').textContent.includes('Copied')", 'Copy feedback missing');
+  assert.equal(await evaluate('window.__copiedSnapshotId'),latest.snapshotId,'Copy action used the wrong snapshot');
+  await evaluate("navigator.clipboard.writeText=async()=>{throw new Error('Clipboard unavailable')}");
+  await click('Copy snapshot ID');
+  await wait("document.querySelector('.agent-vscode-snapshot [role=alert]')?.textContent.includes('Select and copy')", 'Manual copy fallback missing');
   await fill('.context-controls textarea','normalizeEmail');
   await click('Retrieve relevant context');
   await wait(`document.querySelector('.context-output')?.value.includes('normalizeEmail')`, 'Merged bridge did not retrieve actual source');

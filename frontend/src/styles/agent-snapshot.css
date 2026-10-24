@@ -1,0 +1,81 @@
+.agent-vscode-snapshot {
+  background: linear-gradient(135deg, #f8f5ff, #f5f9ff);
+  border: 1px solid #e5dcfa;
+  border-radius: 14px;
+  padding: 16px;
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+.agent-vscode-snapshot > header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.agent-vscode-mark {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 1px solid #e9e3f5;
+  border-radius: 11px;
+  flex-shrink: 0;
+}
+.agent-vscode-snapshot h3 {
+  margin: 0;
+  color: #454059;
+  font-size: 13px;
+  font-weight: 650;
+}
+.agent-vscode-snapshot header span:not(.agent-vscode-mark) {
+  font-size: 11px;
+  color: #9b8eac;
+}
+.agent-snapshot-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9a88b1;
+  font-weight: 600;
+}
+.agent-vscode-snapshot > code {
+  display: block;
+  background: white;
+  border: 1px solid #e4dbf6;
+  border-radius: 8px;
+  padding: 11px 10px;
+  color: #7657bf;
+  font:
+    11px/1.6 'Geist Mono',
+    monospace;
+  overflow-wrap: anywhere;
+  user-select: all;
+  min-width: 0;
+}
+.agent-vscode-snapshot .agent-snapshot-copy {
+  width: 100%;
+  min-height: 36px;
+  font-size: 12px;
+  background: #ede7fc;
+  border: 1px solid #dbcef9;
+  color: #7456ba;
+  box-shadow: none;
+}
+.agent-vscode-snapshot > p {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #91809f;
+  margin: 0;
+}
+.agent-vscode-snapshot > p > strong {
+  font-weight: 550;
+  color: #746084;
+}
+.agent-snapshot-feedback {
+  font-size: 11px;
+  line-height: 1.6;
+  color: #81718e;
+}

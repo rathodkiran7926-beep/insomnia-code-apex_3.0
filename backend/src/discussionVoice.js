@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { boundedFetch } from "./github.js";
+import { Readable, Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
 
 const api = "https://api.elevenlabs.io";
 const missing = () =>
@@ -122,11 +124,63 @@ export async function createSpeech(voiceId, text, signal) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         text: text.slice(0, 1200),
-        ...(process.env.ELEVENLABS_TTS_MODEL
-          ? { model_id: process.env.ELEVENLABS_TTS_MODEL }
-          : {}),
+        model_id: process.env.ELEVENLABS_TTS_MODEL || "eleven_flash_v2_5",
       }),
     },
+  );
+}
+// Keep credentials on the server and forward chunks with backpressure and a
+// bounded lifetime. Cancellation stops provider generation when the call ends.
+export async function streamSpeech(voiceId, text, res, signal) {
+  const { voices } = await availableVoices();
+  if (!voices.some((v) => v.id === voiceId))
+    throw Object.assign(
+      new Error("This voice is unavailable. Choose another voice."),
+      { status: 400 },
+    );
+  const combined = AbortSignal.any([signal, AbortSignal.timeout(45000)]);
+  const response = await fetch(
+    `${api}/v1/text-to-speech/${encodeURIComponent(voiceId)}/stream?output_format=mp3_44100_128`,
+    {
+      method: "POST",
+      signal: combined,
+      headers: { "xi-api-key": key(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: text.slice(0, 1200),
+        model_id: process.env.ELEVENLABS_TTS_MODEL || "eleven_flash_v2_5",
+      }),
+    },
+  );
+  if (!response.ok || !response.body) {
+    await response.body?.cancel();
+    throw Object.assign(
+      new Error(
+        `Voice service unavailable (HTTP ${response.status}). Your text answer remains available.`,
+      ),
+      { status: 502 },
+    );
+  }
+  res.type("audio/mpeg");
+  res.set("Cache-Control", "no-store");
+  res.set("X-Accel-Buffering", "no");
+  if (response.headers.get("content-type")?.includes("audio/mpeg"))
+    res.set("X-Voice-Stream", "1");
+  let size = 0;
+  await pipeline(
+    Readable.fromWeb(response.body),
+    new Transform({
+      transform(chunk, _encoding, callback) {
+        size += chunk.length;
+        callback(
+          size > 3000000
+            ? new Error("Voice response exceeded size limit")
+            : null,
+          chunk,
+        );
+      },
+    }),
+    res,
+    { signal: combined },
   );
 }
 export function checkAudio(buffer, mime, duration) {

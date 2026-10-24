@@ -8,14 +8,15 @@ import { ComponentDiscussion } from './ComponentDiscussion';
 import { PRMergeSimulator } from './PRMergeSimulator';
 import { ChangeImpactExplorer } from './ChangeImpactExplorer';
 import { SourceSetupGuide } from './SourceSetupGuide';
+import { PRComparisonOverview } from './PRComparisonOverview';
 import { Modal } from './UI';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useRepositoryAnalysis } from '../state/RepositoryAnalysisContext';
 import '../styles/pr-comparison.css';
 
 type Ref = RepositorySnapshot['references'][number];
-type Component = { id: string; name: string; role: string; reference: Ref };
-type Changed = {
+export type Component = { id: string; name: string; role: string; reference: Ref };
+export type Changed = {
   status: string;
   before: Component | null;
   after: Component | null;
@@ -37,7 +38,7 @@ type Manifest = {
   engines: Record<string, string>;
   scripts: Record<string, string>;
 };
-type Result = {
+export type Result = {
   id: string;
   createdAt: string;
   beforeSnapshotId: string;
@@ -132,7 +133,9 @@ export function PullRequestChanges({ onDemo }: { onDemo: () => void }) {
     [error, setError] = useState('');
   const [tab, setTab] = useState(tabs[0]),
     [path, setPath] = useState('');
-  useEffect(() => { setTab(routeParams.get('tab') === 'setup' ? tabs[4] : tabs[0]); }, [routeParams, result?.id]);
+  useEffect(() => {
+    setTab(routeParams.get('tab') === 'setup' ? tabs[4] : tabs[0]);
+  }, [routeParams, result?.id]);
   const [mode, setMode] = useState<'system' | 'request' | 'services'>('system');
   const [discuss, setDiscuss] = useState<{ side: Side; id: string } | null>(null);
   const [version, setVersion] = useState<Side>('after');
@@ -276,7 +279,8 @@ export function PullRequestChanges({ onDemo }: { onDemo: () => void }) {
   function componentButton(item: Component, side: Side) {
     return (
       <button className="pr-component-link" onClick={() => inspect(side, item.id)}>
-        {item.name}
+        {snapshots?.[side].components.find((component) => component.id === item.id)?.name ||
+          item.name}
         <small>
           {item.reference.file}:{item.reference.startLine} · {side}
         </small>
@@ -593,19 +597,38 @@ export function PullRequestChanges({ onDemo }: { onDemo: () => void }) {
                 the repository URL selected in Repository.
               </p>
             )}
-          <div className="pr-summary-live">
-            <div>
-              <a href={result.pr.url} target="_blank" rel="noreferrer">
-                #{result.pr.number} {result.pr.title} ↗
-              </a>
-              <p>
-                {result.pr.headBranch} → {result.pr.baseBranch} · {result.pr.state}
+          <div className="pr-summary-live pr-review-summary">
+            <div className="pr-review-summary-copy">
+              <div className="pr-review-pr-title">
+                <span className="pr-review-pr-number">#{result.pr.number}</span>
+                <a href={result.pr.url} target="_blank" rel="noreferrer">
+                  {result.pr.title}
+                  <ArrowUpRight size={15} />
+                </a>
+              </div>
+              <p className="pr-review-branches">
+                <span>{result.pr.headBranch}</span>
+                <span aria-hidden="true">&rarr;</span>
+                <span>{result.pr.baseBranch}</span>
+                <span className={'pr-review-pr-state ' + result.pr.state}>{result.pr.state}</span>
               </p>
-              <small>
-                Common ancestor {result.pr.baseCommit.slice(0, 12)} → head{' '}
-                {result.pr.headCommit.slice(0, 12)} · captured{' '}
-                {new Date(result.createdAt).toLocaleString()}
-              </small>
+              <details className="pr-review-comparison-details">
+                <summary>Comparison details</summary>
+                <dl>
+                  <div>
+                    <dt>Common ancestor</dt>
+                    <dd>{result.pr.baseCommit.slice(0, 12)}</dd>
+                  </div>
+                  <div>
+                    <dt>Head commit</dt>
+                    <dd>{result.pr.headCommit.slice(0, 12)}</dd>
+                  </div>
+                  <div>
+                    <dt>Captured</dt>
+                    <dd>{new Date(result.createdAt).toLocaleString()}</dd>
+                  </div>
+                </dl>
+              </details>
             </div>
             <div className="pr-actions">
               <button disabled={pending} onClick={() => void start(result.pr.url)}>
@@ -674,82 +697,18 @@ export function PullRequestChanges({ onDemo }: { onDemo: () => void }) {
               <PRMergeSimulator key={result.id} comparison={result} />
             </div>
             {tab === tabs[0] && (
-              <>
-                <div className="pr-stats">
-                  {[
-                    [result.pr.files.length, 'changed files'],
-                    [result.components.length, 'changed components'],
-                    [result.edges.added.length, 'added connections'],
-                    [result.edges.removed.length, 'removed connections'],
-                  ].map(([value, label]) => (
-                    <div key={label}>
-                      <strong>{value}</strong>
-                      <span>{label}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="pr-two-columns">
-                  <section className="pr-card">
-                    <h2>What changed in source</h2>
-                    <p>
-                      Matched by file, role and name. Ambiguous symbols are not assumed to be the
-                      same function.
-                    </p>
-                    {result.components.slice(0, 100).map((c, i) => (
-                      <div className="pr-change-row" key={i}>
-                        <span className={'pr-status ' + c.status}>{c.status}</span>
-                        {c.before && componentButton(c.before, 'before')}
-                        {c.after && componentButton(c.after, 'after')}
-                        {c.ambiguous && <small>Ambiguous identity</small>}
-                      </div>
-                    ))}
-                    {!result.components.length && (
-                      <p>
-                        No changed components were resolved in the supported source. Review the
-                        actual file diff and coverage limits.
-                      </p>
-                    )}
-                    {result.components.length > 100 && (
-                      <p>Showing 100 components. Export evidence for the full result.</p>
-                    )}
-                  </section>
-                  <section className="pr-card">
-                    <h2>Possible downstream impact</h2>
-                    <button onClick={() => setTab('Change impact')}>
-                      Open change impact explorer
-                    </button>
-                    <p>
-                      Unchanged dependents reached through incoming static connections, up to three
-                      hops. Changed source components and relationships are listed separately.
-                      These are places to review, not detected bugs.
-                    </p>
-                    <div className="pr-version-tabs">
-                      {(['before', 'after'] as const).map((side) => (
-                        <button
-                          key={side}
-                          aria-pressed={version === side}
-                          onClick={() => setVersion(side)}
-                        >
-                          {side}
-                        </button>
-                      ))}
-                    </div>
-                    {result.impact[version].slice(0, 50).map((c) => (
-                      <div key={c.id}>
-                        {componentButton(c, version)}
-                        <small>
-                          {c.depth} hop(s) · {c.via}
-                        </small>
-                      </div>
-                    ))}
-                    {!result.impact[version].length && (
-                      <p>
-                        No additional incoming connections resolved. Dynamic callers may be missing.
-                      </p>
-                    )}
-                  </section>
-                </div>
-              </>
+              <PRComparisonOverview
+                result={result}
+                snapshots={snapshots}
+                version={version}
+                onVersion={setVersion}
+                onInspect={inspect}
+                onFileDiff={(file) => {
+                  setPath(file);
+                  setTab(tabs[3]);
+                }}
+                onImpact={() => setTab('Change impact')}
+              />
             )}
             {(tab === tabs[1] || tab === tabs[2]) && (
               <section className="pr-card">

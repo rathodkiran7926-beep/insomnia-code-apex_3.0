@@ -17,7 +17,7 @@ import {
   Braces,
   LoaderCircle,
   MessageCircle,
-  Mic,
+  Phone,
   Network,
   PanelLeft,
   PanelRight,
@@ -359,6 +359,11 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
             to="/learn"
             title="Explore paths from this repository's analyzed source"
           >
+            <img
+              className="workspace-platform-icon"
+              src="/codebase_mentor_logo_transparent.svg"
+              alt=""
+            />
             CodeJourney
           </Link>
           <button
@@ -373,8 +378,8 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
               setCenteredConversation(false);
             }}
           >
-            <Mic size={17} />
-            Voice & text
+            <Phone size={17} />
+            Talk to mentor
           </button>
           <button
             aria-controls="workspace-mentor"

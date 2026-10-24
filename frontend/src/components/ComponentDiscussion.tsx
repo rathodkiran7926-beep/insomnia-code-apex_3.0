@@ -5,16 +5,19 @@ import {
   Volume2,
   Play,
   Send,
-  MessagesSquare,
   FilePenLine,
   Save,
   RefreshCw,
   LoaderCircle,
   Maximize2,
+  MicOff,
+  Phone,
+  PhoneOff,
 } from 'lucide-react';
 import { Modal } from './UI';
 import type { RepositorySnapshot } from '../domain/analysisTypes';
 import { analysisApi } from '../services/analysisApi';
+import { mentorSpeech } from '../domain/mentorSpeech';
 import { voiceActivity } from '../domain/voiceActivity';
 import '../styles/component-discussion.css';
 
@@ -87,6 +90,8 @@ export function ComponentDiscussion({
   const [saved, setSaved] = useState('');
   const [voiceRefresh, setVoiceRefresh] = useState(0);
   const [live, setLive] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [preparingVoice, setPreparingVoice] = useState(false);
   const liveActive = useRef(false);
   const stopMonitor = useRef<(() => void) | null>(null);
   const recordLatest = useRef<() => Promise<void>>(async () => {});
@@ -107,6 +112,7 @@ export function ComponentDiscussion({
     (session.componentId !== componentId || session.snapshotId !== snapshot.snapshotId);
   const busy = status === 'thinking' || status === 'transcribing';
   function stopPlayback() {
+    setPreparingVoice(false);
     audio.current?.pause();
     audio.current = null;
     setStatus((old) => (old === 'speaking' ? 'idle' : old));
@@ -114,6 +120,7 @@ export function ComponentDiscussion({
   function cancelWork() {
     liveActive.current = false;
     setLive(false);
+    setMuted(false);
     stopMonitor.current?.();
     stopMonitor.current = null;
     generation.current++;
@@ -333,24 +340,31 @@ export function ComponentDiscussion({
       setQuestion('');
       if (voiceId && config?.voiceConfigured) {
         setStatus('speaking');
-        // Use an explicit request independent of React's pending state update.
-        const blob = await responseBlob(
+        setPreparingVoice(true);
+        await mentorSpeech(
           `/api/discussions/${session.id}/speech`,
           { voiceId, messageId: result.id },
           request.signal,
+          (player) => {
+            if (request.version !== generation.current || request.signal.aborted) return;
+            audio.current = player;
+            player.onplaying = () => {
+              if (request.version === generation.current && !request.signal.aborted)
+                setPreparingVoice(false);
+            };
+            player.onended = () => {
+              if (request.version === generation.current && !request.signal.aborted)
+                setStatus('idle');
+            };
+            player.onerror = () => {
+              if (!request.signal.aborted)
+                showError(
+                  new Error('Playback failed. Read the answer or replay it.'),
+                  request.version,
+                );
+            };
+          },
         );
-        if (request.version !== generation.current || request.signal.aborted) return;
-        if (sound.current) URL.revokeObjectURL(sound.current.url);
-        sound.current = { url: URL.createObjectURL(blob), messageId: result.id, voiceId };
-        const player = new Audio(sound.current.url);
-        audio.current = player;
-        setStatus('speaking');
-        player.onended = () => {
-          if (request.version === generation.current) setStatus('idle');
-        };
-        player.onerror = () =>
-          showError(new Error('Playback failed. Read the answer or replay it.'), request.version);
-        await player.play();
       } else setStatus('idle');
     } catch (e) {
       if (!request.signal.aborted) showError(e, request.version);
@@ -512,16 +526,17 @@ export function ComponentDiscussion({
   }
   recordLatest.current = record;
   useEffect(() => {
-    if (!live || status !== 'idle' || !session || mismatch) return;
+    if (!live || muted || status !== 'idle' || !session || mismatch) return;
     const timer = setTimeout(() => {
       if (liveActive.current) void recordLatest.current();
-    }, 200);
+    }, 80);
     return () => clearTimeout(timer);
-  }, [live, status, session?.id, mismatch]);
+  }, [live, muted, status, session?.id, mismatch]);
   async function startLive() {
     if (!config?.voiceConfigured || !config.textConfigured || !voiceId) return;
     if ((!session || mismatch) && !(await start())) return;
     liveActive.current = true;
+    setMuted(false);
     setLive(true);
     setStatus('idle');
   }
@@ -578,7 +593,11 @@ export function ComponentDiscussion({
   const content = (
     <section className="component-discussion" aria-label="Discuss this component">
       <header>
-        <MessagesSquare size={17} />
+        <img
+          className="discussion-platform-icon"
+          src="/codebase_mentor_logo_transparent.svg"
+          alt="Codebase Mentor"
+        />
         <div>
           <h2>Discuss this component</h2>
           <p>
@@ -598,7 +617,9 @@ export function ComponentDiscussion({
                 : status === 'thinking'
                   ? 'Thinking…'
                   : status === 'speaking'
-                    ? 'Speaking…'
+                    ? preparingVoice
+                      ? 'Preparing voice...'
+                      : 'Speaking…'
                     : 'Error'}
         </span>
         {!centered && onCenteredChange && (
@@ -630,63 +651,116 @@ export function ComponentDiscussion({
           Set LLM_API_KEY and LLM_MODEL in backend/.env to enable AI discussion.
         </p>
       )}
-      <div className={`discussion-microphone ${status === 'listening' ? 'is-listening' : ''}`}>
-        <span className="discussion-mic-icon" aria-hidden="true">
-          <Mic size={24} />
-        </span>
-        <div>
-          <strong>
-            {live
-              ? status === 'speaking'
-                ? 'Your mentor is speaking'
-                : status === 'thinking' || status === 'transcribing'
-                  ? 'Preparing your answer…'
-                  : 'Listening to you…'
-              : 'Talk naturally with your mentor'}
-          </strong>
-          <p>
-            {!config
-              ? 'Checking microphone availability…'
-              : !config.voiceConfigured
-                ? 'Voice needs ELEVENLABS_API_KEY in backend/.env. You can still type below.'
-                : live
-                  ? 'Conversation stays open. Pause after your question; I’ll answer and listen again.'
-                  : 'Start once. Speak, pause, and hear a reply. No Record or Send needed.'}
-          </p>
-        </div>
-        <button
-          type="button"
-          className="discussion-record-button"
-          disabled={
-            !live &&
-            (busy ||
-              status === 'listening' ||
-              !config?.voiceConfigured ||
-              !config.textConfigured ||
-              !voiceId)
-          }
-          onClick={() => {
-            if (live) {
-              cancelWork();
-              setStatus('idle');
-            } else void startLive();
-          }}
+      <div className={`discussion-call-dock ${live ? 'is-active' : ''}`}>
+        <div
+          className={`discussion-microphone ${live ? 'is-call-active' : ''} call-${muted ? 'muted' : status} ${status === 'listening' ? 'is-listening' : ''}`}
         >
-          {live ? <Square size={17} /> : <Mic size={17} />}
-          {live ? 'End conversation' : 'Start live voice'}
-        </button>
-        {live && (status === 'speaking' || status === 'thinking' || status === 'transcribing') && (
+          <span className="discussion-mic-icon" aria-hidden="true">
+            <img
+              src={
+                status === 'thinking' || status === 'transcribing' || preparingVoice
+                  ? '/mentor/shishimaru-thinking.png'
+                  : status === 'speaking'
+                    ? '/mentor/shishimaru-explaining.png'
+                    : '/mentor/shishimaru-welcoming.png'
+              }
+              alt="Shishimaru, your code mentor"
+            />
+          </span>
+          <div>
+            <strong>
+              {live && muted
+                ? 'Microphone paused'
+                : live
+                  ? status === 'speaking'
+                    ? preparingVoice
+                      ? 'Getting your voice reply ready'
+                      : 'Your mentor is speaking'
+                    : status === 'thinking' || status === 'transcribing'
+                      ? 'Preparing your answer…'
+                      : 'Listening to you…'
+                  : 'Talk naturally with your mentor'}
+            </strong>
+            <p>
+              {!config
+                ? 'Checking microphone availability…'
+                : !config.voiceConfigured
+                  ? 'Voice needs ELEVENLABS_API_KEY in backend/.env. You can still type below.'
+                  : live
+                    ? 'Conversation stays open. Pause after your question; I’ll answer and listen again.'
+                    : 'Start once. Speak, pause, and hear a reply. No Record or Send needed.'}
+            </p>
+          </div>
           <button
             type="button"
+            className="discussion-record-button"
+            disabled={
+              !live &&
+              (busy ||
+                status === 'listening' ||
+                !config?.voiceConfigured ||
+                !config.textConfigured ||
+                !voiceId)
+            }
             onClick={() => {
-              generation.current++;
-              operation.current?.abort();
-              stopPlayback();
-              setStatus('idle');
+              if (live) {
+                cancelWork();
+                setStatus('idle');
+              } else void startLive();
             }}
           >
-            Interrupt & speak
+            {live ? <PhoneOff size={17} /> : <Phone size={17} />}
+            {live ? 'End conversation' : 'Start live voice'}
           </button>
+          {live &&
+            (status === 'speaking' || status === 'thinking' || status === 'transcribing') && (
+              <button
+                type="button"
+                onClick={() => {
+                  generation.current++;
+                  operation.current?.abort();
+                  stopPlayback();
+                  setStatus('idle');
+                }}
+              >
+                Interrupt & speak
+              </button>
+            )}
+        </div>
+        {live && (
+          <div className="discussion-call-controls">
+            <span className="discussion-call-status" role="status">
+              <span aria-hidden="true" />
+              {muted
+                ? 'Microphone off'
+                : status === 'listening'
+                  ? 'Listening to your question'
+                  : status === 'speaking'
+                    ? preparingVoice
+                      ? 'Preparing voice'
+                      : 'Voice reply'
+                    : 'Working on your question'}
+            </span>
+            <button
+              type="button"
+              aria-pressed={muted}
+              onClick={() => {
+                if (muted) {
+                  setMuted(false);
+                  setStatus('idle');
+                  return;
+                }
+                cancelWork();
+                liveActive.current = true;
+                setLive(true);
+                setMuted(true);
+                setStatus('idle');
+              }}
+            >
+              {muted ? <Mic size={16} /> : <MicOff size={16} />}
+              {muted ? 'Resume microphone' : 'Pause microphone'}
+            </button>
+          </div>
         )}
       </div>
       <details className="discussion-voice">

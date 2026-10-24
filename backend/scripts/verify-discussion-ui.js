@@ -250,6 +250,17 @@ try {
   await waitFor("document.querySelector('.discussion-state.listening')");
   assert(await evaluate("Array.from(document.querySelectorAll('.component-discussion button')).some(b=>b.textContent.trim()==='End conversation')"));
   const liveSessionId = await evaluate("sessionStorage.getItem('mentor-last-discussion')");
+  await click("Pause microphone");
+  await waitFor("document.querySelector('.call-muted')");
+  assert(!(await evaluate("!!document.querySelector('.discussion-state.listening')")));
+  assert.equal(await evaluate("sessionStorage.getItem('mentor-last-discussion')"), liveSessionId);
+  await click("Resume microphone");
+  await waitFor("document.querySelector('.discussion-state.listening')");
+  assert(await evaluate("!!document.querySelector('.discussion-platform-icon')"));
+  assert(await evaluate("(()=>{const r=document.querySelector('.discussion-call-dock.is-active').getBoundingClientRect();return r.top>=0 && r.bottom<=innerHeight})()"), "Active call controls remain in view");
+  const callImage = await send("Page.captureScreenshot", { format: "png" });
+  writeFileSync(root + "/data/ui-mentor-active-call.png", Buffer.from(callImage.data, "base64"));
+
   await evaluate("document.querySelector('[aria-label=\"Open centered conversation\"]').click()");
   await waitFor("document.querySelector('.mentor-voice-dialog')");
   assert(await evaluate("document.querySelector('.mentor-voice-dialog').getBoundingClientRect().width>700"));
@@ -383,6 +394,7 @@ try {
           "browser recording and editable transcription",
           "explicit-send only",
           "hands-free auto-submit and listen again after spoken reply",
+          "pause and resume microphone preserves the conversation",
           "end conversation stops microphone",
           "interrupt spoken answer and resume listening",
           "centered conversation preserves active voice and session",

@@ -10,6 +10,6 @@ export function voiceActivity() {
       speechMs += elapsed;
       lastSound = now;
     }
-    return { heardSpeech: speechMs >= 250, finished: speechMs >= 250 && now - lastSound >= 1400 };
+    return { heardSpeech: speechMs >= 250, finished: speechMs >= 250 && now - lastSound >= 1000 };
   };
 }
