@@ -10,6 +10,7 @@ import { readSource, answerQuestion } from "./workspace.js";
 import { generateGuide } from "./generatedGuides.js";
 import { discussionRoutes } from "./discussionRoutes.js";
 import { prRoutes } from "./prRoutes.js";
+import { agentContextRouter } from "./agentContextRoutes.js";
 const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: "24kb" }));
@@ -33,6 +34,7 @@ db.prepare(
 ).run();
 app.use("/api/discussions", discussionRoutes);
 app.use("/api/pr", prRoutes);
+app.use("/api/snapshots", agentContextRouter);
 let active = 0;
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.post("/api/analyses", (req, res, next) => {
@@ -206,11 +208,12 @@ app.use((error, _req, res, _next) =>
             : error.message,
     }),
 );
-const server = app.listen(Number(process.env.PORT || 3001), "127.0.0.1", () =>
-  console.log(
-    `Codebase Mentor API: http://127.0.0.1:${process.env.PORT || 3001}`,
-  ),
-);
+const host = process.env.HOST || "127.0.0.1";
+const server = app.listen(Number(process.env.PORT || 3001), host, () => {
+  const address = server.address();
+  const port = typeof address === "object" && address ? address.port : process.env.PORT || 3001;
+  console.log(`Codebase Mentor API: http://${host}:${port}`);
+});
 server.on("error", (error) => {
   if (error.code === "EADDRINUSE") {
     console.error(

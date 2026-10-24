@@ -79,7 +79,9 @@ export function AgentContextPreview() {
         <div className="agent-client-chips" aria-label="Example clients">
           <span>Codex</span>
           <span>Claude Code</span>
-          <span>MCP-compatible agents</span>
+          <span>OpenCode</span>
+          <span>Cursor</span>
+          <span>Other MCP clients</span>
         </div>
         <small>Example clients · Local demonstration</small>
       </div>

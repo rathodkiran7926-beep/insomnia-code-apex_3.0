@@ -8,6 +8,8 @@
   "scripts": {
     "dev": "node --watch --env-file-if-exists=.env src/server.js",
     "start": "node --env-file-if-exists=.env src/server.js",
+    "evaluate:agent-context": "node scripts/evaluate-agent-context-bridge.js",
+    "evaluate:workspace-agent-context": "node scripts/evaluate-workspace-agent-context.js",
     "test": "node --test test/*.test.js",
     "check:llm": "node --env-file-if-exists=.env scripts/check-llm.js",
     "verify:public": "node scripts/verify-public.js",
