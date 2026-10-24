@@ -87,6 +87,30 @@ export async function driveWorkbench(port, stepFile, snapshots, screenshotFile, 
     const response = await send('Runtime.evaluate', { expression, returnByValue: true, contextId: context.id }, context.sessionId);
     if (response.exceptionDetails) throw new Error('Handoff UI evaluation failed'); return response.result.value;
   };
+  const webviewEvaluate = async (rootId, expression) => {
+    const context = await waitFor(async () => {
+      for (const entry of [...contexts.values()].reverse()) {
+        try { const response = await send('Runtime.evaluate', { expression: `!!document.getElementById(${JSON.stringify(rootId)})`, returnByValue: true, contextId: entry.id }, entry.sessionId); if (response.result?.value) return entry; } catch {}
+      }
+      return false;
+    }, `${rootId} webview frame`);
+    const response = await send('Runtime.evaluate', { expression, returnByValue: true, contextId: context.id }, context.sessionId);
+    if (response.exceptionDetails) throw new Error(`${rootId} UI failed: ${response.exceptionDetails.text}`);
+    return response.result.value;
+  };
+  const changesEvaluate = expression => webviewEvaluate('changes-root', expression);
+  const atlasEvaluate = expression => webviewEvaluate('atlas-root', expression);
+  const focusEvaluate = async expression => {
+    const context = await waitFor(async () => {
+      for (const entry of [...contexts.values()].reverse()) {
+        try { const response = await send('Runtime.evaluate', { expression: '!!document.getElementById("focus-root")', returnByValue: true, contextId: entry.id }, entry.sessionId); if (response.result?.value) return entry; } catch {}
+      }
+      return false;
+    }, 'Focus webview frame');
+    const response = await send('Runtime.evaluate', { expression, returnByValue: true, contextId: context.id }, context.sessionId);
+    if (response.exceptionDetails) throw new Error(`Focus UI evaluation failed: ${response.exceptionDetails.text}`);
+    return response.result.value;
+  };
   let lastStep = '';
   try {
     while (true) {
@@ -114,9 +138,9 @@ export async function driveWorkbench(port, stepFile, snapshots, screenshotFile, 
         if (step.action === 'native-open') {
           await evaluate(`Array.from(document.querySelectorAll('.pane-header')).filter(el => ['Map', 'Changes'].includes(el.innerText.trim()) && el.getAttribute('aria-expanded') !== 'false').forEach(el => el.click())`);
           await evaluate(`Array.from(document.querySelectorAll('.pane-header')).filter(el => el.innerText.trim() === 'Focus' && el.getAttribute('aria-expanded') === 'false').forEach(el => el.click())`);
-          const row = `Array.from(document.querySelectorAll('.monaco-list-row')).find(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent === ${JSON.stringify(step.question)}))`;
-          await waitFor(() => evaluate(`!!(${row})`), 'native persisted Saved Handoffs row');
-          await evaluate(`${row}.click()`);
+          await focusEvaluate(`Array.from(document.querySelectorAll('.cm-section')).find(el => el.querySelector('summary')?.textContent.includes('Saved Handoffs')).open = true`);
+          await waitFor(() => focusEvaluate(`Array.from(document.querySelectorAll('.cm-saved-row')).some(el => el.textContent.includes(${JSON.stringify(step.question)}))`), 'Focus Saved Handoffs entry');
+          await focusEvaluate(`Array.from(document.querySelectorAll('.cm-saved-row')).find(el => el.textContent.includes(${JSON.stringify(step.question)})).querySelector('button').click()`);
         } else if (step.action === 'fill') {
           await waitFor(() => handoffEvaluate(`!!document.getElementById('handoff-compose')`), 'handoff compose form');
           if (!await handoffEvaluate(`['question','attemptedSteps','additionalContext'].every(name => document.getElementById('handoff-compose').elements.namedItem(name).value === '')`)) throw new Error('Handoff authored fields must start empty');
@@ -166,9 +190,9 @@ export async function driveWorkbench(port, stepFile, snapshots, screenshotFile, 
         if (step.action === 'native-resume') {
           await evaluate(`Array.from(document.querySelectorAll('.pane-header')).filter(el => ['Map', 'Changes'].includes(el.innerText.trim()) && el.getAttribute('aria-expanded') !== 'false').forEach(el => el.click())`);
           await evaluate(`Array.from(document.querySelectorAll('.pane-header')).filter(el => el.innerText.trim() === 'Focus' && el.getAttribute('aria-expanded') === 'false').forEach(el => el.click())`);
-          await waitFor(() => evaluate(`Array.from(document.querySelectorAll('.label-name')).some(el => el.textContent === ${JSON.stringify(step.title)})`), 'native persisted saved task');
-          const nativeRow = `Array.from(document.querySelectorAll('.monaco-list-row')).find(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent === ${JSON.stringify(step.title)}))`;
-          await evaluate(`${nativeRow}.click()`);
+          await focusEvaluate(`Array.from(document.querySelectorAll('.cm-section')).find(el => el.querySelector('summary')?.textContent.includes('Saved Tasks')).open = true`);
+          await waitFor(() => focusEvaluate(`Array.from(document.querySelectorAll('.cm-saved-row')).some(el => el.textContent.includes(${JSON.stringify(step.title)}))`), 'Focus Saved Tasks entry');
+          await focusEvaluate(`Array.from(document.querySelectorAll('.cm-saved-row')).find(el => el.textContent.includes(${JSON.stringify(step.title)})).querySelector('button').click()`);
           await pause(300);
           const nativeProof = await send('Page.captureScreenshot', { format: 'png' });
           await writeFile(stepFile.replace(/-steps\.json$/, '-native-resume.png'), Buffer.from(nativeProof.data, 'base64'));
@@ -202,42 +226,33 @@ export async function driveWorkbench(port, stepFile, snapshots, screenshotFile, 
         await writeFile(`${stepFile}.${step.step}.complete`, 'done'); console.log(`MENTOR_PHASE6_UI_PASS: ${step.step}`); continue;
       }
       if (step.type === 'pr') {
-        await evaluate(`Array.from(document.querySelectorAll('.pane-header')).filter(el => ['Focus', 'Map'].includes(el.innerText.trim()) && el.getAttribute('aria-expanded') !== 'false').forEach(el => el.click())`);
         await evaluate(`Array.from(document.querySelectorAll('.pane-header')).filter(el => el.innerText.trim() === 'Changes' && el.getAttribute('aria-expanded') === 'false').forEach(el => el.click())`);
         if (step.action === 'select') {
-          await waitFor(() => evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).some(el => el.innerText.includes('Pull Requests'))`), 'native PR listing group');
-          await evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).find(el => el.innerText.includes('Pull Requests')).querySelector('.monaco-tl-twistie').click()`);
-          await waitFor(() => evaluate(`Array.from(document.querySelectorAll('.label-name')).some(el => el.textContent.startsWith('#106 '))`), 'actual PR 106 row');
-          await evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).find(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent.startsWith('#106 '))).click()`);
+          await waitFor(() => changesEvaluate(`Array.from(document.querySelectorAll('.cv-item')).some(el => el.textContent.startsWith('#106 '))`), 'remote PR 106 Webview card');
+          await changesEvaluate(`Array.from(document.querySelectorAll('.cv-item')).find(el => el.textContent.startsWith('#106 ')).querySelector('button').click()`);
         }
         if (step.action === 'start') {
-          await evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).filter(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent.startsWith('Pull Requests'))).forEach(el => { const toggle = el.querySelector('.monaco-tl-twistie'); if (toggle?.classList.contains('expanded') || el.getAttribute('aria-expanded') === 'true') toggle?.click(); })`);
-
-          await waitFor(() => evaluate(`Array.from(document.querySelectorAll('.label-name')).some(el => el.textContent === 'Start Analysis')`), 'native explicit Start Analysis');
-          await evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).find(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent === 'Start Analysis')).click()`);
+          await waitFor(() => changesEvaluate(`Array.from(document.querySelectorAll('.cv-actions button')).some(el => el.textContent === 'Analyze')`), 'explicit PR analysis button');
+          await changesEvaluate(`Array.from(document.querySelectorAll('.cv-actions button')).find(el => el.textContent === 'Analyze').click()`);
         }
-        if (step.action === 'diff-proof') { const proof = await send('Page.captureScreenshot', { format: 'png' }); await writeFile(screenshotFile.replace('focus.png', 'pr-diff.png'), Buffer.from(proof.data, 'base64')); }
+        if (step.action === 'diff-proof') { const proof = await send('Page.captureScreenshot', { format: 'png' }); await writeFile(screenshotFile.replace('focus.png','pr-diff.png'), Buffer.from(proof.data,'base64')); }
         if (step.action === 'inspect') {
-          await waitFor(() => evaluate(`document.body.innerText.includes('Changed Files') && document.body.innerText.includes('Potential Impact')`), 'real stored PR comparison sections');
-          const proof = await send('Page.captureScreenshot', { format: 'png' }); await writeFile(screenshotFile.replace('focus.png', 'pr-changes.png'), Buffer.from(proof.data, 'base64'));
+          await waitFor(() => changesEvaluate(`document.body.innerText.includes('Changed Files') && document.body.innerText.includes('Potential Impact')`), 'real PR comparison Webview sections');
+          const proof = await send('Page.captureScreenshot', { format: 'png' }); await writeFile(screenshotFile.replace('focus.png','pr-changes.png'), Buffer.from(proof.data,'base64'));
         }
         await writeFile(`${stepFile}.${step.step}.complete`, 'done'); console.log(`MENTOR_PHASE5_UI_PASS: ${step.step}`); continue;
       }
       if (step.type === 'atlas') {
-        await evaluate(`Array.from(document.querySelectorAll('.pane-header')).filter(el => ['Focus', 'Changes'].includes(el.innerText.trim()) && el.getAttribute('aria-expanded') !== 'false').forEach(el => el.click())`);
-        await evaluate(`Array.from(document.querySelectorAll('.pane-header')).filter(el => el.innerText.trim() === 'Map' && el.getAttribute('aria-expanded') === 'false').forEach(el => el.click())`);
-        await waitFor(() => evaluate(`(() => { const labels = Array.from(document.querySelectorAll('.label-name')).map(el => el.textContent); return labels[labels.indexOf('Selected Component') + 1] === ${JSON.stringify(step.component)} && labels.includes('Indexed static relationships; not observed execution.'); })()`), 'real native Map data');
+        await waitFor(() => atlasEvaluate(`Array.from(document.querySelectorAll('.node title')).some(el => el.textContent===${JSON.stringify(step.component)})`), 'indexed Atlas SVG component');
         if (step.action === 'evidence') {
-          await waitFor(() => evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).some(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent === ${JSON.stringify(step.related)}))`), 'relationship row');
-          await evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).find(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent === ${JSON.stringify(step.related)})).querySelector('.monaco-tl-twistie').click()`);
-          await waitFor(() => evaluate(`Array.from(document.querySelectorAll('.label-name')).some(el => el.textContent.startsWith('Relationship evidence:'))`), 'relationship evidence row');
-          await evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).find(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent.startsWith('Relationship evidence:'))).click()`);
+          await waitFor(() => atlasEvaluate(`document.querySelector('.relationship-evidence [data-action="source"]') !== null`), 'Atlas relationship evidence');
+          await atlasEvaluate(`document.querySelector('.relationship-evidence [data-action="source"]').click()`);
         } else if (step.action === 'explore') {
-          await waitFor(() => evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).some(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent === ${JSON.stringify(step.related)}))`), 'related native Map row');
-          await evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).find(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent === ${JSON.stringify(step.related)})).click()`);
+          await waitFor(() => atlasEvaluate(`Array.from(document.querySelectorAll('.node title')).some(el => el.textContent===${JSON.stringify(step.related)})`), 'related Atlas SVG component');
+          await atlasEvaluate(`Array.from(document.querySelectorAll('.node title')).find(el => el.textContent===${JSON.stringify(step.related)}).parentElement.dispatchEvent(new MouseEvent('click',{bubbles:true}))`);
         } else {
-          const proof = await send('Page.captureScreenshot', { format: 'png' });
-          await writeFile(screenshotFile.replace('focus.png', 'atlas.png'), Buffer.from(proof.data, 'base64'));
+          const proof = await send('Page.captureScreenshot', { format:'png' });
+          await writeFile(screenshotFile.replace('focus.png','atlas.png'), Buffer.from(proof.data,'base64'));
         }
         await writeFile(`${stepFile}.${step.step}.complete`, 'done'); console.log(`MENTOR_PHASE4_UI_PASS: ${step.step}`); continue;
       }
@@ -259,18 +274,18 @@ export async function driveWorkbench(port, stepFile, snapshots, screenshotFile, 
         continue;
       }
       if (step.type === 'indexed-ack') {
-        await waitFor(() => evaluate(`Array.from(document.querySelectorAll('.monaco-dialog-box .monaco-button')).some(el => el.textContent.includes('Explain indexed snapshot'))`), 'indexed-source acknowledgement');
-        await evaluate(`Array.from(document.querySelectorAll('.monaco-dialog-box .monaco-button')).find(el => el.textContent.includes('Explain indexed snapshot')).click()`);
+        // Explicit Explain Selection already opts into pinned indexed evidence.
+        // The scope warning is inline; there is deliberately no blocking modal.
         await writeFile(`${stepFile}.${step.step}.complete`, 'done');
-        console.log(`MENTOR_PHASE3_UI_PASS: ${step.step}`);
-        continue;
+        console.log(`MENTOR_PHASE3_UI_PASS: ${step.step} (no modal)`); continue;
       }
       if (step.step === 'done') {
         // Let native tree refresh complete, and collapse unused panes as a user
         // would so virtualized repository rows are visible for the UI assertion.
         await evaluate(`Array.from(document.querySelectorAll('.pane-header')).filter(el => ['Map', 'Changes'].includes(el.innerText.trim()) && el.getAttribute('aria-expanded') !== 'false').forEach(el => el.click())`);
-        if (step.expectedSnapshot) await waitFor(() => evaluate(`document.body.innerText.includes(${JSON.stringify(step.expectedSnapshot)})`), 'rendered snapshot ID');
-        if (step.expectedText) await waitFor(() => evaluate(`document.body.innerText.includes(${JSON.stringify(step.expectedText)})`), 'rendered revision status');
+        await evaluate(`Array.from(document.querySelectorAll('.pane-header')).filter(el => el.innerText.trim() === 'Focus' && el.getAttribute('aria-expanded') === 'false').forEach(el => el.click())`);
+        if (step.expectedSnapshot) await waitFor(async () => await focusEvaluate(`document.getElementById('focus-root').textContent.includes(${JSON.stringify(step.expectedSnapshot)})`), 'Focus snapshot ID');
+        if (step.expectedText) await waitFor(async () => await focusEvaluate(`document.getElementById('focus-root').textContent.includes(${JSON.stringify(step.expectedText)})`), 'Focus visible status');
         break;
       }
       if (step.folderName) {

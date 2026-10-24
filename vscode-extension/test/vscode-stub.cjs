@@ -11,6 +11,7 @@ const folders = new EventEmitter();
 const localEvents = new EventEmitter();
 const selections = new EventEmitter();
 const providers = new Map();
+const webviews = new Map();
 const handlers = new Map();
 const errors = [];
 const calls = [];
@@ -51,6 +52,19 @@ module.exports = {
     onDidChangeTextDocument: localEvents.event, onDidSaveTextDocument: localEvents.event, onDidGrantWorkspaceTrust: localEvents.event,
   },
   window: {
+    registerWebviewViewProvider(id, provider) {
+      if (providers.has(id)) throw new Error('Duplicate view registration');
+      providers.set(id, provider);
+      const receive = new EventEmitter(); const visibility = new EventEmitter(); const disposed = new EventEmitter(); const messages = [];
+      const view = { visible: true, onDidChangeVisibility: visibility.event, onDidDispose: disposed.event,
+        webview: { cspSource: 'vscode-resource:', asWebviewUri: uri => uri, options: {},
+          onDidReceiveMessage: receive.event, async postMessage(message) { messages.push(message); return true; } },
+      };
+      webviews.set(id, { view, messages, receive: value => receive.fire(value), visibility: value => { view.visible = value; visibility.fire(); } });
+      provider.resolveWebviewView(view);
+      receive.fire({ type: 'ready' });
+      return { dispose() { disposed.fire(); receive.dispose(); visibility.dispose(); disposed.dispose(); providers.delete(id); webviews.delete(id); } };
+    },
     createTreeView(id, options) {
       const registration = this.registerTreeDataProvider(id, options.treeDataProvider); const events = new EventEmitter();
       return { visible: false, onDidChangeVisibility: events.event, dispose() { registration.dispose(); events.dispose(); } };
@@ -71,7 +85,7 @@ module.exports = {
     executeCommand: async (...args) => { calls.push(args); },
   },
   testState: {
-    providers, handlers, errors, calls, configuration, folders, selections, documents, shown, external,
+    providers, webviews, handlers, errors, calls, configuration, folders, selections, documents, shown, external,
     setBaseUrl: value => { baseUrl = value; },
   },
 };

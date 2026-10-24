@@ -110,3 +110,39 @@ test('checkout change while loading a local citation opens only its immutable in
   assert.equal(await s.nav.open(s.result, 'ref0'), 'indexed');
   assert.deepEqual(editor.testState.shown.map(item => item.document.uri.scheme), ['codebase-mentor-source']);
 });
+
+test('Atlas Open Source prefers the actual workspace editor without claiming historical lines when Git identity is unknown', async t => {
+  const s = await setup(t);
+  s.setLocal({});
+  assert.equal(await s.nav.openWorkspaceSource(s.result, s.reference), 'local-unverified');
+  const opened = editor.testState.shown.at(-1);
+  assert.equal(opened.document.uri.toString(), s.fileUri);
+  assert.equal(opened.selection, undefined, 'unverified local content must not receive stale citation coordinates');
+});
+test('Atlas Open Source highlights citation lines only when complete local content and commit are verified', async t => {
+  const s = await setup(t);
+  assert.equal(await s.nav.openWorkspaceSource(s.result, s.reference), 'local');
+  const opened = editor.testState.shown.at(-1);
+  assert.equal(opened.document.uri.toString(), s.fileUri);
+  assert.equal(opened.selection.start.line, 1);
+});
+test('Atlas Open Source rejects unsafe references and uses indexed fallback when workspace file is absent', async t => {
+  const s = await setup(t);
+  await assert.rejects(() => s.nav.openWorkspaceSource(s.result, { ...s.reference, file: '../secret.ts' }));
+  await fs.unlink(editor.Uri.parse(s.fileUri).fsPath);
+  assert.equal(await s.nav.openWorkspaceSource(s.result, s.reference), 'indexed');
+  assert.equal(editor.testState.shown.at(-1).document.uri.scheme, 'codebase-mentor-source');
+});
+test('Atlas Open Source refuses to reveal a file if the repository binding changes during async open', async t => {
+  const s = await setup(t);
+  s.setLocal({});
+  const original = editor.workspace.openTextDocument;
+  editor.workspace.openTextDocument = async uri => {
+    const document = await original.call(editor.workspace, uri);
+    if (uri.toString() === s.fileUri) s.setBinding({ ...s.result.binding, snapshotId: 'replaced' });
+    return document;
+  };
+  t.after(() => { editor.workspace.openTextDocument = original; });
+  await assert.rejects(() => s.nav.openWorkspaceSource(s.result, s.reference));
+  assert.equal(editor.testState.shown.length, 0);
+});

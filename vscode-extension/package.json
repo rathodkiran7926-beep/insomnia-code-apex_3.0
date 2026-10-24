@@ -40,15 +40,13 @@
       "codebaseMentor": [
         {
           "id": "codebaseMentor.focus",
-          "name": "Focus"
-        },
-        {
-          "id": "codebaseMentor.map",
-          "name": "Map"
+          "name": "Focus",
+          "type": "webview"
         },
         {
           "id": "codebaseMentor.changes",
-          "name": "Changes"
+          "name": "Changes",
+          "type": "webview"
         }
       ]
     },
@@ -147,6 +145,11 @@
         "command": "codebaseMentor.explainAtlasComponent",
         "title": "Codebase Mentor: Explain with Codebase Mentor",
         "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "codebaseMentor.openRepositoryArchitecture",
+        "title": "Codebase Mentor: Open Complete Repository Architecture",
+        "icon": "$(type-hierarchy)"
       },
       {
         "command": "codebaseMentor.openFullAtlas",

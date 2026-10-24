@@ -4,7 +4,7 @@ A local desktop companion to the **same backend used by the web platform**.
 Connect a workspace to an analyzed public GitHub snapshot, understand indexed
 code, explore relationships, review PRs, resume saved tasks, and prepare context
 for manual sharing. One Activity Bar container contains **Focus**, **Map** and
-**Changes**; larger Mentor, checkpoint and handoff forms open beside the editor.
+**Changes**; larger Mentor, Architecture Diagram, checkpoint and handoff forms open beside the editor.
 
 ## Install and connect
 
@@ -64,10 +64,31 @@ The verified release environment is Windows VS Code1.143.1 and Node24.15.0.
 | Understand code | Select a declaration and run **Explain Selection** |
 | Ask more | Use the Mentor panel's component-scoped follow-up |
 | Open evidence | Click a source citation for the exact indexed location |
-| Explore architecture | Run **Show Related Code** or open **Map** |
+| Explore one component | Select code and run **Show Related Code**; the one-hop diagram opens in an editor tab |
+| Explore the entire repository | Choose **Full architecture** in Focus; a separate VS Code tab renders the complete indexed repository graph (not a web link) |
 | Review a PR | Open **Changes**, select/enter a matching PR, then **Start Analysis** |
 | Resume work | Use **Save Task Checkpoint** and Focus ? **Saved Tasks** |
 | Prepare a question | Use **Ask Senior with Context** and Focus ? **Saved Handoffs** |
+
+**Focus dashboard (webview):** responsive repository status card, four main actions,
+current editor selection, and collapsible Saved Tasks / Saved Handoffs. The
+**Repository details & settings** section contains longer technical metadata and
+connection management. Saved-item menus retain Resume, Details, Ask Senior,
+Delete and historical-source workflows through the existing extension commands.
+Disabled local-only features display a small 'Off' label until expanded. The
+webview communicates with the trusted extension host through a validated command
+allowlist, without direct backend requests, source uploads or credentials.
+
+**Architecture Diagram:** the Map sidebar leads with **Open Architecture Diagram**;
+advanced tree navigation remains available under **Detailed Map Tree**. A lightweight,
+local SVG editor-tab webview displays the
+backend's bounded one-hop JSON neighborhood. Click a node to inspect it;
+double-click or choose **Explore Node** to request the next backend
+neighborhood. The inspector provides Open Source, Explain with Mentor, Ask
+Senior and relationship evidence. Zoom/Fit are view-only. No Mermaid CDN,
+LLM call, extra graph analyzer, direct webview networking, or duplicated
+backend business logic is used. The existing native Map tree remains available
+for keyboard-focused navigation and as a fallback.
 
 Mentor and Map reuse the backend resolver and candidate picker. Relationships
 retain their stored type, direction and uncertainty. They are static evidence,
@@ -82,6 +103,8 @@ requests, not the backend worker. Resume waiting explicitly. **Refresh** reads t
 stored comparison; **Reanalyze Selected PR** explicitly creates a new job.
 Unavailable complete source offers the real PR files page rather than a patch
 presented as full source. GitHub availability and API quotas can limit live PRs.
+
+**Full architecture** in Focus opens an **entire-repository architecture diagram inside VS Code**, based on the already-analyzed `GET /api/snapshots/:id` graph. Modules/files and their backend-defined relationships are grouped for presentation only. Large repositories open at a folder overview; click folders to expand and search indexed file paths. Click a file to inspect its indexed components, **Open source** to navigate to its working file, or **Explore 1-hop** to open the focused Map. The diagram supports mouse pan and wheel zoom. There are no additional model calls and no browser navigation. The snapshot response is bounded to 24 MB, 10,000 components and 50,000 relationships; exceptionally large analyses display a clear error rather than silently inventing or omitting graph data.
 
 **Open Full Architecture Atlas** opens the web workspace configured by
 `codebaseMentor.webBaseUrl` (default `http://127.0.0.1:5173`). Select the repository

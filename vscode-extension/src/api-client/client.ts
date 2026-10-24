@@ -3,6 +3,7 @@ import { validateHandoffInput, validateHandoffSelection, validateHandoffPreview,
 import { validateSnapshot, validSnapshotId, normalizeGithubRemote, type SnapshotMetadata, type RepositoryBinding } from '../repository';
 import { parsePrUrl, validatePullRequestPage, validatePrJob, validatePrComparison, type PrState, type PullRequestPage, type PrJob, type PrComparison } from './prContracts';
 import { validateNeighborhood, validComponentId, type Neighborhood } from './atlasContracts';
+import { validateRepositoryGraph, type RepositoryGraph } from './repositoryGraph';
 import { validateEvidence, validateResolution, validateMentorAnswer, validateSource, safeSourcePath, type SnapshotEvidence, type Resolution, type MentorAnswer, type PinnedSource, type SourceReference } from './mentorContracts';
 import { validateCheckpointBinding, validateCheckpointCapability, validateCheckpointInput, validateCheckpointDetail, validateCheckpointPage, validateCheckpointResume, validateCheckpointDeletion, validateLocalCheckpointContext, type CheckpointCapability, type CheckpointInput, type CheckpointDetail, type CheckpointPage, type CheckpointResume, type LocalCheckpointContext } from './checkpointContracts';
 
@@ -137,6 +138,14 @@ export class MentorApi {
     try { if (!validSnapshotId(id)) throw new Error(); parsePrUrl(prUrl, repositoryIdentity); }
     catch { throw new ApiError('configuration', 'Invalid PR comparison identity.'); }
     return this.parse(await this.request('GET', `/api/pr/comparisons/${id}`, undefined, signal, this.options.timeoutMs ?? 10000, 8000000), value => validatePrComparison(value, id, repositoryIdentity, prUrl));
+  }
+
+  /** The full validated graph of an already analyzed snapshot, used only by the editor-tab overview. */
+  async repositoryGraph(snapshotId: string, signal?: AbortSignal): Promise<RepositoryGraph> {
+    if (!validSnapshotId(snapshotId)) throw new ApiError('configuration', 'Connect a valid repository snapshot first.');
+    const data = await this.request('GET', `/api/snapshots/${encodeURIComponent(snapshotId)}`, undefined, signal,
+      this.options.timeoutMs ?? 20000, 24_000_000);
+    return this.parse(data, value => validateRepositoryGraph(value, snapshotId));
   }
 
   async neighborhood(snapshotId: string, componentId: string, limit = 25, signal?: AbortSignal): Promise<Neighborhood> {

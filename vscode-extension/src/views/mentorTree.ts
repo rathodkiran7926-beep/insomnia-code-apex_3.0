@@ -42,27 +42,61 @@ export class MentorTree implements vscode.TreeDataProvider<vscode.TreeItem>, vsc
     const state = this.state();
     const [label, icon] = labels[state.status];
     const workspace = vscode.workspace.name ?? vscode.workspace.workspaceFolders?.map(folder => folder.name).join(', ');
-    const tasks = row('Saved Tasks', 'history'); tasks.id = 'codebaseMentor.savedTasks'; tasks.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
-    const handoffs = row('Saved Handoffs', 'export'); handoffs.id = 'codebaseMentor.savedHandoffs'; handoffs.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
-    return [
-      row('Codebase Mentor', 'book', 'Your IDE companion to the shared Codebase Mentor platform.'),
-      row(label, icon, state.message),
-      row(workspace ? `Workspace: ${workspace}` : 'No workspace open', 'folder', workspace ?? 'Open a folder or workspace to prepare for future repository integration.'),
-      row('Understand your repository in the IDE', 'lightbulb', 'Connect an existing analyzed snapshot to compare indexed and local repository context.'),
-      ...(this.mentorState ? [row('Explain Selection', 'comment-discussion', 'Explain the indexed component enclosing the current code selection.', 'codebaseMentor.explainSelection'),
-        row('Open Mentor', 'book', this.mentorState().result ? `Latest component: ${this.mentorState().result!.component.name}` : 'View source-grounded explanations and citations.', 'codebaseMentor.openMentor')] : []),
-      ...(this.checkpoints ? [tasks] : []), ...(this.handoffs ? [handoffs] : []),
-      ...(!this.repositories || folders.length === 0 ? [row('No repository snapshot connected', 'info', 'Open a workspace folder to connect an existing snapshot.')] : folders.flatMap(folder => {
-        const entries = this.repositoryRows({ uri: folder.uri.toString(), name: folder.name });
-        if (folders.length === 1) return entries;
+    // Keep the existing item providers and commands, but progressively disclose
+    // management controls instead of presenting them as a flat action list.
+    const taskState = this.checkpoints?.(); const handoffState = this.handoffs?.();
+    const tasks = row(`Saved Tasks${taskState?.page ? ` (${taskState.page.items.length}${taskState.page.hasMore ? '+' : ''})` : ''}`, 'history');
+    tasks.id = 'codebaseMentor.savedTasks';
+    tasks.collapsibleState = taskState?.page?.items.length ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed;
+    const handoffs = row(`Saved Handoffs${handoffState?.page ? ` (${handoffState.page.items.length}${handoffState.page.hasMore ? '+' : ''})` : ''}`, 'export');
+    handoffs.id = 'codebaseMentor.savedHandoffs';
+    handoffs.collapsibleState = handoffState?.page?.items.length ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed;
+    const activeUri = this.editorContext?.()?.workspaceUri;
+    const primary = this.repositories && folders.length ? folders.find(folder => folder.uri.toString() === activeUri) ?? (folders.length === 1 ? folders[0] : undefined) : undefined;
+    const selected = this.editorContext?.();
+    const actions = this.mentorState ? [
+      row('Explain Selection', 'sparkle', 'Explain the indexed component enclosing your selection.', 'codebaseMentor.explainSelection'),
+      row('Open Mentor', 'comment-discussion', 'Review the current answer and source citations.', 'codebaseMentor.openMentor'),
+      row('Architecture Diagram', 'type-hierarchy', 'Open an interactive, evidence-backed diagram in an editor tab.', 'codebaseMentor.openMap'),
+      row('Ask Senior', 'export', 'Prepare a reviewed handoff; local feature must be enabled.', 'codebaseMentor.askSeniorWithContext'),
+    ] : [];
+    const details = row('Repository Details & Settings', 'gear');
+    details.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
+    const detailRows: vscode.TreeItem[] = [];
+    if (this.repositories) for (const folder of folders) {
+      const entries = this.repositoryRows({ uri: folder.uri.toString(), name: folder.name });
+      if (folders.length === 1) detailRows.push(...entries);
+      else {
         const group = row(folder.name, 'repo', folder.uri.toString());
-        group.id = folder.uri.toString();
-        group.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
-        this.children.set(group, entries); return [group];
-      })),
-      row(state.status === 'connected' ? 'Check backend connection' : 'Retry backend connection', 'refresh', 'Check GET /api/health on the configured server.', 'codebaseMentor.checkConnection'),
-      row('Open settings', 'gear', 'Configure the backend URL.', 'codebaseMentor.openSettings'),
+        group.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
+        this.children.set(group, entries); detailRows.push(group);
+      }
+    }
+    detailRows.push(row(state.status === 'connected' ? 'Check Backend Connection' : 'Retry Backend Connection', 'refresh', state.message, 'codebaseMentor.checkConnection'), row('Open Settings', 'gear', 'Configure the backend URL.', 'codebaseMentor.openSettings'));
+    this.children.set(details, detailRows);
+    const repo = primary && this.repositories?.context({ uri: primary.uri.toString(), name: primary.name });
+    const summary = repo?.binding
+      ? `Repository: ${repo.binding.repositoryIdentity.replace('https://github.com/', '')}`
+      : 'Repository: Not connected';
+    const summaryItem = row(summary, repo?.binding ? 'repo' : 'plug', repo?.binding ? `Snapshot ${repo.binding.snapshotId}\nCommit ${repo.binding.indexedCommit}\n${repo.message ?? repo.status}` : 'Connect an analyzed repository snapshot.', repo?.binding ? undefined : 'codebaseMentor.connectRepository');
+    if (repo?.binding) {
+      summaryItem.description = repo.comparison?.revision === 'matched' ? 'Indexed revision matched' : repo.comparison?.revision === 'different' ? 'Different revision' : 'Revision unverified';
+    }
+    const overview: vscode.TreeItem[] = [
+      row(label, icon, state.message),
+      row(workspace ? `Workspace: ${workspace}` : 'No workspace open', 'folder', workspace ?? 'Open a repository folder.'),
+      ...(this.repositories && folders.length ? [summaryItem] : []),
+      ...(repo?.binding ? [row(`Snapshot ${repo.binding.snapshotId.slice(0, 8)} · ${repo.local.branch ?? 'Branch unknown'} · ${repo.binding.indexedCommit.slice(0, 8)}`, 'git-commit', `Indexed commit: ${repo.binding.indexedCommit}\nLocal HEAD: ${repo.local.head ?? 'Unknown'}\nIdentity: ${repo.comparison?.identity ?? 'unverified'}\n${repo.message ?? ''}`)] : []),
+      ...(selected ? [row(`Selected: ${selected.file.split('/').at(-1) ?? selected.file}`, 'file-code', `${selected.file}\nSelection ${selected.selection.start.line + 1}–${selected.selection.end.line + 1}`, 'codebaseMentor.explainSelection')] : []),
+      ...actions,
+      ...(this.checkpoints ? [tasks] : []),
+      ...(this.handoffs ? [handoffs] : []),
+      ...(this.repositories && !repo?.binding && folders.length ? [row('Connect Repository', 'plug', 'Select an analyzed snapshot.', 'codebaseMentor.connectRepository')] : []),
+      details,
     ];
+    // Keep the status and workspaces visible, but hide advanced identity fields,
+    // refresh, disconnect, settings and large capability warnings in Details.
+    return overview;
   }
 
   private repositoryRows(folder: FolderContext): vscode.TreeItem[] {

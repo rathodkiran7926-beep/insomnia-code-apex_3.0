@@ -36,6 +36,7 @@ export interface MentorState {
 	status: "idle" | "loading" | "ready" | "empty" | "error" | "cancelled";
 	message: string;
 	result?: MentorResult;
+  history?: readonly MentorResult[];
 	canPrevious: boolean;
 	canLatest: boolean;
 }
@@ -115,6 +116,7 @@ export class MentorController {
 			status: this.status,
 			message: this.message,
 			result: this.history[this.index],
+      history: this.history.slice(),
 			canPrevious: this.index > 0,
 			canLatest: this.index >= 0 && this.index < this.history.length - 1,
 		};

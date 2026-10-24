@@ -129,6 +129,23 @@ export function validateAnswer(value, context) {
     throw new Error("Invalid mentor citation");
   return result;
 }
+// Avoid exposing provider response bodies, credentials or untrusted exception
+// text. The LLM is optional, but its failures should be actionable, not silent.
+function llmFallbackNotice(error) {
+  const reason = error instanceof Error ? error.message : "";
+  if (/multiple models|no model IDs|set LLM_MODEL/i.test(reason))
+    return "AI provider model selection failed. Set LLM_MODEL to the exact served model in backend/.env, then restart the backend.";
+  if (/401|403|unauthorized|forbidden|api.key|authentication/i.test(reason))
+    return "AI provider rejected authentication or access. Verify LLM_API_KEY and provider permissions in backend/.env.";
+  if (/404|model not found/i.test(reason))
+    return "AI provider endpoint or model was not found. Verify LLM_BASE_URL and LLM_MODEL in backend/.env.";
+  if (/json|parse|invalid mentor citation|invalid.*answer|schema|response.format/i.test(reason))
+    return "AI provider response did not match the required grounded JSON format. Check the served model and try LLM_JSON_MODE=0 if response_format is unsupported.";
+  if (/timeout|abort|fetch failed|econn|enotfound|network|certificate/i.test(reason))
+    return "AI provider was unreachable or timed out. Check the ngrok endpoint, server logs and connectivity.";
+  return "AI request failed or returned unsupported output. Run npm run check:llm from backend/ to diagnose provider configuration.";
+}
+
 export async function answerQuestion(graph, componentId, question) {
   const context = questionContext(graph, componentId);
   const { component: c, relationships, references, connected } = context;
@@ -209,9 +226,8 @@ export async function answerQuestion(graph, componentId, question) {
       mode = "ai";
       notice =
         "AI explanation based on saved source. Citation IDs checked; review the explanation.";
-    } catch {
-      notice =
-        "AI response unavailable. Showing recorded source facts for this component.";
+    } catch (error) {
+      notice = `AI response unavailable. ${llmFallbackNotice(error)} Showing recorded source facts for this component.`;
     }
   }
   // Large call neighborhoods can exceed the IDE response contract even without AI.

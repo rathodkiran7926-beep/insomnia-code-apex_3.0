@@ -91,7 +91,7 @@ export function registerPrCommands(context: vscode.ExtensionContext, pr: PrContr
   register('prExploreMap', async raw => {
     const action = sideAction(raw); if (!action.componentId) throw new Error('Choose a comparison component.');
     const component = comparisonComponent(pr.current(action.viewId).comparison, action.side, action.componentId, action.referenceId);
-    await atlas.open(await target(action, component.reference, component)); await vscode.commands.executeCommand('codebaseMentor.map.focus');
+    await atlas.open(await target(action, component.reference, component)); await vscode.commands.executeCommand('codebaseMentor.openMap');
   });
   register('prExplainComponent', async raw => {
     const action = sideAction(raw); if (!action.componentId) throw new Error('Choose a comparison component.');

@@ -9,7 +9,12 @@ export function savedTaskItems(state: CheckpointState): SavedTaskItem[] {
     const item = new SavedTaskItem(label, vscode.TreeItemCollapsibleState.None); item.iconPath = new vscode.ThemeIcon(icon); item.tooltip = label;
     item.checkpointAction = action; if (command) item.command = { command: `codebaseMentor.${command}`, title: label, arguments: action ? [action] : [] }; return item;
   };
-  return [row(state.message, undefined, undefined, state.status === 'loading' || state.status === 'saving' ? 'sync~spin' : 'info'),
+  const statusLabel = state.status === 'disabled' ? 'Tasks off · enable on local backend'
+    : state.status === 'ready' && state.page ? `${state.page.items.length} saved task${state.page.items.length === 1 ? '' : 's'}`
+    : state.message.length > 77 ? `${state.message.slice(0, 76)}…` : state.message;
+  const stateRow = row(statusLabel, undefined, undefined, state.status === 'loading' || state.status === 'saving' ? 'sync~spin' : 'info');
+  stateRow.tooltip = state.message;
+  return [stateRow,
     ...(state.page?.items.map(checkpoint => {
       const action = { id: checkpoint.id, contextId: checkpointActionContext(state.binding) }; const item = row(checkpoint.taskTitle, 'resumeTask', action);
       item.id = `checkpoint-task:${action.contextId}:${checkpoint.id}`;

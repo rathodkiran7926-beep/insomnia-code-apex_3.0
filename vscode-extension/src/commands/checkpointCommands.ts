@@ -104,7 +104,7 @@ export function registerCheckpointCommands(context: vscode.ExtensionContext, che
     if (!['source', 'map', 'mentor', 'fileDiff'].includes(type)) return;
     const saved = target(value.viewId, referenceId, componentId);
     if (type === 'source') await source.openReference(saved.resolved, saved.reference);
-    if (type === 'map' && componentId) { await atlas.open(saved.resolved); await vscode.commands.executeCommand('codebaseMentor.map.focus'); }
+    if (type === 'map' && componentId) { await atlas.open(saved.resolved); await vscode.commands.executeCommand('codebaseMentor.openMap'); }
     if (type === 'mentor' && componentId) { mentorPanel.show(); await mentor.explainComponent(saved.resolved); }
     if (type === 'fileDiff') {
       const resume = state.resume; const change = resume?.changes.items.find(item => item.referenceId === referenceId);

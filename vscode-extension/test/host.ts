@@ -25,7 +25,7 @@ export async function run(): Promise<void> {
     assert.ok(commands.includes(contribution.command), `Missing handler: ${contribution.command}`);
   }
   await vscode.commands.executeCommand('codebaseMentor.openWorkspace');
-  for (const view of ['focus', 'map', 'changes']) {
+  for (const view of ['focus', 'changes']) {
     await vscode.commands.executeCommand(`codebaseMentor.${view}.focus`);
   }
   await vscode.commands.executeCommand('codebaseMentor.checkConnection');
@@ -455,7 +455,7 @@ export async function run(): Promise<void> {
     await stepDone('atlas-public-mentor-related'); await waitFor(() => mentor.getAtlasState().result?.target.component.id === related.id);
     await vscode.commands.executeCommand('codebaseMentor.mapBack');
     assert.equal(mentor.getAtlasState().result!.target.component.id, component.id);
-    await vscode.commands.executeCommand('codebaseMentor.map.focus');
+    await vscode.commands.executeCommand('codebaseMentor.openMap');
     await step({ step: 'atlas-public-proof', type: 'atlas', action: 'inspect', component: component.name }); await stepDone('atlas-public-proof');
     // Public source has dynamic/external unresolved calls. Test a genuinely empty
     // supported neighborhood from the same graph, without manufacturing edges.
@@ -474,7 +474,7 @@ export async function run(): Promise<void> {
     await waitFor(() => mentor.getRepositoryContext(folders[0]!.uri.toString())?.comparison?.revision === 'different');
     const historical = mentor.getAtlasState().result!;
     await vscode.commands.executeCommand('codebaseMentor.openAtlasSource', { viewId: historical.id, referenceId: historical.target.component.referenceId });
-    assert.equal(vscode.window.activeTextEditor!.document.uri.scheme, 'codebase-mentor-source');
+    assert.equal(vscode.window.activeTextEditor!.document.uri.scheme, 'file', 'Explicit Atlas Open Source chooses the safe local file; historical citation lines are not applied.');
     await vscode.commands.executeCommand('codebaseMentor.disconnectRepository', folders[0]!.uri.toString());
     assert.equal(mentor.getAtlasState().result, undefined);
     await vscode.commands.executeCommand('codebaseMentor.openWorkspace');

@@ -122,6 +122,67 @@ export class SourceNavigation implements vscode.TextDocumentContentProvider, vsc
     } finally { if (this.pending?.controller === controller) this.pending = undefined; }
   }
 
+  /**
+   * Explicit Atlas "Open Source": prefer a genuine workspace document so normal
+   * VS Code features (selection, editing, Mentor commands) continue to work.
+   * An unverified checkout is NEVER shown with historical citation coordinates.
+   * Other citation/diff actions continue using strict pinned-source navigation.
+   */
+  async openWorkspaceSource(result: SourceTarget, raw: SourceReference): Promise<'local' | 'local-unverified' | 'indexed' | 'external' | undefined> {
+    this.bound(result.binding);
+    const reference = validateCitation(raw, result.snapshot);
+    const folder = vscode.Uri.parse(result.binding.workspaceUri);
+    const gitRootUri = this.git.read(folder).rootUri;
+    const root = gitRootUri ? vscode.Uri.parse(gitRootUri) : folder;
+    const file = vscode.Uri.joinPath(root, ...reference.file.split('/'));
+    this.cancel();
+    const controller = new AbortController();
+    this.pending = { controller, binding: result.binding };
+    try {
+      if (await this.safeLocal(root, folder, file)) {
+        this.active(controller, result.binding);
+        const document = await vscode.workspace.openTextDocument(file);
+        this.active(controller, result.binding);
+        if (!await this.safeLocal(root, folder, file)) throw new Error('Local source path changed while opening. No workspace source was revealed.');
+        this.active(controller, result.binding);
+        // A matched Git commit alone does not prove the displayed file text is
+        // identical to the indexed snapshot. Check complete source before
+        // highlighting any source citation coordinates.
+        let verified = false;
+        const localVersion = document.version;
+        if (!document.isDirty && this.localMatches(result.binding, file)) {
+          try {
+            const source = validateSource(await this.api.source(result.snapshot, reference, controller.signal), result.snapshot, reference);
+            this.active(controller, result.binding);
+            verified = !document.isDirty && this.localMatches(result.binding, file) &&
+              normalizedText(document.getText()) === normalizedText(source.excerpt);
+          } catch (error) {
+            if (controller.signal.aborted) throw error;
+            // Failure to confirm source equality is not permission to claim
+            // citation coordinates match the local checkout.
+          }
+        }
+        this.active(controller, result.binding);
+        const editor = await vscode.window.showTextDocument(document, { preview: false, viewColumn: result.sourceContext.viewColumn ?? vscode.ViewColumn.One });
+        this.active(controller, result.binding);
+        if (verified && !document.isDirty && document.version === localVersion && this.localMatches(result.binding, file)) {
+          editor.selection = new vscode.Selection(this.range(document, reference).start, this.range(document, reference).end);
+          editor.revealRange(editor.selection, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+          return 'local';
+        }
+        // Only show the actual current workspace file; no historical line
+        // highlight, no assumed correspondence, and no uploaded editor buffer.
+        vscode.window.setStatusBarMessage?.('Codebase Mentor: Opened working file (not verified against indexed snapshot). Historical citation lines were not applied.', 9000);
+        return 'local-unverified';
+      }
+    } finally {
+      if (this.pending?.controller === controller) this.pending = undefined;
+    }
+    // The local file is absent/unsafe: retain the existing immutable-source
+    // fallback rather than opening a guessed location or symlink target.
+    return this.openReference(result, reference);
+  }
+
   async openReference(result: SourceTarget, raw: SourceReference): Promise<'local' | 'indexed' | 'external' | undefined> {
     this.bound(result.binding);
     const reference = validateCitation(raw, result.snapshot);

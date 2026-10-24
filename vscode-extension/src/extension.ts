@@ -5,7 +5,7 @@ import { registerHandoffCommands, type HandoffCommands } from './commands/handof
 import { MentorApi } from './api-client/client';
 import { Connection } from './connection';
 import { registerCommands } from './commands/register';
-import { MentorTree } from './views/mentorTree';
+import { FocusView } from './views/focusView';
 import { BindingStore, type RepositoryBinding } from './repository';
 import { RepositoryController } from './repositoryController';
 import { GitContext } from './vscode-adapters/gitContext';
@@ -17,10 +17,13 @@ import { MentorPanel } from './views/mentorPanel';
 import { registerMentorCommands } from './commands/mentorCommands';
 import { AtlasController } from './atlasController';
 import { AtlasTree } from './views/atlasTree';
+import { AtlasPanel } from './views/atlasPanel';
+import { RepositoryAtlasPanel } from './views/repositoryAtlasPanel';
 import { registerAtlasCommands } from './commands/atlasCommands';
 import { ComparisonContexts } from './comparisonContexts';
 import { PrController } from './prController';
 import { ChangesTree } from './views/changesTree';
+import { ChangesView } from './views/changesView';
 import { registerPrCommands } from './commands/prCommands';
 import { CheckpointController } from './checkpointController';
 import { CheckpointPanel } from './views/checkpointPanel';
@@ -55,9 +58,10 @@ export function activate(context: vscode.ExtensionContext) {
     }), { title: 'Codebase Mentor: Choose Indexed Component', placeHolder: 'Select the enclosing component you want explained.' }))?.candidate,
     verified: (selection, evidence, reference, signal) => source.verified(selection, evidence, reference, signal),
     sourceVersion: selection => source.contextVersion(selection),
-    acknowledge: async () => await vscode.window.showWarningMessage('Explain the indexed snapshot instead of unverified local code?', {
-      modal: true, detail: 'The checkout revision, selected file or unsaved editor differs from the indexed source, or its identity could not be verified. Current line numbers may identify different indexed code. The Mentor will name the resolved indexed component. No editor buffer will be uploaded.',
-    }, 'Explain indexed snapshot') === 'Explain indexed snapshot',
+    // Explain Selection is an explicit user request for the pinned indexed snapshot.
+    // Show the scope/revision warning inside the Mentor instead of interrupting
+    // every request with a Windows modal. Never upload unsaved editor buffers.
+    acknowledge: async () => true,
   });
   const mentorPanel = new MentorPanel(context.extensionUri, mentor, source);
   const atlas = new AtlasController(api, {
@@ -65,13 +69,15 @@ export function activate(context: vscode.ExtensionContext) {
     workspace: () => editorContext()?.workspaceUri, editor: editorContext,
     resolve: (selection, signal) => mentor.resolveContext(selection, signal),
   });
-  const atlasTree = new AtlasTree(atlas, () => folders().some(folder => Boolean(repositories.bindingFor(folder.uri))), () => {
+  const atlasLocalNotice = (): string | undefined => {
     const target = atlas.state.result?.target; if (!target) return;
     const folder = folders().find(item => item.uri === target.binding.workspaceUri); if (!folder) return;
     const local = repositories.context(folder); const editor = editorContext();
     if (local.comparison?.revision !== 'matched') return 'Local revision differs or is unknown. Selection coordinates refer to the indexed snapshot; inspect its source.';
     if (local.local.dirty || editor?.hasUnsavedChanges) return 'Local changes are outside the indexed snapshot. Source links verify text or open read-only indexed source.';
-  });
+  };
+  const atlasPanel = new AtlasPanel(context.extensionUri, atlas, atlasLocalNotice);
+  const atlasTree = new AtlasTree(atlas, () => folders().some(folder => Boolean(repositories.bindingFor(folder.uri))), atlasLocalNotice);
   let checkpoints: CheckpointController | undefined;
   let handoffContext: HandoffController | undefined;
   const activeBinding = (): RepositoryBinding | undefined => {
@@ -81,6 +87,38 @@ export function activate(context: vscode.ExtensionContext) {
     if (selected) return repositories.bindingFor(selected.workspaceUri);
     const all = folders(); return all.length === 1 ? repositories.bindingFor(all[0]!.uri) : undefined;
   };
+  // The repo-wide Atlas reuses the existing indexed snapshot endpoint and
+  // never changes the workspace binding. Component drill-down reuses Map.
+  const fullRepositoryAtlas = new RepositoryAtlasPanel(context.extensionUri, api, {
+    trusted: () => vscode.workspace.isTrusted,
+    bindings: () => folders().flatMap(folder => {
+      const binding = repositories.bindingFor(folder.uri); return binding ? [binding] : [];
+    }),
+    current: binding => repositories.bindingFor(binding.workspaceUri, binding),
+    focus: async (binding, component, reference, graph) => {
+      const target = {
+        binding,
+        snapshot: { snapshotId: graph.snapshotId, repositoryIdentity: graph.repositoryIdentity,
+          indexedCommit: graph.indexedCommit, limitations: graph.limitations },
+        component, reference,
+        // An indexed-only target. No real local editor selection is claimed.
+        sourceContext: { workspaceUri: binding.workspaceUri, repositoryRootUri: binding.workspaceUri,
+          file: reference.file, selection: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+          hasSelection: false, hasUnsavedChanges: false, binding, revision: 'unknown' as const },
+        scopeNotice: 'Selected from the complete indexed repository architecture.',
+      };
+      atlasPanel.show(); await atlas.open(target);
+    },
+    source: async (binding, component, reference, graph) => {
+      await source.openWorkspaceSource({ binding,
+        snapshot: { snapshotId: graph.snapshotId, repositoryIdentity: graph.repositoryIdentity,
+          indexedCommit: graph.indexedCommit, limitations: graph.limitations },
+        sourceContext: { workspaceUri: binding.workspaceUri, repositoryRootUri: binding.workspaceUri,
+          file: reference.file, selection: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+          hasSelection: false, hasUnsavedChanges: false, binding, revision: 'unknown' as const },
+      }, reference);
+    },
+  });
   // Saved identity may retain local editing state during a transient outage;
   // bindingFor remains the only actionable, revalidated evidence binding.
   const recoverableBinding = (): RepositoryBinding | undefined => {
@@ -107,7 +145,7 @@ export function activate(context: vscode.ExtensionContext) {
   let handoffActions: HandoffCommands | undefined;
   const handoffPanel = new HandoffPanel(context.extensionUri, handoffs, async (type,value) => { await handoffActions?.perform(type,value); }, activeBinding);
   const changesTree = new ChangesTree(pr, () => Boolean(activeBinding()));
-  const changesView = vscode.window.createTreeView('codebaseMentor.changes', { treeDataProvider: changesTree });
+  const changesView = new ChangesView(context.extensionUri, pr, changesTree);
   let focusVisible = false; let checkpointAnchor: string | undefined;
   let disposed = false;
   const check = async () => {
@@ -117,15 +155,15 @@ export function activate(context: vscode.ExtensionContext) {
     await gitReady;
     if (!disposed) await repositories.restore();
   };
-  context.subscriptions.push(connection, git, repositories, temporary, checkpointTemporary, handoffTemporary, handoffs, handoffPanel, tasks, checkpointPanel, mentor, source, mentorPanel, atlas, atlasTree, pr, changesTree, changesView,
+  context.subscriptions.push(connection, git, repositories, temporary, checkpointTemporary, handoffTemporary, handoffs, handoffPanel, tasks, checkpointPanel, mentor, source, mentorPanel, atlas, atlasPanel, fullRepositoryAtlas, atlasTree, pr, changesTree, changesView,
     handoffs.onChange(() => { handoffTemporary.setSession(handoffs.state.binding, handoffs.state.detail?.id); source.contextChanged(); }),
     tasks.onChange(() => { checkpointTemporary.setSession(tasks.state.binding, tasks.state.detail?.checkpoint.id); mentor.contextChanged(); atlas.contextChanged(); source.contextChanged(); }),
     pr.onChange(() => {
       temporary.setSession(pr.state.binding, pr.state.comparison?.id);
       mentor.contextChanged(); atlas.contextChanged(); source.contextChanged(); changesTree.refresh();
     }),
-    changesView.onDidChangeVisibility(event => { pr.setVisible(event.visible); if (event.visible) void pr.open(); }),
-    vscode.window.registerTreeDataProvider('codebaseMentor.map', atlasTree), atlas.onChange(() => atlasTree.refresh()),
+    vscode.window.registerWebviewViewProvider('codebaseMentor.changes', changesView, { webviewOptions: { retainContextWhenHidden: true } }),
+    atlas.onChange(() => atlasTree.refresh()),
     vscode.workspace.registerTextDocumentContentProvider('codebase-mentor-source', source),
     repositories.onChange(() => {
       pr.contextChanged(); tasks.contextChanged(); handoffs.contextChanged(); mentor.contextChanged(); source.contextChanged(); atlas.contextChanged(); atlasTree.refresh(); changesTree.refresh();
@@ -133,19 +171,25 @@ export function activate(context: vscode.ExtensionContext) {
       if (anchor !== checkpointAnchor) { checkpointAnchor = anchor; if (anchor && focusVisible) { void tasks.refresh(); void handoffs.refresh(); } }
     }),
     { dispose: () => { disposed = true; } });
-  for (const surface of ['focus'] as const) {
-    const provider = new MentorTree(surface, () => connection.state, repositories, editorContext, () => mentor.state, () => tasks.state, () => handoffs.state);
-    const focusView = vscode.window.createTreeView('codebaseMentor.focus', { treeDataProvider: provider });
-    focusVisible = focusView.visible;
-    context.subscriptions.push(provider,
-      focusView, focusView.onDidChangeVisibility(event => { focusVisible = event.visible; if (event.visible) { void tasks.refresh(); void handoffs.refresh(); } }), tasks.onChange(() => provider.refresh()), handoffs.onChange(() => provider.refresh()),
-      connection.onChange(() => provider.refresh()),
-      repositories.onChange(() => provider.refresh()), mentor.onChange(() => provider.refresh()));
-  }
+  const focusProvider = new FocusView(context.extensionUri, {
+    connection: () => connection.state, repositories, editor: editorContext,
+    mentor: () => mentor.state, tasks: () => tasks.state, handoffs: () => handoffs.state,
+    folders, trusted: () => vscode.workspace.isTrusted,
+  }, visible => {
+    focusVisible = visible;
+    if (visible) { void tasks.refresh(); void handoffs.refresh(); }
+  });
+  context.subscriptions.push(focusProvider,
+    vscode.window.registerWebviewViewProvider('codebaseMentor.focus', focusProvider, { webviewOptions: { retainContextWhenHidden: true } }),
+    tasks.onChange(() => focusProvider.refresh()), handoffs.onChange(() => focusProvider.refresh()),
+    connection.onChange(() => focusProvider.refresh()), repositories.onChange(() => focusProvider.refresh()),
+    mentor.onChange(() => focusProvider.refresh()),
+    vscode.window.onDidChangeActiveTextEditor(() => focusProvider.refresh()),
+    vscode.window.onDidChangeTextEditorSelection(() => focusProvider.refresh()));
   registerCommands(context, connection, check);
   registerRepositoryCommands(context, repositories, git, connection);
   registerMentorCommands(context, mentor, mentorPanel, source, editorContext);
-  registerAtlasCommands(context, atlas, mentor, mentorPanel, source);
+  registerAtlasCommands(context, atlas, mentor, mentorPanel, source, atlasPanel, () => fullRepositoryAtlas.show());
   registerPrCommands(context, pr, api, temporary, atlas, mentor, mentorPanel, source, editorContext, async (resolved,origin) => { await handoffActions?.launch({binding:resolved.binding,componentId:resolved.component.id,sourceReferenceIds:[resolved.component.referenceId],origin}); });
   checkpointActions = registerCheckpointCommands(context, tasks, checkpointPanel, checkpointTemporary, mentor, mentorPanel, atlas, pr, source, editorContext, activeBinding, localCheckpointContext, async seed => { await handoffActions?.launch(seed); });
   handoffActions = registerHandoffCommands(context, handoffs, handoffPanel, mentor, atlas, handoffTemporary, source, editorContext, activeBinding);

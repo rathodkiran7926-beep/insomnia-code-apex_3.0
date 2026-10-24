@@ -14,3 +14,14 @@ test('Mentor UI renders wrapped plain text, provenance and citation actions with
   assert.ok(html.includes('independent question')); assert.ok(html.includes('aria-live'));
   assert.ok(renderMentorBody({ ...state, result: { ...state.result, answer: { ...state.result.answer, mode: 'ai' } } }).includes('AI-assisted explanation · Review required'));
 });
+test('chat-style Mentor separates authored question and answer and never mixes repositories', () => {
+  const anchor = { backendUrl:'http://127.0.0.1:3001/', workspaceUri:'file:///repo', snapshotId:'s1' };
+  const create = (id, snapshotId, componentId, question) => ({ id, binding:anchor, component:{id:componentId,referenceId:'r1',name:'function',role:'function'},componentSource:{file:'src/f.ts'},snapshot:{snapshotId,repositoryIdentity:'https://github.com/a/b',indexedCommit:'a'.repeat(40)},question,scopeNotice:'Indexed',indexedOnly:false,answer:{mode:'facts',notice:'Facts only',answer:'Backend source evidence',citations:[]} });
+  const a=create('one','s1','c1','My first question');
+  const b=create('two','s1','c1','My follow-up question');
+  const other=create('three','s2','c2','Other repository question');
+  const html=renderMentorBody({status:'ready',message:'Ready',result:b,history:[a,other,b],canPrevious:true,canLatest:false});
+  assert(html.includes('question-bubble')); assert(html.includes('answer-bubble'));
+  assert(html.includes('My first question')); assert(html.includes('My follow-up question'));
+  assert(!html.includes('Other repository question'));
+});

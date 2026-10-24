@@ -1,0 +1,28 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { ChangesView, ChangesTree, editor } = require('../.test-output/activation.cjs');
+const vscode = editor;
+test('Changes webview uses native command-backed rows and rejects stale/unknown actions', async () => {
+  const listeners = new Set();
+  const state = {status:'ready',message:'Stored static comparison',viewId:'pr-v1',selected:{number:42,title:'Fix app',state:'open'},page:{pullRequests:[{number:42,title:'Fix app',state:'open',url:'https://github.com/a/b/pull/42'}],state:'all',page:1,hasMore:false}};
+  const pr = {state,onChange(cb){listeners.add(cb);return{dispose(){listeners.delete(cb);}}},setVisible(){},async open(){}};
+  const tree = new ChangesTree(pr, () => true);
+  const changes = new ChangesView(vscode.Uri.parse('file:///extension'),pr,tree);
+  const registration = vscode.window.registerWebviewViewProvider('test.changes',changes);
+  const webview = vscode.testState.webviews.get('test.changes');
+  assert.match(webview.view.webview.html,/connect-src 'none'/);
+  const render = webview.messages.at(-1);
+  assert.equal(render.selected.number,42);
+  assert(render.rows.some(r=>String(r.label).startsWith('Pull Requests')));
+  const before = vscode.testState.calls.length;
+  webview.receive({type:'action',epoch:render.epoch-1,id:'row-1'});
+  webview.receive({type:'action',epoch:render.epoch,id:'spoof'});
+  await new Promise(r=>setTimeout(r,15));
+  assert.equal(vscode.testState.calls.length,before);
+  const prGroup = render.rows.find(r=>String(r.label).startsWith('Pull Requests'));
+  const item = prGroup.children.find(x=>x.label.includes('Fix app'));
+  webview.receive({type:'action',epoch:render.epoch,id:item.action});
+  await new Promise(r=>setTimeout(r,15));
+  assert.equal(vscode.testState.calls.at(-1)[0],'codebaseMentor.selectPr');
+  changes.dispose();tree.dispose();registration.dispose();
+});

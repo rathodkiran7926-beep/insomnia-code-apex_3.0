@@ -48,13 +48,10 @@ export class AtlasTree implements vscode.TreeDataProvider<AtlasItem>, vscode.Dis
     };
     const empty = () => this.row('No supported relationships found for this component.');
     const allEdges = [...new Map([...n.incoming, ...n.outgoing].map(e => [e.id, e])).values()];
-    return [status,
-      this.row(`Indexed ${n.repositoryIdentity.replace('https://github.com/', '')} @ ${n.indexedCommit.slice(0, 12)}`, 'git-commit'),
-      ...(result.target?.scopeNotice ? [this.row(result.target.scopeNotice)] : []),
-      ...(this.localNotice?.() ? [this.row(this.localNotice()!, 'warning')] : []),
-      this.group('Selected Component', [selected, refRow(n.component.referenceId, 'Declaration'), this.row('Explain with Codebase Mentor', 'comment-discussion', 'explainAtlasComponent', action(n.component.id))]),
-      this.group(`Incoming Relationships (${n.incoming.length})`, n.incoming.length ? n.incoming.map(e => relationshipRow(e, 'incoming')) : [empty()]),
-      this.group(`Outgoing Relationships (${n.outgoing.length})`, n.outgoing.length ? n.outgoing.map(e => relationshipRow(e, 'outgoing')) : [empty()]),
+    const details = [
+      this.group('Selected Component', [selected, refRow(n.component.referenceId, 'Declaration'), this.row('Explain with Codebase Mentor', 'comment-discussion', 'explainAtlasComponent', action(n.component.id))], false),
+      this.group(`Incoming Relationships (${n.incoming.length})`, n.incoming.length ? n.incoming.map(e => relationshipRow(e, 'incoming')) : [empty()], false),
+      this.group(`Outgoing Relationships (${n.outgoing.length})`, n.outgoing.length ? n.outgoing.map(e => relationshipRow(e, 'outgoing')) : [empty()], false),
       this.group('Source Evidence', [refRow(n.component.referenceId, 'Component declaration'), ...allEdges.map(e => refRow(e.referenceId, `${e.type} evidence`))], false),
       this.group('Documentation', n.documentation.length ? n.documentation.flatMap(doc => {
         const row = this.row('Inferred AI documentation · review required', 'book'); row.tooltip = doc.explanation;
@@ -63,11 +60,20 @@ export class AtlasTree implements vscode.TreeDataProvider<AtlasItem>, vscode.Dis
       }) : [this.row('No component-specific documentation is available.')], false),
       ...(n.truncated ? [this.row(`Showing at most ${n.limit} relationships; more are available in the full Atlas.`, 'warning')] : []),
       this.group('Analysis limitations', n.limitations.map(text => this.row(text, 'warning')), false),
-      ...(state.canBack ? [this.row('Back to Previous Component', 'arrow-left', 'mapBack')] : []),
       this.row('Back to Editor Selection', 'code', 'mapBackToEditor'),
-      this.row('Show Related Code', 'type-hierarchy', 'showRelatedCode'),
       this.row('Refresh Map', 'refresh', 'refreshMap'),
       this.row('Open Full Architecture Atlas', 'link-external', 'openFullAtlas'),
+    ];
+    const summary = this.row(n.component.name, 'symbol-method', 'openMap');
+    summary.description = `${n.incoming.length} in · ${n.outgoing.length} out`;
+    summary.tooltip = `Selected indexed component: ${n.component.name}\n${n.repositoryIdentity} @ ${n.indexedCommit}`;
+    return [
+      this.row('Open Architecture Diagram', 'type-hierarchy', 'openMap'),
+      summary,
+      ...(result.target?.scopeNotice ? [this.row('Selection scope (see diagram)', 'info', 'openMap')] : []),
+      ...(this.localNotice?.() ? [this.row('Revision notice (see diagram)', 'warning', 'openMap')] : []),
+      ...(state.canBack ? [this.row('Back to Previous Component', 'arrow-left', 'mapBack')] : []),
+      this.group('Detailed Map Tree', details, false),
     ];
   }
   dispose(): void { this.changed.dispose(); }

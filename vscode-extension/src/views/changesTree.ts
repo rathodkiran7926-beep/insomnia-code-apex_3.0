@@ -32,7 +32,11 @@ export class ChangesTree implements vscode.TreeDataProvider<ChangesItem>, vscode
     if (parent) return this.children.get(parent)?.() ?? [];
     const state = this.pr.state; const result = state.comparison;
     const action = (extra: Omit<ChangesAction, 'viewId'> = {}): ChangesAction => ({ viewId: state.viewId, ...extra });
-    const rows = [this.row(state.message || `PR Changes: ${state.status}`, ['running', 'starting', 'listing'].includes(state.status) ? 'sync~spin' : state.status === 'error' ? 'warning' : 'info')];
+    const fullStatus = state.message || `PR Changes: ${state.status}`;
+    const summary = fullStatus.length > 90 ? `${fullStatus.slice(0, 89)}…` : fullStatus;
+    const statusRow = this.row(summary, ['running', 'starting', 'listing'].includes(state.status) ? 'sync~spin' : state.status === 'error' ? 'warning' : 'info');
+    statusRow.tooltip = fullStatus;
+    const rows = [statusRow];
     if (!this.connected()) return [...rows, this.row('Connect a repository snapshot to discover remote pull requests.', 'repo'), this.row('Connect Repository', 'plug', 'connectRepository')];
     if (state.selected) {
       const selected = state.selected;
