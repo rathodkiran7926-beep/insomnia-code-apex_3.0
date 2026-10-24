@@ -26,6 +26,7 @@ type StoredSource = {
   excerpt: string;
   url: string;
   complete?: boolean;
+  linkLabel?: string;
 };
 type Segment = { text: string; classes: string[] };
 function highlightedLines(text: string, language: string) {
@@ -56,6 +57,8 @@ export function RepositorySource({
   annotationLines = [],
   secondaryRange,
   navigationRange,
+  versionLabel = 'commit',
+  compact = false,
 }: {
   source?: StoredSource;
   commit: string;
@@ -64,6 +67,8 @@ export function RepositorySource({
   annotationLines?: number[];
   secondaryRange?: { startLine: number; endLine: number };
   navigationRange?: { startLine: number; endLine: number };
+  versionLabel?: 'commit' | 'source hash';
+  compact?: boolean;
 }) {
   const viewer = useRef<HTMLDivElement>(null);
   const expandedViewer = useRef<HTMLDivElement>(null);
@@ -207,7 +212,7 @@ export function RepositorySource({
   }
   const render = (large: boolean) => (
     <div
-      className={`repository-source ${wrap ? 'source-wrapped' : ''} ${large ? 'source-expanded' : ''}`}
+      className={`repository-source ${wrap ? 'source-wrapped' : ''} ${large ? 'source-expanded' : ''} ${compact && !large ? 'source-compact' : ''}`}
       ref={large ? expandedViewer : viewer}
       data-source-complete={source.complete ? 'true' : 'false'}
       style={large ? ({ '--source-font-size': `${fontSize}px` } as CSSProperties) : undefined}
@@ -439,7 +444,7 @@ export function RepositorySource({
           </span>
         </span>
         <a href={source.url} target="_blank" rel="noreferrer">
-          Open on GitHub <ExternalLink size={12} />
+          {source.linkLabel || 'Open on GitHub'} <ExternalLink size={12} />
         </a>
       </div>
       {truncated && (
@@ -464,7 +469,7 @@ export function RepositorySource({
         open={expanded}
         onOpenChange={setExpanded}
         title={name || 'Source code'}
-        description={`${source.complete ? 'Complete file' : 'Saved excerpt'} at commit ${commit.slice(0, 12)}. ${source.file}`}
+        description={`${source.complete ? 'Complete file' : 'Saved excerpt'} at ${versionLabel} ${commit.slice(0, 12)}. ${source.file}`}
         className="repository-source-dialog"
       >
         {render(true)}

@@ -16,7 +16,10 @@
     "verify:discussion": "node scripts/verify-discussion-ui.js",
     "verify:pr": "node scripts/verify-pr.js",
     "verify:pr-ui": "node scripts/verify-pr-ui.js",
-    "verify:handoffs": "node scripts/verify-handoffs-ui.js"
+    "verify:handoffs": "node scripts/verify-handoffs-ui.js",
+    "verify:journeys": "node scripts/verify-journeys-ui.js",
+    "verify:practice": "node scripts/verify-practice-ui.js",
+    "verify:journey-runtime": "node scripts/verify-journey-runtime.js"
   },
   "dependencies": {
     "express": "^5.1.0",

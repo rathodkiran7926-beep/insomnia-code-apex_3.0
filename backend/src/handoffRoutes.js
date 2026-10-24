@@ -10,6 +10,10 @@ import {
 } from "./handoffContext.js";
 import { containsCredential } from "./handoffSafety.js";
 import {
+  promoteHandoffMemory,
+  reopenHandoffMemory,
+} from "./engineeringMemory.js";
+import {
   captureHandoffRepository,
   handoffRepository,
   handoffRepositorySource,
@@ -111,6 +115,11 @@ function detail(id) {
     activity: db
       .prepare(
         `SELECT a.*,u.name AS actor_name FROM handoff_activity a JOIN collaboration_users u ON u.id=a.actor_id WHERE session_id=? ORDER BY a.created_at DESC,a.rowid DESC LIMIT 50`,
+      )
+      .all(id),
+    memoryRecords: db
+      .prepare(
+        "SELECT id,type,status,revision,origin_resolution_id FROM engineering_memory WHERE origin_session_id=? ORDER BY created_at DESC",
       )
       .all(id),
   };
@@ -365,7 +374,7 @@ handoffRoutes.get("/knowledge", (req, res) => {
       `SELECT s.id,s.title,s.repository_id,s.updated_at,p.file_path,p.commit_sha,p.source_url,p.start_line,p.end_line,
     r.solution,r.explanation,r.confirmed_at,u.name AS approved_by FROM handoff_resolutions r JOIN handoff_sessions s ON s.id=r.session_id
     JOIN handoff_snapshots p ON p.session_id=s.id JOIN collaboration_users u ON u.id=r.approved_by
-    WHERE s.workspace_id=? AND r.approved_for_knowledge=1 AND (instr(lower(s.title),lower(?))>0 OR instr(lower(r.explanation),lower(?))>0)
+    WHERE s.workspace_id=? AND r.approved_for_knowledge=1 AND NOT EXISTS (SELECT 1 FROM engineering_memory m WHERE m.origin_resolution_id=r.id AND m.status<>'approved') AND (instr(lower(s.title),lower(?))>0 OR instr(lower(r.explanation),lower(?))>0)
     ORDER BY r.confirmed_at DESC LIMIT 30 OFFSET ?`,
     )
     .all(workspaceId, search, search, offset);
@@ -497,10 +506,15 @@ handoffRoutes.patch("/:id/status", (req, res) => {
     db.prepare(
       "UPDATE handoff_sessions SET status=?,resolved_at=? WHERE id=?",
     ).run(status, status === "CLOSED" ? session.resolved_at : null, session.id);
-    if (["RESOLVED", "CLOSED"].includes(session.status) && status !== "CLOSED")
+    if (
+      ["RESOLVED", "CLOSED"].includes(session.status) &&
+      status !== "CLOSED"
+    ) {
       db.prepare(
         "UPDATE handoff_resolutions SET approved_for_knowledge=0 WHERE session_id=?",
       ).run(session.id);
+      reopenHandoffMemory(session.id, req.collaborator.id);
+    }
     activity(session.id, req.collaborator.id, "status_changed", {
       from: session.status,
       to: status,
@@ -584,6 +598,12 @@ handoffRoutes.post("/:id/confirm-resolution", (req, res) => {
   res.json(detail(session.id));
 });
 handoffRoutes.post("/:id/approve-knowledge", (req, res) => {
+  const { type } = z
+    .object({
+      type: z.enum(["decision", "failure_lesson"]).default("decision"),
+    })
+    .strict()
+    .parse(req.body);
   const { session, member } = access(req);
   if (member.role !== "maintainer")
     throw fail(403, "Only maintainers can approve team knowledge.");
@@ -591,7 +611,7 @@ handoffRoutes.post("/:id/approve-knowledge", (req, res) => {
     throw fail(409, "Confirm a solution before approving knowledge.");
   const row = db
     .prepare(
-      "SELECT id FROM handoff_resolutions WHERE session_id=? AND confirmed_at IS NOT NULL ORDER BY confirmed_at DESC LIMIT 1",
+      "SELECT id FROM handoff_resolutions WHERE session_id=? AND confirmed_at IS NOT NULL ORDER BY confirmed_at DESC,rowid DESC LIMIT 1",
     )
     .get(session.id);
   if (!row) throw fail(409, "No confirmed solution is available.");
@@ -599,6 +619,7 @@ handoffRoutes.post("/:id/approve-knowledge", (req, res) => {
     db.prepare(
       "UPDATE handoff_resolutions SET approved_for_knowledge=1,approved_by=? WHERE id=?",
     ).run(req.collaborator.id, row.id);
+    promoteHandoffMemory(session, row.id, req.collaborator.id, type);
     activity(session.id, req.collaborator.id, "knowledge_approved");
   });
   res.json(detail(session.id));

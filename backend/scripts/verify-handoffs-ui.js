@@ -363,8 +363,122 @@ try {
   );
   await evaluate(`location.hash='/knowledge'`);
   await wait(
-    `document.body.innerText.includes('The API is create-only; updating accounts is a separate operation.')`,
+    `document.querySelector('.memory-toolbar') && document.body.innerText.includes('The API is create-only; updating accounts is a separate operation.')`,
     "Approved knowledge is missing",
+  );
+  await click("Capture knowledge");
+  await wait(
+    `document.querySelector('.memory-editor')`,
+    "Standalone knowledge editor did not open",
+  );
+  await evaluate(
+    `(()=>{const e=document.querySelector('select[aria-label="Knowledge type"]');e.value='failure_lesson';e.dispatchEvent(new Event('change',{bubbles:true}));})()`,
+  );
+  await fill(
+    "input[name=memoryTitle]",
+    "Remember the duplicate-account failure",
+  );
+  await fill(
+    "textarea[name=observedFailure]",
+    "The signup request rejected an already registered account.",
+  );
+  await fill(
+    "textarea[name=resolution]",
+    "Use the update endpoint when changing an existing account.",
+  );
+  await fill(
+    "textarea[name=prevention]",
+    "Keep create and update behavior separate.",
+  );
+  await evaluate(
+    `(()=>{const e=document.querySelector('select[aria-label="Knowledge source component"]');e.value=${JSON.stringify(component.referenceId)};e.dispatchEvent(new Event('change',{bubbles:true}));})()`,
+  );
+  await click("Save knowledge draft");
+  await wait(
+    `document.querySelector('.memory-detail')?.innerText.includes('Remember the duplicate-account failure')`,
+    "Standalone draft did not open",
+  );
+  await wait(
+    `document.querySelector('.memory-detail')?.innerText.includes('Cause: unknown')`,
+    "Failure cause was invented",
+  );
+  await click("Submit for review");
+  await wait(
+    `document.body.innerText.includes('Approve this revision')`,
+    "Draft did not reach review",
+  );
+  await click("Approve this revision");
+  await wait(
+    `document.querySelector('.memory-detail')?.innerText.includes('This revision was approved by a maintainer.')`,
+    "Exact revision approval failed",
+  );
+  await click("Revise knowledge");
+  await wait(
+    `document.querySelector('.memory-editor')`,
+    "Revision editor missing",
+  );
+  await fill(
+    "textarea[name=prevention]",
+    "Review the account contract and preserve separate create and update endpoints.",
+  );
+  await click("Save new draft revision");
+  await wait(
+    `document.querySelector('.memory-detail')?.innerText.includes('Revision 2')`,
+    "Correction did not create a new revision",
+  );
+  await evaluate(
+    `(()=>{const e=[...document.querySelectorAll('summary')].find(e=>e.textContent.includes('Revision history & audit trail'));e.click();})()`,
+  );
+  await wait(
+    `document.querySelector('.memory-history')?.parentElement.innerText.includes('Revision 1 · Approved by')`,
+    "Approved history was overwritten",
+  );
+  await click("Submit for review");
+  await wait(
+    `document.body.innerText.includes('Approve this revision')`,
+    "Corrected draft review missing",
+  );
+  await click("Approve this revision");
+  await wait(
+    `document.querySelector('.memory-detail')?.innerText.includes('This revision was approved by a maintainer.')`,
+    "Corrected revision was not approved",
+  );
+  const memoryScreenshot = await send("Page.captureScreenshot", {
+    format: "png",
+    captureBeyondViewport: true,
+  });
+  writeFileSync(
+    `${root}/data/engineering-memory.png`,
+    Buffer.from(memoryScreenshot.data, "base64"),
+  );
+  await send("Emulation.setDeviceMetricsOverride", {
+    width: 390,
+    height: 844,
+    deviceScaleFactor: 1,
+    mobile: true,
+  });
+  await pause(200);
+  assert(
+    await evaluate(`document.documentElement.scrollWidth<=innerWidth+2`),
+    "Knowledge page overflows mobile width",
+  );
+  await send("Emulation.setDeviceMetricsOverride", {
+    width: 1440,
+    height: 1000,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
+  await evaluate(`location.hash='/workspace?component=${component.id}'`);
+  await wait(
+    `document.querySelector('.related-team-knowledge')?.innerText.includes('Remember the duplicate-account failure')`,
+    "Approved memory did not surface for its workspace component",
+  );
+  await evaluate(
+    `location.hash='/journeys/repo-${snapshot.snapshotId}-${component.id}'`,
+  );
+  await wait(
+    `document.querySelector('.journey-learning-panel .related-team-knowledge')?.innerText.includes('Remember the duplicate-account failure')`,
+    "Approved memory did not surface for its CodeJourney event",
   );
   await evaluate(`location.hash='/handoffs/${sessionId}'`);
   await wait(
@@ -403,6 +517,11 @@ try {
           "maintainer approval",
           "backend restart persistence",
           "team knowledge",
+          "standalone failure lesson and unknown cause",
+          "draft review and exact revision approval",
+          "immutable approved revision history",
+          "relevant knowledge in the code workspace",
+          "relevant knowledge in CodeJourney details",
           "mobile layout",
         ],
         sessionId,
@@ -412,7 +531,7 @@ try {
     ),
   );
   console.log(
-    "Handoff browser checks passed: developer → senior reply → accepted solution → approved knowledge; persistence and mobile layout verified.",
+    "Collaboration browser checks passed: handoff → senior review → accepted answer → linked knowledge; standalone failure lesson, exact revision approval/history, workspace retrieval, persistence and mobile layout verified.",
   );
 } catch (error) {
   if (inspect)

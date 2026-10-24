@@ -5,8 +5,7 @@ if (
   !process.env.DATABASE_PATH?.endsWith("discussion-ui-verification.sqlite")
 )
   throw new Error("Use only through verify-discussion-ui.js");
-process.env.LLM_BASE_URL =
-  "https://generativelanguage.googleapis.com/v1beta/openai";
+process.env.LLM_BASE_URL = "https://test-model.invalid/v1";
 process.env.LLM_API_KEY = "isolated-test-key";
 process.env.LLM_MODEL = "configured-test-model";
 process.env.ELEVENLABS_API_KEY = "isolated-test-voice-key";
@@ -51,7 +50,7 @@ persist();
 const original = globalThis.fetch;
 globalThis.fetch = async (url, options = {}) => {
   const target = String(url);
-  if (target.includes("generativelanguage.googleapis.com")) {
+  if (target.includes("test-model.invalid")) {
     trace.reasonings++;
     persist();
     const body = JSON.parse(options.body);

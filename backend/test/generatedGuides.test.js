@@ -70,7 +70,7 @@ test("documentation rejects fabricated citations and model-generated source URLs
   guide.sections[0].content = "Go to https://invented.example";
   assert.throws(() => validateGuide(guide, graph.references), /coordinates/);
 });
-test("Gemini guides are generated once, citation-checked, and cached per component", async () => {
+test("AI provider guides are generated once, citation-checked, and cached per component", async () => {
   const fetchOriginal = globalThis.fetch,
     key = process.env.LLM_API_KEY;
   process.env.LLM_API_KEY = "mock-key";
@@ -153,7 +153,7 @@ test("missing keys and invalid responses fail explicitly and do not cache fake d
   }
 });
 
-test("temporary Gemini overload is retried once before a project guide is saved", async () => {
+test("temporary AI provider overload is retried once before a project guide is saved", async () => {
   const key = process.env.LLM_API_KEY,
     original = globalThis.fetch;
   process.env.LLM_API_KEY = "mock-key";

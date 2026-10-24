@@ -341,8 +341,9 @@ try {
     mobile: true,
   });
   await pause(200);
-  assert(await evaluate("(()=>{const box=document.querySelector('.mentor-bottom-talk').getBoundingClientRect();return Math.abs(box.left+box.width/2-innerWidth/2)<1})()"), "Voice launcher must be centered in the viewport");
-  await evaluate("document.querySelector('.mentor-bottom-talk').click()");
+  await evaluate("document.querySelector('.mentor-voice-launch').click()");
+  await waitFor("document.querySelector('button[aria-label=\"Open centered conversation\"]')");
+  await evaluate("document.querySelector('button[aria-label=\"Open centered conversation\"]').click()");
   await waitFor("document.querySelector('.mentor-voice-dialog')");
   assert(
     await evaluate("document.documentElement.scrollWidth<=innerWidth+1 && document.querySelector('.mentor-voice-dialog').getBoundingClientRect().width<=innerWidth"),
@@ -385,7 +386,7 @@ try {
           "end conversation stops microphone",
           "interrupt spoken answer and resume listening",
           "centered conversation preserves active voice and session",
-          "bottom-center launcher and mobile conversation layout",
+          "workspace voice launcher and mobile conversation layout",
           "draft decision pending",
           "save only on click",
           "component-change banner",

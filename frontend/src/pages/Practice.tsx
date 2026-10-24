@@ -1,3 +1,5 @@
+import { JourneyConceptLinks } from '../components/JourneyConceptLinks';
+import '../styles/practice-features.css';
 import { useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
@@ -28,7 +30,20 @@ import {
 import { hints, initialPractice, solutionPractice } from '../data/fixtures';
 import { runPracticeChecks } from '../domain/practice';
 import { demoService } from '../services/demoService';
+import { PracticeQuiz } from '../components/PracticeQuiz';
+import { RepositoryPractice } from '../components/RepositoryPractice';
+import type { PracticeDifficulty } from '../services/practiceApi';
 import { useWorkspace } from '../state/WorkspaceContext';
+
+const difficultyStorageKey = 'codebase-mentor.practice-difficulty.v1';
+function loadDifficulty(): PracticeDifficulty {
+  try {
+    const saved = localStorage.getItem(difficultyStorageKey);
+    return saved === 'intermediate' || saved === 'advanced' ? saved : 'beginner';
+  } catch {
+    return 'beginner';
+  }
+}
 
 export default function Practice() {
   const { state, patch, startJourney, applyPracticeResult } = useWorkspace();
@@ -38,6 +53,8 @@ export default function Practice() {
   const [located, setLocated] = useState(false);
   const [reflection, setReflection] = useState('');
   const [saved, setSaved] = useState(false);
+  const [section, setSection] = useState<'sample' | 'repository' | 'quiz'>('sample');
+  const [difficulty, setDifficulty] = useState<PracticeDifficulty>(loadDifficulty);
   const passing = state.practiceResult === 'solution';
   const unsupported = state.practiceResult === 'unsupported';
   const report = state.practiceResult ? runPracticeChecks(state.practiceCode) : null;
@@ -49,6 +66,14 @@ export default function Practice() {
       mounted.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(difficultyStorageKey, difficulty);
+    } catch {
+      // The selected level remains available for this page session.
+    }
+  }, [difficulty]);
 
   async function run() {
     const submittedCode = state.practiceCode;
@@ -67,7 +92,7 @@ export default function Practice() {
         className="practice-page-heading"
         eyebrow="PRACTICE / YOUR FIRST CONTRIBUTION"
         title="Small change. Real understanding."
-        description="Apply what you learned to the same signup flow, with guidance when you need it."
+        description="Practice on your repository, review key concepts, or start with the guided signup exercise."
         actions={
           <Button
             icon={BookOpen}
@@ -81,7 +106,47 @@ export default function Practice() {
           </Button>
         }
       />
-      <div className="practice-layout">
+      <JourneyConceptLinks practice />
+      <div className="practice-feature-controls">
+        <div className="practice-feature-tabs" aria-label="Practice sections">
+          <button
+            type="button"
+            aria-pressed={section === 'sample'}
+            className={section === 'sample' ? 'active' : ''}
+            onClick={() => setSection('sample')}
+          >
+            Guided sample
+          </button>
+          <button
+            type="button"
+            aria-pressed={section === 'repository'}
+            className={section === 'repository' ? 'active' : ''}
+            onClick={() => setSection('repository')}
+          >
+            Repository practice
+          </button>
+          <button
+            type="button"
+            aria-pressed={section === 'quiz'}
+            className={section === 'quiz' ? 'active' : ''}
+            onClick={() => setSection('quiz')}
+          >
+            Quick quizzes
+          </button>
+        </div>
+        <label className="practice-difficulty">
+          Task & quiz difficulty
+          <select
+            value={difficulty}
+            onChange={(event) => setDifficulty(event.target.value as PracticeDifficulty)}
+          >
+            <option value="beginner">Beginner</option>
+            <option value="intermediate">Intermediate</option>
+            <option value="advanced">Advanced</option>
+          </select>
+        </label>
+      </div>
+      <div className="practice-layout" hidden={section !== 'sample'}>
         <TiltCard className="panel practice-brief" maxTilt={4}>
           <div className="row between">
             <Badge tone="green">Starter exercise</Badge>
@@ -352,6 +417,8 @@ export default function Practice() {
           </TiltCard>
         </aside>
       </div>
+      {section === 'repository' && <RepositoryPractice difficulty={difficulty} />}
+      {section === 'quiz' && <PracticeQuiz difficulty={difficulty} />}
     </>
   );
 }

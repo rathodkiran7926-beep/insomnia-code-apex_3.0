@@ -10,6 +10,8 @@ const Workspace = lazy(() => import('./pages/Workspace'));
 const DemoWorkspace = lazy(() => import('./pages/DemoWorkspace'));
 const Repository = lazy(() => import('./pages/Repository'));
 const Journeys = lazy(() => import('./pages/Journeys'));
+const PreparedJourneys = lazy(() => import('./pages/PreparedJourneys'));
+const CodeJourneyTheater = lazy(() => import('./pages/CodeJourneyTheater'));
 const Learn = lazy(() => import('./pages/Learn'));
 const Practice = lazy(() => import('./pages/Practice'));
 const Changes = lazy(() => import('./pages/Changes'));
@@ -54,6 +56,8 @@ export default function App() {
                   <Route path="demo-workspace" element={<DemoWorkspace />} />
                   <Route path="repository" element={<Repository />} />
                   <Route path="journeys" element={<Journeys />} />
+                  <Route path="journeys/:id" element={<CodeJourneyTheater />} />
+                  <Route path="prepared-journeys" element={<PreparedJourneys />} />
                   <Route path="learn" element={<Learn />} />
                   <Route path="practice" element={<Practice />} />
                   <Route path="changes" element={<Changes />} />

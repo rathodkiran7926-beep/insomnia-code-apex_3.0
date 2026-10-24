@@ -70,6 +70,7 @@ export function MentorNavigation({
   const [closed, setClosed] = useState<string[]>([]);
   const repo = (snapshot?.repository || repositoryUrl).replace('https://github.com/', '');
   function active(path: string) {
+    if (path === '/journeys' && location.pathname.startsWith('/journeys/')) return true;
     const [pathname, query = ''] = path.split('?');
     if (pathname === '/handoffs') return location.pathname.startsWith('/handoffs');
     return location.pathname === pathname && location.search === (query ? '?' + query : '');

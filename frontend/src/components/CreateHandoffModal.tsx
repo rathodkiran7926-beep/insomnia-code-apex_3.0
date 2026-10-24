@@ -7,6 +7,7 @@ import { handoffApi, type HandoffDetail, type TeamMember } from '../services/han
 import { HandoffAccountGate, HandoffTeamAccess } from './HandoffAccount';
 import { RepositorySource } from './RepositorySource';
 import { Modal, Button } from './UI';
+import { RelatedTeamKnowledge } from './RelatedTeamKnowledge';
 
 export function CreateHandoffModal({
   open,
@@ -188,6 +189,11 @@ function CreateForm({
           />
         </label>
       </div>
+      <RelatedTeamKnowledge
+        snapshotId={snapshot.snapshotId}
+        referenceId={referenceId}
+        repository={snapshot.repository}
+      />
       {!valid && (
         <p className="handoff-error" role="alert">
           Select 1–300 non-empty lines inside this file, up to 18,000 characters.

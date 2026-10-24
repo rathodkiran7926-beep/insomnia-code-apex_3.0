@@ -30,6 +30,7 @@ import { WorkspaceSplitter } from './WorkspaceSplitter';
 import { ChangeImpactExplorer } from './ChangeImpactExplorer';
 import { Modal } from './UI';
 import { CreateHandoffModal } from './CreateHandoffModal';
+import { RelatedTeamKnowledge } from './RelatedTeamKnowledge';
 import {
   automaticWorkspaceMode,
   componentForCitation,
@@ -296,6 +297,13 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
           ))}
         </div>
         <div className="mentor-layout-buttons">
+          <Link
+            className="button button-ghost"
+            to="/journeys"
+            title="Explore paths from this repository's analyzed source"
+          >
+            CodeJourney
+          </Link>
           <button
             className="mentor-voice-launch"
             aria-label="Discuss this component"
@@ -680,6 +688,11 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
                 {selected && (
                   <>
                     <div className="workspace-mentor-content">
+                      <RelatedTeamKnowledge
+                        snapshotId={snapshot.snapshotId}
+                        referenceId={selected.referenceId}
+                        repository={snapshot.repository}
+                      />
                       <WorkspaceMentorOverview
                         snapshot={snapshot}
                         componentId={selectedId}

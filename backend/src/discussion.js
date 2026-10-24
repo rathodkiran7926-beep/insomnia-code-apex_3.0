@@ -1,3 +1,4 @@
+import { llmConfig } from "./llmConfig.js";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { z } from "zod";
@@ -47,6 +48,7 @@ const replySchema = z
     memory,
   })
   .strict();
+const replyJSONSchema = z.toJSONSchema(replySchema);
 const decisionSchema = z
   .object({
     problem: z.string().max(2000),
@@ -256,7 +258,7 @@ export async function scopedEvidence(session, referenceId) {
   };
 }
 async function reason(messages, signal) {
-  if (!process.env.LLM_API_KEY || !process.env.LLM_MODEL)
+  if (!llmConfig().apiKey)
     throw fail(
       "Text discussion requires LLM_API_KEY and LLM_MODEL in backend/.env.",
       503,
@@ -265,24 +267,21 @@ async function reason(messages, signal) {
     let raw;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        raw = await boundedFetch(
-          `${(process.env.LLM_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai").replace(/\/$/, "")}/chat/completions`,
-          {
-            method: "POST",
-            signal,
-            limit: 64000,
-            headers: {
-              Authorization: `Bearer ${process.env.LLM_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: process.env.LLM_MODEL,
-              temperature: 0,
-              response_format: { type: "json_object" },
-              messages,
-            }),
+        raw = await boundedFetch(llmConfig().endpoint, {
+          method: "POST",
+          signal,
+          limit: 64000,
+          headers: {
+            Authorization: `Bearer ${llmConfig().apiKey}`,
+            "Content-Type": "application/json",
           },
-        );
+          body: JSON.stringify({
+            model: llmConfig().model,
+            temperature: 0,
+            response_format: { type: "json_object" },
+            messages,
+          }),
+        });
         break;
       } catch (error) {
         if (
@@ -297,23 +296,24 @@ async function reason(messages, signal) {
     return JSON.parse(JSON.parse(raw).choices?.[0]?.message?.content || "{}");
   } catch (error) {
     if (signal?.aborted) throw fail("Discussion request cancelled", 499);
+    if (error instanceof SyntaxError) throw error;
     const message = [500, 502, 503, 504].includes(error.remoteStatus)
-      ? `Gemini is temporarily unavailable (HTTP ${error.remoteStatus}) after an automatic retry. Your question has not been answered; retry shortly.`
+      ? `AI provider is temporarily unavailable (HTTP ${error.remoteStatus}) after an automatic retry. Your question has not been answered; retry shortly.`
       : error.remoteStatus === 429
-        ? "Gemini rate limit or quota reached. Wait and retry, or check your provider quota."
+        ? "AI provider rate limit or quota reached. Wait and retry, or check your provider quota."
         : error.remoteStatus === 401
-          ? "Gemini rejected LLM_API_KEY (HTTP 401). Create a replacement Gemini API key in Google AI Studio, update backend/.env, and restart the backend. Run npm.cmd run check:llm in backend to verify it."
+          ? "AI provider rejected LLM_API_KEY (HTTP 401). Obtain a replacement key from your configured endpoint administrator, update backend/.env, and restart the backend. Run npm.cmd run check:llm in backend to verify it."
           : error.remoteStatus === 403
-            ? "Gemini denied access (HTTP 403). Check the key's API restrictions, project permissions, and regional availability in Google AI Studio. Run npm.cmd run check:llm in backend for the provider's details."
+            ? "AI provider denied access (HTTP 403). Check the endpoint's API restrictions, model permissions, and server access policy. Run npm.cmd run check:llm in backend for the provider's details."
             : ["EACCES", "EPERM"].includes(error.code)
-              ? "Network access to Gemini was blocked. Restart the backend from a normal terminal and check firewall or proxy settings."
-              : "Gemini could not answer. Check your configured model, credentials, quota, or network and retry.";
+              ? "Network access to AI provider was blocked. Restart the backend from a normal terminal and check firewall or proxy settings."
+              : "AI provider could not answer. Check your configured model, credentials, quota, or network and retry.";
     throw Object.assign(fail(message, 502), { cause: error });
   }
 }
 const busy = new Set();
 export async function discussionTurn(id, question, signal) {
-  if (!process.env.LLM_API_KEY || !process.env.LLM_MODEL)
+  if (!llmConfig().apiKey)
     throw fail(
       "Text discussion requires LLM_API_KEY and LLM_MODEL in backend/.env.",
       503,
@@ -345,39 +345,75 @@ export async function discussionTurn(id, question, signal) {
             ? JSON.parse(r.data).text
             : JSON.stringify(JSON.parse(r.data).answer),
       }));
+    const schema = structuredClone(replyJSONSchema);
+    schema.properties.claims.items.properties.evidenceIds.items.enum =
+      context.references.map((reference) => reference.id);
     const format =
-      "Return JSON {spokenText,displayText,claims:[{text,evidenceIds:[]}],alternatives:[{name,pros:[],cons:[],assumptions:[]}],followUpQuestion:null,uncertainties:[],memory:{summary,requirements:[],rejectedAlternatives:[],openQuestions:[]}}. Claims about this code require supplied evidence IDs. General engineering alternatives are not source facts. Use at most three options; ask one requirements question before a recommendation when requirements are unknown. Maintain a concise rolling summary including explicit requirements, rejections, and unresolved questions. Never infer that the developer selected an option.";
+      "Return exactly one JSON object matching this schema, without Markdown fences or extra fields: " +
+      JSON.stringify(schema) +
+      " All required fields must be present. spokenText and displayText are nonempty strings. Every source claim needs at least one evidence ID copied exactly from allowedEvidenceIds; do not use file paths, component names or invented IDs. For general advice without source claims, claims may be an empty array. alternatives, uncertainties and memory list fields must be arrays, not strings or objects. followUpQuestion must be a string or null. General engineering alternatives are not source facts. Use at most three options; ask one requirements question before a recommendation when requirements are unknown. Maintain a concise rolling summary including explicit requirements, rejections, and unresolved questions. Never infer that the developer selected an option.";
+    const messages = [
+      {
+        role: "system",
+        content:
+          baseInstruction +
+          "\n" +
+          format +
+          "\nA periodically reset request counter is not automatically a classic token bucket. Process-memory counters are not evidence of a global multi-instance quota. Ask about burst allowance, identity scope, deployment topology, fairness, consistency and infrastructure when relevant to a rate-limiter recommendation.",
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          untrustedEvidence: context,
+          allowedEvidenceIds: context.references.map(
+            (reference) => reference.id,
+          ),
+          rollingMemory: session.memory,
+        }),
+      },
+      ...history,
+      { role: "user", content: question },
+    ];
     let answer;
     try {
-      answer = validateReply(
-        await reason(
-          [
-            {
-              role: "system",
-              content:
-                baseInstruction +
-                "\n" +
-                format +
-                "\nA periodically reset request counter is not automatically a classic token bucket. Process-memory counters are not evidence of a global multi-instance quota. Ask about burst allowance, identity scope, deployment topology, fairness, consistency and infrastructure when relevant to a rate-limiter recommendation.",
-            },
-            {
-              role: "user",
-              content: JSON.stringify({
-                untrustedEvidence: context,
-                rollingMemory: session.memory,
-              }),
-            },
-            ...history,
-            { role: "user", content: question },
-          ],
-          signal,
-        ),
-        context.references,
-      );
+      try {
+        answer = validateReply(
+          await reason(messages, signal),
+          context.references,
+        );
+      } catch (validationError) {
+        if (validationError.status) throw validationError;
+        if (signal?.aborted) throw fail("Discussion request cancelled", 499);
+        // Regenerate once from the same pinned evidence. Never invent or replace citation IDs.
+        const issues = validationError.issues?.slice(0, 12).map((issue) => ({
+          path: issue.path.join("."),
+          code: issue.code,
+        })) || [
+          { path: "claims.evidenceIds", code: "unknown_source_reference" },
+        ];
+        answer = validateReply(
+          await reason(
+            [
+              ...messages.slice(0, -1),
+              {
+                role: "user",
+                content: JSON.stringify({
+                  question,
+                  request:
+                    "Answer this question again. The prior response failed validation; obey the exact schema and cite only allowedEvidenceIds. Do not repeat an invalid response or invent missing evidence.",
+                  validationIssues: issues,
+                }),
+              },
+            ],
+            signal,
+          ),
+          context.references,
+        );
+      }
     } catch (error) {
       if (error.status) throw error;
       throw fail(
-        "Gemini returned invalid discussion evidence. Please retry.",
+        "The model could not return a valid source-linked reply after an automatic retry. Your question was not saved; please try again.",
         502,
       );
     }
@@ -442,7 +478,7 @@ export async function discussionTurn(id, question, signal) {
   }
 }
 export async function draftDecision(id, chosenOption, signal) {
-  if (!process.env.LLM_API_KEY || !process.env.LLM_MODEL)
+  if (!llmConfig().apiKey)
     throw fail(
       "Text discussion requires LLM_API_KEY and LLM_MODEL in backend/.env.",
       503,
@@ -532,7 +568,10 @@ export async function draftDecision(id, chosenOption, signal) {
     return session.draft;
   } catch (error) {
     if (error.status) throw error;
-    throw fail("Gemini returned an invalid decision draft. Please retry.", 502);
+    throw fail(
+      "AI provider returned an invalid decision draft. Please retry.",
+      502,
+    );
   } finally {
     busy.delete(id);
   }

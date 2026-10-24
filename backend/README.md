@@ -17,14 +17,17 @@ Configuration: `PORT`, optional `DATABASE_PATH`, `GITHUB_TOKEN`, `LLM_API_KEY`, 
 
 If analysis reports `EACCES` or `EPERM` when reaching GitHub, the backend process is being denied network access. Start it from a normal terminal with `cd backend` and `npm.cmd run dev`, and check firewall/proxy rules if the error persists. A GitHub token does not fix operating-system network restrictions. If port 3001 is already occupied, stop the older backend first: the UI connects to whichever process owns that port.
 
-Gemini Flash is the default model configuration. Put your Google AI Studio API key in `LLM_API_KEY` in the ignored `backend/.env` file. Keep `.env.example` credential-free.
+All text-generation features share `src/llmConfig.js` and an OpenAI-compatible chat-completions endpoint. This includes repository explanations, workspace questions, component discussions and decision drafts, generated guides, handoff briefings, and Code Journey explanations/questions. Existing citation validation and source fallbacks remain in place. ElevenLabs transcription and speech retain their separate configuration.
+
+Set these values in the ignored `backend/.env` file:
 
 ```dotenv
-LLM_API_KEY=your_gemini_api_key
-LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-LLM_MODEL=gemini-3.5-flash
+LLM_API_KEY=your_endpoint_api_key
+LLM_BASE_URL=https://studio-unmapped-vicinity.ngrok-free.dev/v1
+LLM_MODEL=qwen2.5-codebase:latest
 ```
 
-This uses Google's [OpenAI-compatible endpoint](https://ai.google.dev/gemini-api/docs/openai) with the existing validated documentation adapter. Google's [model page](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash) currently marks Gemini 3.5 Flash deprecated and says requests are routed to Gemini 3.6 Flash. The requested model ID remains configurable. Restart the backend and run a new repository analysis to generate new explanations; saved snapshots retain their earlier documentation.
+The model ID above was returned by the configured endpoint's models API. Other served models can be selected with `LLM_MODEL`. The key is never stored in source files or public configuration responses. Restart the backend after changing environment values; existing saved guides remain attached to their original snapshots and are not silently regenerated.
 
-To diagnose mentor or voice reply failures, run `npm.cmd run check:llm` from `backend`. It loads `.env` and sends a tiny prompt without repository contents, reporting the provider's error with configured credentials redacted. HTTP 401 means the configured credentials were rejected: create a replacement key in [Google AI Studio](https://aistudio.google.com/api-keys), update `LLM_API_KEY` in `.env`, run the check again, then restart the backend. HTTP 403 indicates access restrictions or permissions; HTTP 429 indicates quota or rate limits. Environment variables already set in the terminal override `.env`, so remove any stale `LLM_API_KEY` from that terminal before restarting. Live voice also needs Gemini for mentor replies, in addition to ElevenLabs for transcription and speech. Never put real credentials in `.env.example`; rotate any keys previously shared in it.
+Run `npm.cmd run check:llm` in `backend` to send a tiny connection diagnostic without repository contents. HTTP 401 means the endpoint rejected the key; HTTP 403 indicates access restrictions; HTTP 429 indicates quota or request limits. A tunnel or model server must remain online. Shell environment variables take precedence over values loaded from `.env`. Never put a real key in `.env.example`.
+Discussion replies use an explicit JSON schema with the current snapshot's allowed evidence IDs. If the model returns malformed JSON, a wrong field shape, or unknown citation IDs, the backend requests one corrected reply against the same pinned source and question. Citation validation is never bypassed and IDs are not silently replaced. Only the final validated reply and its user question are committed; two invalid replies leave the conversation unchanged. Authentication and network errors retain their separate recovery messages.

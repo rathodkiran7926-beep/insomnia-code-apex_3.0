@@ -91,12 +91,14 @@ const reply = () => ({
     openQuestions: ["Deployment topology"],
   },
 });
-async function fakeGemini(fn, run) {
+async function fakeAI(fn, run) {
   const original = globalThis.fetch,
     key = process.env.LLM_API_KEY,
-    model = process.env.LLM_MODEL;
+    model = process.env.LLM_MODEL,
+    base = process.env.LLM_BASE_URL;
   process.env.LLM_API_KEY = "test";
   process.env.LLM_MODEL = "configured-test-model";
+  process.env.LLM_BASE_URL = "https://test-model.invalid/v1/";
   globalThis.fetch = fn;
   try {
     return await run();
@@ -106,6 +108,8 @@ async function fakeGemini(fn, run) {
     else process.env.LLM_API_KEY = key;
     if (model === undefined) delete process.env.LLM_MODEL;
     else process.env.LLM_MODEL = model;
+    if (base === undefined) delete process.env.LLM_BASE_URL;
+    else process.env.LLM_BASE_URL = base;
   }
 }
 const jsonResponse = (value) =>
@@ -141,12 +145,16 @@ test("discussion is bound to the selected component/snapshot and includes counte
     /Unknown source/,
   );
 });
-test("Gemini uses configured model, supplied evidence, rolling memory, and bounded history", async () => {
+test("AI provider uses configured model, supplied evidence, rolling memory, and bounded history", async () => {
   const view = startDiscussion(graph, component.id);
-  await fakeGemini(
+  await fakeAI(
     async (_url, options) => {
       const body = JSON.parse(options.body);
       assert.equal(body.model, "configured-test-model");
+      assert.equal(
+        String(_url),
+        "https://test-model.invalid/v1/chat/completions",
+      );
       assert.match(
         body.messages[0].content,
         /not automatically a classic token bucket/,
@@ -172,10 +180,10 @@ test("Gemini uses configured model, supplied evidence, rolling memory, and bound
     },
   );
 });
-test("temporary Gemini overload retries once and persists a single conversation turn", async () => {
+test("temporary AI provider overload retries once and persists a single conversation turn", async () => {
   const view = startDiscussion(graph, component.id);
   let attempts = 0;
-  await fakeGemini(
+  await fakeAI(
     async () =>
       ++attempts === 1
         ? new Response("", { status: 503 })
@@ -188,34 +196,50 @@ test("temporary Gemini overload retries once and persists a single conversation 
   );
 });
 
-test("Gemini authentication failures are not retried", async () => {
+test("AI provider authentication failures are not retried", async () => {
   const view = startDiscussion(graph, component.id);
   let attempts = 0;
-  await fakeGemini(
+  await fakeAI(
     async () => {
       attempts++;
       return new Response("", { status: 401 });
     },
     async () => {
-      await assert.rejects(discussionTurn(view.id, "Explain"), /HTTP 401.*replacement.*restart/);
+      await assert.rejects(
+        discussionTurn(view.id, "Explain"),
+        /HTTP 401.*replacement.*restart/,
+      );
       assert.equal(attempts, 1);
       assert.equal(sessionView(discussion(view.id)).messages.length, 0);
     },
   );
 });
 
-test("Gemini permission and network failures have distinct recovery instructions", async () => {
+test("AI provider permission and network failures have distinct recovery instructions", async () => {
   for (const [response, expected] of [
     [() => new Response("", { status: 403 }), /HTTP 403.*restrictions/],
-    [() => { throw Object.assign(new Error("blocked"), { cause: { code: "EACCES" } }); }, /Network access to Gemini was blocked/],
+    [
+      () => {
+        throw Object.assign(new Error("blocked"), {
+          cause: { code: "EACCES" },
+        });
+      },
+      /Network access to AI provider was blocked/,
+    ],
   ]) {
     const view = startDiscussion(graph, component.id);
     let attempts = 0;
-    await fakeGemini(async () => { attempts++; return response(); }, async () => {
-      await assert.rejects(discussionTurn(view.id, "Explain"), expected);
-      assert.equal(attempts, 1);
-      assert.equal(sessionView(discussion(view.id)).messages.length, 0);
-    });
+    await fakeAI(
+      async () => {
+        attempts++;
+        return response();
+      },
+      async () => {
+        await assert.rejects(discussionTurn(view.id, "Explain"), expected);
+        assert.equal(attempts, 1);
+        assert.equal(sessionView(discussion(view.id)).messages.length, 0);
+      },
+    );
   }
 });
 
@@ -223,7 +247,7 @@ test("ending a discussion request cancels a pending overload retry", async () =>
   const view = startDiscussion(graph, component.id);
   const controller = new AbortController();
   let attempts = 0;
-  await fakeGemini(
+  await fakeAI(
     async () => {
       attempts++;
       controller.abort();
@@ -242,7 +266,7 @@ test("ending a discussion request cancels a pending overload retry", async () =>
 
 test("invalid evidence and provider failures never create fabricated conversation messages", async () => {
   const view = startDiscussion(graph, component.id);
-  await fakeGemini(
+  await fakeAI(
     async () =>
       jsonResponse({
         ...reply(),
@@ -256,7 +280,7 @@ test("invalid evidence and provider failures never create fabricated conversatio
       assert.equal(sessionView(discussion(view.id)).messages.length, 0);
     },
   );
-  await fakeGemini(
+  await fakeAI(
     async () => new Response("", { status: 503 }),
     async () => {
       await assert.rejects(
@@ -278,7 +302,7 @@ test("invalid evidence and provider failures never create fabricated conversatio
 });
 test("decision drafts remain pending and are saved only by an explicit save operation", async () => {
   const view = startDiscussion(graph, component.id);
-  await fakeGemini(
+  await fakeAI(
     async () => jsonResponse(reply()),
     () => discussionTurn(view.id, "No Redis available."),
   );
@@ -299,7 +323,7 @@ test("decision drafts remain pending and are saved only by an explicit save oper
     verification: ["Test boundaries and burst behavior"],
     evidenceIds: [component.referenceId],
   };
-  await fakeGemini(
+  await fakeAI(
     async () => jsonResponse(decision),
     async () => {
       const draft = await draftDecision(view.id, undefined);
@@ -391,4 +415,95 @@ test("voice list and selected voice IDs come from the account; recordings are tr
     if (key === undefined) delete process.env.ELEVENLABS_API_KEY;
     else process.env.ELEVENLABS_API_KEY = key;
   }
+});
+
+test("invalid discussion shape retries once against the exact schema and saves only one validated turn", async () => {
+  const view = startDiscussion(graph, component.id);
+  let attempts = 0;
+  await fakeAI(
+    async (_url, options) => {
+      const body = JSON.parse(options.body);
+      attempts++;
+      assert.match(
+        body.messages[0].content,
+        /All required fields must be present/,
+      );
+      const evidence = JSON.parse(body.messages[1].content);
+      assert(evidence.allowedEvidenceIds.includes(component.referenceId));
+      if (attempts === 1)
+        return jsonResponse({
+          ...reply(),
+          claims: [{ text: "A code claim.", evidenceIds: [] }],
+        });
+      const correction = JSON.parse(body.messages.at(-1).content);
+      assert.equal(correction.question, "Explain this implementation.");
+      assert(
+        correction.validationIssues.some(
+          (issue) => issue.path === "claims.0.evidenceIds",
+        ),
+      );
+      assert.equal(sessionView(discussion(view.id)).messages.length, 0);
+      return jsonResponse(reply());
+    },
+    async () => {
+      const result = await discussionTurn(
+        view.id,
+        "Explain this implementation.",
+      );
+      assert.equal(attempts, 2);
+      assert.equal(sessionView(discussion(view.id)).messages.length, 2);
+      assert(
+        result.answer.citations.every((c) =>
+          graph.references.some((r) => r.id === c.id),
+        ),
+      );
+    },
+  );
+});
+
+test("malformed JSON regenerates once while unknown citations are never silently corrected", async () => {
+  for (const invalid of [
+    "not-json",
+    JSON.stringify({
+      ...reply(),
+      claims: [{ text: "Unsupported claim.", evidenceIds: ["invented-ref"] }],
+    }),
+  ]) {
+    const view = startDiscussion(graph, component.id);
+    let attempts = 0;
+    await fakeAI(
+      async () =>
+        ++attempts === 1
+          ? new Response(
+              JSON.stringify({ choices: [{ message: { content: invalid } }] }),
+            )
+          : jsonResponse(reply()),
+      async () => {
+        await discussionTurn(view.id, "Explain this code.");
+        assert.equal(attempts, 2);
+        const saved = sessionView(discussion(view.id)).messages;
+        assert.equal(saved.length, 2);
+        assert(!JSON.stringify(saved).includes("invented-ref"));
+      },
+    );
+  }
+});
+
+test("two invalid model replies stop without persisting any messages", async () => {
+  const view = startDiscussion(graph, component.id);
+  let attempts = 0;
+  await fakeAI(
+    async () => {
+      attempts++;
+      return jsonResponse({ ...reply(), memory: "wrong shape" });
+    },
+    async () => {
+      await assert.rejects(
+        discussionTurn(view.id, "Explain"),
+        /after an automatic retry/,
+      );
+      assert.equal(attempts, 2);
+      assert.equal(sessionView(discussion(view.id)).messages.length, 0);
+    },
+  );
 });

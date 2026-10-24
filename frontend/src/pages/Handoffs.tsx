@@ -14,6 +14,7 @@ import {
 import { Button, Badge, PageHeading } from '../components/UI';
 import { HandoffRepositoryBrowser } from '../components/HandoffRepositoryBrowser';
 import { HandoffAccountGate, HandoffTeamAccess } from '../components/HandoffAccount';
+import { CollaborationTabs } from '../components/CollaborationTabs';
 import { useCollaboration } from '../state/CollaborationContext';
 import {
   handoffApi,
@@ -37,6 +38,7 @@ export default function Handoffs() {
   const { id } = useParams();
   return (
     <div className="handoff-page">
+      <CollaborationTabs />
       <HandoffAccountGate>{id ? <Review key={id} id={id} /> : <SessionList />}</HandoffAccountGate>
     </div>
   );
@@ -225,6 +227,7 @@ function SessionList() {
   );
 }
 function Review({ id }: { id: string }) {
+  const [knowledgeType, setKnowledgeType] = useState<'decision' | 'failure_lesson'>('decision');
   const { account, workspace, select } = useCollaboration();
   const [data, setData] = useState<HandoffDetail | null>(null),
     [error, setError] = useState(''),
@@ -683,13 +686,57 @@ function Review({ id }: { id: string }) {
                     latestResolution.confirmed_at &&
                     locked &&
                     !latestResolution.approved_for_knowledge && (
-                      <Button disabled={busy} onClick={() => void mutate('/approve-knowledge', {})}>
-                        Approve for Team Knowledge
-                      </Button>
+                      <div className="handoff-form">
+                        <label>
+                          Save accepted learning as
+                          <select
+                            aria-label="Handoff knowledge type"
+                            value={knowledgeType}
+                            onChange={(e) =>
+                              setKnowledgeType(e.target.value as 'decision' | 'failure_lesson')
+                            }
+                          >
+                            <option value="decision">Design decision</option>
+                            <option value="failure_lesson">
+                              Failure lesson (cause remains unknown)
+                            </option>
+                          </select>
+                        </label>
+                        <small>
+                          Only reusable engineering knowledge needs publication. The discussion
+                          stays in this handoff; the approved record links back to it.
+                        </small>
+                        <Button
+                          disabled={busy}
+                          onClick={() => void mutate('/approve-knowledge', { type: knowledgeType })}
+                        >
+                          Approve for Team Knowledge
+                        </Button>
+                      </div>
                     )}
                   {!!latestResolution.approved_for_knowledge && (
-                    <Link to="/knowledge">Published in Team Knowledge</Link>
+                    <Link
+                      to={
+                        data.memoryRecords?.find(
+                          (r) => r.origin_resolution_id === latestResolution.id,
+                        )
+                          ? `/knowledge?record=${data.memoryRecords.find((r) => r.origin_resolution_id === latestResolution.id)!.id}`
+                          : '/knowledge'
+                      }
+                    >
+                      Published in Team Knowledge
+                    </Link>
                   )}
+                  {data.memoryRecords
+                    ?.filter((r) => r.status !== 'approved')
+                    .map((record) => (
+                      <p key={record.id}>
+                        <Link to={`/knowledge?record=${record.id}`}>
+                          Linked {record.type === 'decision' ? 'decision' : 'failure lesson'} ·{' '}
+                          {record.status.replaceAll('_', ' ')}
+                        </Link>
+                      </p>
+                    ))}
                 </div>
               )}
               {canReview && !author && !locked && (

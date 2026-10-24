@@ -1,4 +1,5 @@
 import express from "express";
+import { llmConfig } from "./llmConfig.js";
 import { z } from "zod";
 import { db } from "./storage.js";
 import {
@@ -51,7 +52,7 @@ function requestSignal(res) {
 }
 discussionRoutes.get("/config", (_req, res) =>
   res.json({
-    textConfigured: !!(process.env.LLM_API_KEY && process.env.LLM_MODEL),
+    textConfigured: !!llmConfig().apiKey,
     voiceConfigured: !!process.env.ELEVENLABS_API_KEY,
     maxRecordingSeconds: 60,
   }),

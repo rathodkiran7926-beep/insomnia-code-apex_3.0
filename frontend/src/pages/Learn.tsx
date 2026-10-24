@@ -1,3 +1,4 @@
+import { JourneyConceptLinks } from '../components/JourneyConceptLinks';
 import {
   ArrowRight,
   BookOpen,
@@ -77,16 +78,12 @@ export default function Learn() {
         title="A route that starts where you are."
         description="Understand the right things, in the right order, with a contribution to work toward."
         actions={
-          <Button
-            variant="primary"
-            icon={ArrowRight}
-            magnetic
-            onClick={() => open(current)}
-          >
+          <Button variant="primary" icon={ArrowRight} magnetic onClick={() => open(current)}>
             Continue learning
           </Button>
         }
       />
+      <JourneyConceptLinks />
       <div className="learning-setup">
         <TiltCard className="panel profile-panel" maxTilt={4}>
           <div className="row between">

@@ -2,6 +2,8 @@
 
 Implemented in the existing Codebase Mentor application on 24 October 2026.
 
+Smart Context Handoff now connects to **Living Engineering Memory** through the shared Handoffs / Team Knowledge tabs. Accepted answers can become linked decisions or failure lessons; standalone records, exact-revision approval, history and source applicability checks are also available. See [the combined workflow guide](collaboration-and-engineering-memory.md) for the current knowledge lifecycle and APIs. The handoff/source-sharing behavior below remains in place.
+
 ## What it does
 
 A developer can ask a human teammate a focused question about repository code. The handoff saves the original source, its exact commit, the question, debugging notes, a focused evidence graph, and an optional Gemini briefing. The shared review also includes complete captured source files, a searchable file/component explorer, and architecture diagrams from the same commit. The selected lines remain highlighted while the reviewer reads surrounding code. A senior reviewer can reply, annotate the original lines, request clarification, and propose a solution. Every question has a separate database-backed conversation.

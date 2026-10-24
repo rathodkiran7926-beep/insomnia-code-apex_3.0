@@ -81,6 +81,13 @@ export type HandoffComment = {
   created_at: string;
 };
 export type HandoffDetail = {
+  memoryRecords?: {
+    id: string;
+    type: 'decision' | 'failure_lesson';
+    status: string;
+    revision: number;
+    origin_resolution_id: string;
+  }[];
   session: HandoffSession;
   role?: TeamWorkspace['role'];
   snapshot: {
@@ -133,9 +140,11 @@ export async function handoffApi<T>(
   url: string,
   body?: unknown,
   method = body === undefined ? 'GET' : 'POST',
+  signal?: AbortSignal,
 ): Promise<T> {
   const response = await fetch(url, {
     method,
+    signal,
     credentials: 'same-origin',
     ...(body === undefined
       ? {}

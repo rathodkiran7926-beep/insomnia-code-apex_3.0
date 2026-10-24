@@ -31,6 +31,7 @@ import { useWorkspace } from '../state/WorkspaceContext';
 import { useRepositoryAnalysis } from '../state/RepositoryAnalysisContext';
 import { Badge, Button, IconButton, Modal, ProgressBar } from './UI';
 import { MentorNavigation, IntegrationLinks, workspaceNavigation } from './MentorNavigation';
+import { handoffApi } from '../services/handoffApi';
 
 const navigation = [
   { path: '/workspace', label: 'Mentor workspace', icon: LayoutGrid },
@@ -64,6 +65,25 @@ export function Shell() {
     }
   }, [sidebarCollapsed]);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [codeJourneys, setCodeJourneys] = useState<
+    { id: string; title: string; topic: string; tags: string[] }[]
+  >([]);
+  useEffect(() => {
+    if (!searchOpen) return;
+    setCodeJourneys([]);
+    if (!activeRepository) return;
+    let cancelled = false;
+    handoffApi<{ journeys: typeof codeJourneys }>(
+      `/api/codejourneys?snapshotId=${activeRepository.snapshotId}`,
+    )
+      .then((r) => {
+        if (!cancelled) setCodeJourneys(r.journeys);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [searchOpen, activeRepository?.snapshotId]);
   const [query, setQuery] = useState('');
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -106,8 +126,9 @@ export function Shell() {
     setProgressNotification('dismissed');
     setProgressPopupOpen(false);
   };
-  const current =
-    location.pathname === '/demo-workspace'
+  const current = location.pathname.startsWith('/journeys')
+    ? 'CodeJourney'
+    : location.pathname === '/demo-workspace'
       ? 'Demo workspace'
       : location.pathname.startsWith('/handoffs')
         ? 'Context Handoffs'
@@ -121,7 +142,8 @@ export function Shell() {
     location.pathname === '/workspace' ||
     location.pathname === '/changes' ||
     location.pathname.startsWith('/handoffs') ||
-    location.pathname === '/knowledge';
+    location.pathname === '/knowledge' ||
+    location.pathname.startsWith('/journeys');
   const learningRoute = getRoute(
     state.personalized ? state.profile : 'beginner',
     state.personalized ? state.goal : 'contribute',
@@ -155,6 +177,12 @@ export function Shell() {
   }, [location.pathname]);
 
   const searchItems = [
+    ...codeJourneys.map((j) => ({
+      label: j.title,
+      group: 'Journey',
+      description: `CodeJourney / ${j.topic} / ${j.tags.join(' ')}`,
+      action: () => go(`/journeys/${j.id}`),
+    })),
     ...navigation.map((x) => ({
       label: x.label,
       group: 'Page',
@@ -241,11 +269,13 @@ export function Shell() {
               {analyzingRepository ? (
                 <span className="breadcrumb-repo">
                   <GitBranch size={13} />{' '}
-                  {location.pathname === '/changes'
-                    ? 'Pull request analysis'
-                    : activeRepository
-                      ? activeRepository.repository.replace('https://github.com/', '')
-                      : 'Select a repository'}
+                  {location.pathname.startsWith('/journeys')
+                    ? 'Repository source paths'
+                    : location.pathname === '/changes'
+                      ? 'Pull request analysis'
+                      : activeRepository
+                        ? activeRepository.repository.replace('https://github.com/', '')
+                        : 'Select a repository'}
                 </span>
               ) : (
                 <button

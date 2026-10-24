@@ -12,8 +12,12 @@ import { discussionRoutes } from "./discussionRoutes.js";
 import { prRoutes } from "./prRoutes.js";
 import { collaborationRoutes } from "./collaborationAuth.js";
 import { handoffRoutes } from "./handoffRoutes.js";
+import { journeyRoutes } from "./journeyRoutes.js";
+import { engineeringMemoryRoutes } from "./engineeringMemoryRoutes.js";
+import { practiceRoutes } from "./practiceRoutes.js";
 const app = express();
 app.disable("x-powered-by");
+app.use("/api/practice", express.json({ limit: "128kb" }));
 app.use(express.json({ limit: "24kb" }));
 app.use("/api", (req, res, next) => {
   res.set("Cache-Control", "no-store");
@@ -38,6 +42,9 @@ app.use("/api/discussions", discussionRoutes);
 app.use("/api/pr", prRoutes);
 app.use("/api/collaboration", collaborationRoutes);
 app.use("/api/handoffs", handoffRoutes);
+app.use("/api", journeyRoutes);
+app.use("/api/memory", engineeringMemoryRoutes);
+app.use("/api/practice", practiceRoutes);
 let active = 0;
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.post("/api/analyses", (req, res, next) => {
