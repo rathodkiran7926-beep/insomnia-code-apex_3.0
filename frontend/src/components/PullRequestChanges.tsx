@@ -719,8 +719,9 @@ export function PullRequestChanges({ onDemo }: { onDemo: () => void }) {
                       Open change impact explorer
                     </button>
                     <p>
-                      Incoming static connections, up to three hops. These are places to review, not
-                      detected bugs.
+                      Unchanged dependents reached through incoming static connections, up to three
+                      hops. Changed source components and relationships are listed separately.
+                      These are places to review, not detected bugs.
                     </p>
                     <div className="pr-version-tabs">
                       {(['before', 'after'] as const).map((side) => (

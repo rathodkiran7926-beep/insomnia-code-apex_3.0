@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
@@ -16,6 +23,7 @@ import {
   PanelRight,
   Search,
   Send,
+  GitBranch,
 } from 'lucide-react';
 import { useRepositoryAnalysis } from '../state/RepositoryAnalysisContext';
 import { analysisApi } from '../services/analysisApi';
@@ -27,8 +35,8 @@ import { WorkspaceConnectionMap as ConnectionMap } from './WorkspaceConnectionMa
 import { WorkspaceMentorOverview } from './WorkspaceMentorOverview';
 import { WorkspaceOptions } from './WorkspaceOptions';
 import { WorkspaceSplitter } from './WorkspaceSplitter';
-import { ChangeImpactExplorer } from './ChangeImpactExplorer';
-import { Modal } from './UI';
+import { ImpactPreviewPanel } from './ImpactPreviewPanel';
+import type { ImpactPreviewResult } from '../services/impactPreview';
 import { CreateHandoffModal } from './CreateHandoffModal';
 import { RelatedTeamKnowledge } from './RelatedTeamKnowledge';
 import {
@@ -101,7 +109,14 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
   const [mentorWidth, setMentorWidth] = useState(320);
   const [manualGraphShare, setManualGraphShare] = useState<number | null>(null);
   const [selectionDetailsOpen, setSelectionDetailsOpen] = useState(false);
-  const [impactOpen, setImpactOpen] = useState(false);
+  const [impactActive, setImpactActive] = useState(false);
+  const [impactMapEnabled, setImpactMapEnabled] = useState(false);
+  const [impactTargetId, setImpactTargetId] = useState<string | null>(null);
+  const [impactResults, setImpactResults] = useState<ImpactPreviewResult | null>(null);
+  const [inspectedResultId, setInspectedResultId] = useState<string | null>(null);
+  const [impactActivation, setImpactActivation] = useState(0);
+  const [impactFitToken, setImpactFitToken] = useState(0);
+  const [rightPanelTab, setRightPanelTab] = useState<'mentor' | 'impact'>('mentor');
   const [sourceCollapsed, setSourceCollapsed] = useState(false);
   const [explorer, setExplorer] = useState(true);
   const [mentor, setMentor] = useState(
@@ -173,6 +188,48 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
     setSourceCollapsed(false);
     setManualGraphShare(null);
   };
+  function startImpactPreview(componentId: string) {
+    setImpactTargetId(componentId);
+    setImpactActive(true);
+    setImpactMapEnabled(true);
+    setImpactResults(null);
+    setInspectedResultId(null);
+    setImpactActivation((value) => value + 1);
+    setImpactFitToken((value) => value + 1);
+    setRightPanelTab('impact');
+    setMentor(true);
+    setCenteredConversation(false);
+  }
+  function setImpactMapHighlighting(enabled: boolean) {
+    if (enabled && selected && (!impactActive || impactTargetId !== selected.id)) {
+      startImpactPreview(selected.id);
+      return;
+    }
+    setImpactMapEnabled(enabled);
+    if (enabled) {
+      setImpactActivation((value) => value + 1);
+      setImpactFitToken((value) => value + 1);
+    }
+  }
+  function inspectImpactEvidence(next: Reference) {
+    setCitation(next);
+    setSourceCollapsed(false);
+    setEditing(false);
+    if (view === 'connections') changeView('split');
+  }
+  const reportImpactResults = useCallback((result: ImpactPreviewResult | null) => {
+    setImpactResults(result);
+  }, []);
+  function focusImpactResult(id: string) {
+    setInspectedResultId(id);
+  }
+  function selectMapNode(id: string) {
+    if (impactActive) {
+      if (id !== impactTargetId) focusImpactResult(id);
+      return;
+    }
+    select(id);
+  }
   const outgoing = edges.filter((e) => e.source === selectedId);
   const incoming = edges.filter((e) => e.target === selectedId);
   const files = [...new Set(components.map((c) => refs.get(c.referenceId)!.file))].sort();
@@ -456,12 +513,14 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
                     >
                       {selectionDetailsOpen ? 'Less details' : 'Details'}
                     </button>
-                    <button
-                      className="selection-details-toggle"
-                      onClick={() => setImpactOpen(true)}
-                    >
-                      Change impact
-                    </button>
+                    <label className="selection-details-toggle impact-toggle">
+                      <input
+                        type="checkbox"
+                        checked={impactActive && impactMapEnabled}
+                        onChange={(event) => setImpactMapHighlighting(event.target.checked)}
+                      />
+                      <GitBranch size={13} /> What If I Change This?
+                    </label>
                   </div>
                   {view !== 'connections' && (!sourceCollapsed || view === 'code') && (
                     <div className="mentor-edit-toolbar combined-source-toolbar">
@@ -561,17 +620,48 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
                         unresolved in file
                       </small>
                     </div>
-                    <div className="workspace-graph-legend" aria-label="Graph layout">
-                      <span>Callers</span>
-                      <span>Selected component</span>
-                      <span>Dependencies</span>
+                    <div className="workspace-graph-legend" aria-label="Graph legend">
+                      {impactActive && impactMapEnabled ? (
+                        <>
+                          <span className="impact-legend-target">Analysis target</span>
+                          <span className="impact-legend-direct">Direct dependent</span>
+                          <span className="impact-legend-indirect">Indirect dependent</span>
+                          <span>Other indexed relationships</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Callers</span>
+                          <span>Selected component</span>
+                          <span>Dependencies</span>
+                        </>
+                      )}
                     </div>
                     <ConnectionMap
                       key={view}
                       selectedId={selectedId}
                       snapshot={snapshot}
-                      onSelect={select}
+                      onSelect={selectMapNode}
+                      impact={
+                        impactActive && impactMapEnabled && impactTargetId
+                          ? {
+                              targetId: impactTargetId,
+                              affected: impactResults?.affected || [],
+                              evidencePathIds:
+                                impactResults?.affected.flatMap((item) =>
+                                  item.evidencePaths.flatMap((path) => path.map((edge) => edge.id)),
+                                ) || [],
+                              focusedId: inspectedResultId,
+                              activation: impactActivation,
+                              fitToken: impactFitToken,
+                            }
+                          : undefined
+                      }
                     />
+                    {impactActive && impactMapEnabled && (
+                      <p className="impact-map-disclaimer">
+                        Possible impact from source relationships—not confirmed breakage.
+                      </p>
+                    )}
                   </section>
                 )}
                 {view === 'split' && !sourceCollapsed && (
@@ -669,124 +759,158 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
         {mentor && (
           <aside
             id="workspace-mentor"
-            aria-label="Mentor"
+            aria-label={rightPanelTab === 'impact' ? 'Impact preview' : 'Mentor'}
             className={`real-mentor-panel ${centeredConversation ? 'conversation-centered' : ''}`}
           >
-            {discussing ? (
-              <ComponentDiscussion
-                snapshot={snapshot}
-                componentId={selectedId}
-                centered={centeredConversation}
-                onCenteredChange={setCenteredConversation}
-              />
-            ) : (
-              <>
-                <div className="mentor-panel-heading">
-                  <MessageCircle size={15} />
-                  YOUR MENTOR <span className="mentor-live-dot" />
-                </div>
-                {selected && (
-                  <>
-                    <div className="workspace-mentor-content">
-                      <RelatedTeamKnowledge
-                        snapshotId={snapshot.snapshotId}
-                        referenceId={selected.referenceId}
-                        repository={snapshot.repository}
-                      />
-                      <WorkspaceMentorOverview
-                        snapshot={snapshot}
-                        componentId={selectedId}
-                        onSelect={select}
-                      />
-                      <ComponentDocumentation
-                        defaultOpen={false}
-                        key={selectedId}
-                        snapshot={snapshot}
-                        componentId={selectedId}
-                        onInspect={select}
-                      />
-                      <div className="mentor-conversation" aria-live="polite">
-                        {turns
-                          .filter((t) => t.componentId === selectedId)
-                          .map((t, i) => (
-                            <article className="mentor-turn" key={i}>
-                              <h3>{t.question}</h3>
-                              <p>{t.answer}</p>
-                              <small>{t.notice}</small>
-                              <div className="mentor-citations">
-                                {t.citations.map((c) => (
-                                  <button
-                                    key={c.id}
-                                    title={c.file}
-                                    onClick={() => inspectCitation(c)}
-                                  >
-                                    {c.file.split('/').pop()}:{c.startLine}-{c.endLine}
-                                  </button>
-                                ))}
-                              </div>
-                            </article>
-                          ))}
-                        {asking && (
-                          <p role="status">
-                            <LoaderCircle size={14} className="mentor-spin" />
-                            Reading saved source…
-                          </p>
-                        )}
-                        {questionError && <p role="alert">{questionError}</p>}
-                      </div>
-                      <div className="mentor-question-suggestions">
-                        <small>ASK ABOUT THE SELECTED CODE</small>
-                        {['Explain Code', 'Explore Dependencies', 'What Could Break?'].map((q) => (
-                          <button
-                            key={q}
-                            disabled={asking}
-                            onClick={() =>
-                              void ask(
-                                {
-                                  'Explain Code':
-                                    'Explain this component using its source references.',
-                                  'Explore Dependencies':
-                                    'What calls this component and which dependencies does it use?',
-                                  'What Could Break?':
-                                    'What could break if I change this component, and what should I verify?',
-                                }[q] || q,
-                              )
-                            }
-                          >
-                            {q}
-                            <ArrowRight size={13} />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <form
-                      className="mentor-question-form"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        void ask(question);
-                      }}
-                    >
-                      <label htmlFor="mentor-code-question">Ask about {selected.name}</label>
-                      <div>
-                        <textarea
-                          id="mentor-code-question"
-                          maxLength={1500}
-                          placeholder="Why does this code work this way?"
-                          value={question}
-                          onChange={(e) => setQuestion(e.target.value)}
+            <div className="workspace-right-panel-tabs" role="tablist" aria-label="Right panel">
+              <button
+                role="tab"
+                aria-selected={rightPanelTab === 'mentor'}
+                onClick={() => setRightPanelTab('mentor')}
+              >
+                Mentor
+              </button>
+              <button
+                role="tab"
+                aria-selected={rightPanelTab === 'impact'}
+                onClick={() => setRightPanelTab('impact')}
+              >
+                Impact
+              </button>
+            </div>
+            <div
+              className="workspace-right-panel-content"
+              hidden={rightPanelTab !== 'mentor'}
+              aria-hidden={rightPanelTab !== 'mentor'}
+            >
+              {discussing ? (
+                <ComponentDiscussion
+                  snapshot={snapshot}
+                  componentId={selectedId}
+                  centered={centeredConversation}
+                  onCenteredChange={setCenteredConversation}
+                />
+              ) : (
+                <>
+                  <div className="mentor-panel-heading">
+                    <MessageCircle size={15} />
+                    YOUR MENTOR <span className="mentor-live-dot" />
+                  </div>
+                  {selected && (
+                    <>
+                      <div className="workspace-mentor-content">
+                        <RelatedTeamKnowledge
+                          snapshotId={snapshot.snapshotId}
+                          referenceId={selected.referenceId}
+                          repository={snapshot.repository}
                         />
-                        <button aria-label="Ask mentor" disabled={asking || !question.trim()}>
-                          <Send size={16} />
-                        </button>
+                        <WorkspaceMentorOverview
+                          snapshot={snapshot}
+                          componentId={selectedId}
+                          onSelect={select}
+                        />
+                        <ComponentDocumentation
+                          defaultOpen={false}
+                          key={selectedId}
+                          snapshot={snapshot}
+                          componentId={selectedId}
+                          onInspect={select}
+                        />
+                        <div className="mentor-conversation" aria-live="polite">
+                          {turns
+                            .filter((t) => t.componentId === selectedId)
+                            .map((t, i) => (
+                              <article className="mentor-turn" key={i}>
+                                <h3>{t.question}</h3>
+                                <p>{t.answer}</p>
+                                <small>{t.notice}</small>
+                                <div className="mentor-citations">
+                                  {t.citations.map((c) => (
+                                    <button
+                                      key={c.id}
+                                      title={c.file}
+                                      onClick={() => inspectCitation(c)}
+                                    >
+                                      {c.file.split('/').pop()}:{c.startLine}-{c.endLine}
+                                    </button>
+                                  ))}
+                                </div>
+                              </article>
+                            ))}
+                          {asking && (
+                            <p role="status">
+                              <LoaderCircle size={14} className="mentor-spin" />
+                              Reading saved source…
+                            </p>
+                          )}
+                          {questionError && <p role="alert">{questionError}</p>}
+                        </div>
+                        <div className="mentor-question-suggestions">
+                          <small>ASK ABOUT THE SELECTED CODE</small>
+                          {['Explain Code', 'Explore Dependencies', 'What Could Break?'].map(
+                            (q) => (
+                              <button
+                                key={q}
+                                disabled={asking}
+                                onClick={() =>
+                                  void ask(
+                                    {
+                                      'Explain Code':
+                                        'Explain this component using its source references.',
+                                      'Explore Dependencies':
+                                        'What calls this component and which dependencies does it use?',
+                                      'What Could Break?':
+                                        'What could break if I change this component, and what should I verify?',
+                                    }[q] || q,
+                                  )
+                                }
+                              >
+                                {q}
+                                <ArrowRight size={13} />
+                              </button>
+                            ),
+                          )}
+                        </div>
                       </div>
-                      <small>
-                        Answers use this commit’s saved source. Local drafts are separate.
-                      </small>
-                    </form>
-                  </>
-                )}
-              </>
-            )}
+                      <form
+                        className="mentor-question-form"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          void ask(question);
+                        }}
+                      >
+                        <label htmlFor="mentor-code-question">Ask about {selected.name}</label>
+                        <div>
+                          <textarea
+                            id="mentor-code-question"
+                            maxLength={1500}
+                            placeholder="Why does this code work this way?"
+                            value={question}
+                            onChange={(e) => setQuestion(e.target.value)}
+                          />
+                          <button aria-label="Ask mentor" disabled={asking || !question.trim()}>
+                            <Send size={16} />
+                          </button>
+                        </div>
+                        <small>
+                          Answers use this commit’s saved source. Local drafts are separate.
+                        </small>
+                      </form>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="impact-preview-host" hidden={rightPanelTab !== 'impact'}>
+              <ImpactPreviewPanel
+                key={impactActivation}
+                snapshot={snapshot}
+                active={impactActive}
+                targetId={impactTargetId || selectedId}
+                onOpenReference={inspectImpactEvidence}
+                onResultsChange={reportImpactResults}
+              />
+            </div>
           </aside>
         )}
       </div>
@@ -805,24 +929,6 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
           }
         />
       )}
-      <Modal
-        open={impactOpen}
-        onOpenChange={setImpactOpen}
-        title="Explore change impact"
-        description="Find callers and HTTP routes connected to the code you plan to change."
-        className="impact-dialog"
-      >
-        {impactOpen && (
-          <ChangeImpactExplorer
-            snapshot={snapshot}
-            initialComponentId={selectedId}
-            onInspect={(id) => {
-              select(id);
-              setImpactOpen(false);
-            }}
-          />
-        )}
-      </Modal>
     </div>
   );
 }

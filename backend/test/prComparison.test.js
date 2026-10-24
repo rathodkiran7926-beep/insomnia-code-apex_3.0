@@ -145,6 +145,12 @@ test("comparison detects modifications beyond excerpt limits, graph changes and 
   );
   assert(r.edges.added.length > 0);
   assert(r.impact.after.some((c) => c.name === "caller" && c.depth === 1));
+  const caller = r.impact.after.find((component) => component.name === "caller");
+  assert(
+    !r.components.some(
+      (component) => component.before?.id === caller.id || component.after?.id === caller.id,
+    ),
+  );
 });
 test("file renames preserve named component identity without relying on sequential IDs", () => {
   const a = input({ "old.ts": "export function same(){return 1}" }, "a");

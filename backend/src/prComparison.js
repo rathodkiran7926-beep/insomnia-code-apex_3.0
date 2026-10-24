@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { traceIncomingImpact } from "./impactPreview.js";
 
 export function compareEvidence(pr, before, after) {
   const changed = new Set(
@@ -108,31 +109,18 @@ export function compareEvidence(pr, before, after) {
     const seeds = new Set(
       components.flatMap((c) => (c[side] ? [c[side].id] : [])),
     );
-    const visited = new Set(seeds),
-      result = [];
-    let frontier = [...seeds];
-    for (let depth = 1; depth <= 3; depth++) {
-      const next = [];
-      for (const edge of input.graph.relationships)
-        if (frontier.includes(edge.target) && !visited.has(edge.source)) {
-          visited.add(edge.source);
-          next.push(edge.source);
-          const c = input.graph.components.find((c) => c.id === edge.source);
-          if (c && result.length < 150)
-            result.push({
-              ...dto({
-                component: c,
-                reference: input.graph.references.find(
-                  (r) => r.id === c.referenceId,
-                ),
-              }),
-              depth,
-              via: edge.type,
-            });
-        }
-      frontier = next;
-    }
-    return result;
+    return traceIncomingImpact(input.graph, [...seeds], {
+      scenario: "behavior-change",
+      depth: 3,
+      limit: 150,
+    }).affected.map((affected) => ({
+      id: affected.id,
+      name: affected.name,
+      role: affected.role,
+      reference: affected.reference,
+      depth: affected.minDepth,
+      via: affected.relationshipTypes[0],
+    }));
   }
   const setup = {
     environment: pr.files.flatMap((f) =>
