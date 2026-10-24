@@ -4,6 +4,57 @@ import { pipeline } from "node:stream/promises";
 import tar from "tar-stream";
 import { isSetupPath } from "./setupRequirements.js";
 const MAX_RESPONSE = 8 * 1024 * 1024;
+const MAX_ERROR_RESPONSE = 4096;
+
+async function readErrorResponse(response) {
+  const reader = response.body?.getReader();
+  if (!reader) return "";
+  const chunks = [];
+  let size = 0;
+  while (size < MAX_ERROR_RESPONSE) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = value.subarray(0, MAX_ERROR_RESPONSE - size);
+    chunks.push(Buffer.from(chunk));
+    size += chunk.length;
+    if (chunk.length < value.length || size === MAX_ERROR_RESPONSE) {
+      await reader.cancel();
+      break;
+    }
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+function githubErrorMessage(response, body, hostname) {
+  if (hostname !== "api.github.com") return null;
+  let message;
+  try {
+    const parsed = JSON.parse(body);
+    if (typeof parsed.message === "string")
+      message = parsed.message.replace(/\s+/g, " ").trim().slice(0, 500);
+  } catch {
+    return null;
+  }
+  const retryAfter = Number(response.headers.get("retry-after"));
+  const resetAt = Number(response.headers.get("x-ratelimit-reset"));
+  if (
+    response.status === 403 &&
+    (response.headers.get("x-ratelimit-remaining") === "0" ||
+      /rate limit exceeded|secondary rate limit/i.test(message || ""))
+  ) {
+    const retryTime =
+      Number.isFinite(retryAfter) && retryAfter > 0
+        ? ` Retry after approximately ${Math.ceil(retryAfter)} seconds.`
+        : Number.isFinite(resetAt) && resetAt > 0 && resetAt < 8640000000000
+          ? ` Retry after ${new Date(resetAt * 1000).toISOString()}.`
+          : "";
+    return `GitHub API rate limit exceeded.${retryTime} Configure or refresh GITHUB_TOKEN in backend/.env, restart the backend, or retry after the limit resets.`;
+  }
+  return message
+    ? `GitHub API returned ${response.status}: ${message}`
+    : `GitHub API returned ${response.status}`;
+}
+
 export async function boundedFetch(
   url,
   { limit = MAX_RESPONSE, binary = false, headers = {}, ...options } = {},
@@ -46,13 +97,16 @@ export async function boundedFetch(
       );
     current = next;
   }
-  if (!response.ok)
-    throw Object.assign(
-      new Error(
-        `Remote request failed (${response.status}). Check repository, revision, or API rate limit.`,
-      ),
-      { remoteStatus: response.status },
-    );
+  if (!response.ok) {
+    const body = await readErrorResponse(response);
+    const githubMessage = githubErrorMessage(response, body, current.hostname);
+    const message =
+      githubMessage ||
+      `Remote request to ${current.hostname} failed (${response.status}). Check repository access, revision, or API rate limits.`;
+    throw Object.assign(new Error(message), {
+      remoteStatus: response.status,
+    });
+  }
   const chunks = [];
   let size = 0;
   for await (const chunk of response.body) {

@@ -8,6 +8,7 @@ import {
   FlaskConical,
   GitBranch,
   GitPullRequest,
+  GitFork,
   Layers,
   LayoutGrid,
   MessageSquareText,
@@ -25,6 +26,7 @@ export const workspaceNavigation = [
     links: [
       { path: '/repository', label: 'Architecture', icon: Layers },
       { path: '/repository?tab=documentation', label: 'Documentation', icon: BookOpen },
+      { path: '/first-contribution', label: 'First Contribution', icon: GitFork },
     ],
   },
   {
