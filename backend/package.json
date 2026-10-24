@@ -6,6 +6,8 @@
     "node": ">=24"
   },
   "scripts": {
+    "evaluate:agent-context": "node scripts/evaluate-agent-context-bridge.js",
+    "evaluate:workspace-agent-context": "node scripts/evaluate-workspace-agent-context.js",
     "dev": "node --watch --env-file-if-exists=.env src/server.js",
     "start": "node --env-file-if-exists=.env src/server.js",
     "test": "node --test test/*.test.js",

@@ -103,6 +103,8 @@ Snapshots and conversations persist in SQLite and stay pinned to their original 
 
 Practice now includes repository-based tasks, saved coding drafts with syntax feedback, and quick concept quizzes alongside the existing guided sample. Repository tasks use the shared custom model configuration; quizzes use a reviewed question bank. See [Practice setup and implementation](docs/practice-implementation.md) for usage, endpoints, checks, and limitations.
 
+Agent Context Bridge retrieves compact, cited context from the selected repository snapshot and exports JSON, a prompt slice, or an MCP request. The optional [MCP package](mcp/README.md) exposes task context, symbol inspection, dependencies, and snapshot drift checks to coding agents. [Windows setup](MCP_PLUGIN_HANDOFF.md) includes optional install/start/stop scripts; installation is not required for the web interface. The prepared context demo remains available at `/#/agent-context-demo`.
+
 See [the implementation and setup guide](docs/smart-context-handoff.md) for permissions, APIs, migrations, verification and limitations. The original prepared knowledge demo and Agent Context Bridge remain under Settings & Integrations.
 
 ## Verify

@@ -49,6 +49,7 @@ export const workspaceNavigation = [
     links: [
       { path: '/handoffs', label: 'Context Handoffs', icon: Users },
       { path: '/knowledge', label: 'Team Knowledge', icon: MessageSquareText },
+      { path: '/agent-context', label: 'Agent Context Bridge', icon: Bot },
     ],
   },
   {

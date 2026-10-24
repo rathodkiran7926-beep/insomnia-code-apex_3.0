@@ -1,0 +1,21 @@
+CODEBASE MENTOR — SIMPLE CODEX SETUP
+
+1. Extract this ZIP to a permanent folder, such as C:\Tools\Codebase-Mentor. Do not move the folder after installation because Codex stores absolute paths.
+2. Double-click Install-Codebase-Mentor.bat once.
+   - It checks Node.js 24+, installs the backend and MCP dependencies, creates missing local env files, updates only the Codebase Mentor MCP entry in your Codex config (making a backup), and starts the backend.
+3. Reload/restart VS Code once.
+4. Open the PUBLIC GitHub repository you want to work on in VS Code with Codex.
+5. Ask Codex normal questions, for example:
+   - "Explain the request flow in this codebase."
+   - "Find the files and dependencies affected by changing authentication."
+   - "Inspect the implementation of <symbol> and show source evidence."
+
+On first use, Codebase Mentor detects the current workspace's GitHub origin/upstream, reuses the latest analyzed snapshot if present, or starts analysis using the existing analyzer. The first analysis may take several minutes. You do not need to supply a snapshot ID or open the Codebase Mentor UI.
+
+IMPORTANT LIMITS
+- The existing analyzer supports PUBLIC GitHub repositories only. Private GitHub repos and local-only folders are not supported by this build.
+- Keep this extracted plugin folder in place after installation.
+- If you need the backend later, double-click Start-Codebase-Mentor.bat. To stop the managed local backend, double-click Stop-Codebase-Mentor.bat.
+- If Codex does not show the tools after setup, reload VS Code once and check Codex MCP settings. The installation script automatically updates your config; it does not publish the plugin to a marketplace.
+
+See MCP_PLUGIN_HANDOFF.md for architecture, limitations, and verification status.

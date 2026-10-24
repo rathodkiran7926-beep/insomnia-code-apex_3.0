@@ -181,8 +181,19 @@ try {
   assert(await evaluate(`document.documentElement.scrollWidth<=innerWidth+2`),'Mobile repository practice overflow');
   const mobile=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
   writeFileSync(root+'/data/practice-mobile.png',Buffer.from(mobile.data,'base64'));
+  const latest = await (await fetch(origin+'/api/snapshots/latest?repository='+encodeURIComponent('https://github.com/test/practice-checkout'))).json();
+  assert(latest.snapshotId && latest.commit==='d'.repeat(40), 'Merged latest snapshot endpoint failed');
+  await evaluate(`location.hash='/agent-context'`);
+  await wait(`document.querySelector('.context-controls textarea')`, 'Merged Agent Context page missing');
+  await fill('.context-controls textarea','normalizeEmail');
+  await click('Retrieve relevant context');
+  await wait(`document.querySelector('.context-output')?.value.includes('normalizeEmail')`, 'Merged bridge did not retrieve actual source');
+  await click('MCP request');
+  assert(await evaluate(`document.querySelector('.context-output').value.includes('get_task_context')`), 'MCP export missing');
+  await click('Open prepared context demo');
+  await wait(`document.querySelector('[aria-label="Context snapshot"]')`, 'Original prepared context feature was lost');
   assert.equal(errors.length,0,errors.join('\n'));
-  console.log('Practice browser checks passed: guided sample, repository task generation through shared provider config, pinned citations, syntax-only saved attempts/history, quiz grading/completion, difficulty persistence and mobile layout. Isolated provider responses; no analyzed code executed.');
+  console.log('Browser checks passed: guided sample, repository task generation through shared provider config, pinned citations, syntax-only saved attempts/history, quiz grading/completion, difficulty persistence, mobile layout, latest snapshot lookup, Agent Context Bridge retrieval/MCP export and preserved context demo. Isolated provider responses; no analyzed code executed.');
 } catch (error) {
   if (evaluate)
     console.error(

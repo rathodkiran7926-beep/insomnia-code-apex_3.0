@@ -18,6 +18,7 @@ const Changes = lazy(() => import('./pages/Changes'));
 const Knowledge = lazy(() => import('./pages/Knowledge'));
 const Progress = lazy(() => import('./pages/Progress'));
 const AgentContext = lazy(() => import('./pages/AgentContext'));
+const PreparedAgentContext = lazy(() => import('./pages/PreparedAgentContext'));
 const Handoffs = lazy(() => import('./pages/Handoffs'));
 const TeamKnowledge = lazy(() => import('./pages/TeamKnowledge'));
 
@@ -67,6 +68,7 @@ export default function App() {
                   <Route path="handoffs/:id" element={<Handoffs />} />
                   <Route path="progress" element={<Progress />} />
                   <Route path="agent-context" element={<AgentContext />} />
+                  <Route path="agent-context-demo" element={<PreparedAgentContext />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Route>
               </Routes>
