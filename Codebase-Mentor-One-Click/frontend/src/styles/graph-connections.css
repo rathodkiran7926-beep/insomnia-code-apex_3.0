@@ -1,0 +1,25 @@
+.clear-connection-label {
+  position: absolute;
+  pointer-events: all;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border: 1px solid #e8dff2;
+  border-radius: 5px;
+  background: #fffdfefa;
+  color: #8c75a0;
+  font: 10px/1.4 var(--mono);
+  box-shadow: 0 2px 5px #50377105;
+}
+.analysis-canvas .react-flow__edge.selected path,
+.system-architecture-canvas .react-flow__edge.selected path {
+  stroke: #9471c9;
+}
+.analysis-canvas .react-flow__handle {
+  width: 5px;
+  height: 5px;
+  background: #c7b7dc;
+  border-color: #fff;
+}

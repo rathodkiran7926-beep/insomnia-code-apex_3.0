@@ -1,0 +1,6 @@
+[mcp_servers.codebase_mentor]
+command = "node"
+args = ["--env-file-if-exists=mcp/.env", "mcp/src/stdio.js"]
+startup_timeout_sec = 30
+tool_timeout_sec = 360
+enabled = true
