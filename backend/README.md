@@ -12,10 +12,16 @@ Node.js 24+, Express, TypeScript Compiler API and built-in SQLite. See the [proj
 | GET    | `/api/snapshots/:id`                          | Evidence graph, report, source references, documentation metadata                                    |
 | GET    | `/api/snapshots/:id/documentation`            | Markdown including Mermaid                                                                           |
 | GET    | `/api/snapshots/:id/documentation?download=1` | Markdown attachment                                                                                  |
+| POST   | `/api/contributions/analyze`                  | `{ "snapshotId": "...", "preferences": { "skills": [], "interests": [], "difficulty": "beginner" } }` → live GitHub readiness signals and ranked open issues |
+| POST   | `/api/contributions/plan`                     | `{ "snapshotId": "...", "issueNumber": 42, "preferences": {} }` → issue discussion and snapshot-grounded contribution plan |
+
+Contribution endpoints require a completed snapshot already stored by Workspace; they never start another repository analysis. GitHub metadata is fetched on demand and bounded to one page per collection. Snapshot file references and setup commands are derived only from stored analysis data. If the configured LLM is unavailable, recommendation ranking uses transparent rules and the plan endpoint returns a clearly labeled snapshot-based fallback.
 
 Configuration: `PORT`, optional `DATABASE_PATH`, `GITHUB_TOKEN`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`. The `.env` file is loaded by start/dev scripts. Documentation adapter failures fall back to extracted facts.
 
 If analysis reports `EACCES` or `EPERM` when reaching GitHub, the backend process is being denied network access. Start it from a normal terminal with `cd backend` and `npm.cmd run dev`, and check firewall/proxy rules if the error persists. A GitHub token does not fix operating-system network restrictions. If port 3001 is already occupied, stop the older backend first: the UI connects to whichever process owns that port.
+
+GitHub API failures include the service's response reason when available. For a rate-limit 403, configure or refresh `GITHUB_TOKEN` in `backend/.env`, restart the backend, or wait until the reported reset time. For other 403 responses, verify that the repository is public and the requested revision is accessible.
 
 All text-generation features share `src/llmConfig.js` and an OpenAI-compatible chat-completions endpoint. This includes repository explanations, workspace questions, component discussions and decision drafts, generated guides, handoff briefings, and Code Journey explanations/questions. Existing citation validation and source fallbacks remain in place. ElevenLabs transcription and speech retain their separate configuration.
 

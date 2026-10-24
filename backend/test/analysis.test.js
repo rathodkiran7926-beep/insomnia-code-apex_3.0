@@ -25,6 +25,53 @@ test("network permission errors explain how to restart the backend", async () =>
   }
 });
 
+test("GitHub API rate-limit failures explain how to recover", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({ message: "API rate limit exceeded for 192.0.2.1." }),
+      {
+        status: 403,
+        headers: {
+          "content-type": "application/json",
+          "x-ratelimit-remaining": "0",
+          "x-ratelimit-reset": "1790000000",
+        },
+      },
+    );
+  try {
+    await assert.rejects(
+      boundedFetch("https://api.github.com/repos/example/api"),
+      (error) =>
+        error.remoteStatus === 403 &&
+        error.message.includes("GitHub API rate limit exceeded") &&
+        error.message.includes("GITHUB_TOKEN") &&
+        !error.message.includes("192.0.2.1"),
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("GitHub API access errors preserve the service's actionable reason", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ message: "Resource not accessible by integration" }), {
+      status: 403,
+      headers: { "content-type": "application/json" },
+    });
+  try {
+    await assert.rejects(
+      boundedFetch("https://api.github.com/repos/example/api"),
+      (error) =>
+        error.remoteStatus === 403 &&
+        error.message.includes("Resource not accessible by integration"),
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 const files = {
   "package.json": '{"dependencies":{"express":"5"}}',
   "app.ts": `import express from 'express';

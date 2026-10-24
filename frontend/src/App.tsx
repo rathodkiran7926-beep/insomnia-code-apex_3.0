@@ -21,6 +21,7 @@ const AgentContext = lazy(() => import('./pages/AgentContext'));
 const PreparedAgentContext = lazy(() => import('./pages/PreparedAgentContext'));
 const Handoffs = lazy(() => import('./pages/Handoffs'));
 const TeamKnowledge = lazy(() => import('./pages/TeamKnowledge'));
+const FirstContribution = lazy(() => import('./pages/FirstContribution'));
 
 function LegacyJourneyRedirect() {
   const location = useLocation();
@@ -60,6 +61,7 @@ export default function App() {
                   <Route path="workspace" element={<Workspace />} />
                   <Route path="demo-workspace" element={<DemoWorkspace />} />
                   <Route path="repository" element={<Repository />} />
+                  <Route path="first-contribution" element={<FirstContribution />} />
                   <Route path="journeys" element={<LegacyJourneyRedirect />} />
                   <Route path="journeys/:id" element={<LegacyJourneyRedirect />} />
                   <Route path="learn/:id" element={<CodeJourneyTheater />} />

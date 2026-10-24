@@ -18,6 +18,7 @@ import { engineeringMemoryRoutes } from "./engineeringMemoryRoutes.js";
 import { practiceRoutes } from "./practiceRoutes.js";
 import { agentContextRouter } from "./agentContextRoutes.js";
 import { impactPreviewRoutes } from "./impactPreviewRoutes.js";
+import { contributionRoutes } from "./contributionRoutes.js";
 const app = express();
 app.disable("x-powered-by");
 app.use("/api", componentNamesMiddleware(db));
@@ -50,6 +51,7 @@ app.use("/api", journeyRoutes);
 app.use("/api/memory", engineeringMemoryRoutes);
 app.use("/api/practice", practiceRoutes);
 app.use("/api/snapshots", agentContextRouter);
+app.use("/api/contributions", contributionRoutes);
 let active = 0;
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.post("/api/analyses", (req, res, next) => {
