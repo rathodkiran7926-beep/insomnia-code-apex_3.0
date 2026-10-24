@@ -10,6 +10,7 @@ const DemoWorkspace = lazy(() => import('./pages/DemoWorkspace'));
 const Repository = lazy(() => import('./pages/Repository'));
 const Journeys = lazy(() => import('./pages/Journeys'));
 const Learn = lazy(() => import('./pages/Learn'));
+const DecisionMemory = lazy(() => import('./pages/DecisionMemory'));
 const Practice = lazy(() => import('./pages/Practice'));
 const Changes = lazy(() => import('./pages/Changes'));
 const Knowledge = lazy(() => import('./pages/Knowledge'));
@@ -51,6 +52,7 @@ export default function App() {
                 <Route path="repository" element={<Repository />} />
                 <Route path="journeys" element={<Journeys />} />
                 <Route path="learn" element={<Learn />} />
+                <Route path="decision-memory" element={<DecisionMemory />} />
                 <Route path="practice" element={<Practice />} />
                 <Route path="changes" element={<Changes />} />
                 <Route path="knowledge" element={<Knowledge />} />
