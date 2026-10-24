@@ -10,6 +10,7 @@ import { readSource, answerQuestion } from "./workspace.js";
 import { generateGuide } from "./generatedGuides.js";
 import { discussionRoutes } from "./discussionRoutes.js";
 import { prRoutes } from "./prRoutes.js";
+import { ideRoutes } from "./ideRoutes.js";
 const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: "24kb" }));
@@ -33,6 +34,7 @@ db.prepare(
 ).run();
 app.use("/api/discussions", discussionRoutes);
 app.use("/api/pr", prRoutes);
+app.use("/api/ide", ideRoutes);
 let active = 0;
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.post("/api/analyses", (req, res, next) => {

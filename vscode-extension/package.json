@@ -1,0 +1,129 @@
+{
+  "name": "codebase-mentor",
+  "displayName": "Codebase Mentor",
+  "description": "A lightweight IDE companion to the shared Codebase Mentor backend.",
+  "version": "0.1.0",
+  "publisher": "codebase-mentor-local",
+  "private": true,
+  "license": "SEE LICENSE IN LICENSE.txt",
+  "engines": {
+    "vscode": "^1.100.0",
+    "node": ">=24"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Backend health is available. Trust is required for Git/editor context and snapshot connections. No source contents are uploaded."
+    },
+    "virtualWorkspaces": {
+      "supported": true
+    }
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codebaseMentor",
+          "title": "Codebase Mentor",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "codebaseMentor": [
+        {
+          "id": "codebaseMentor.focus",
+          "name": "Focus"
+        },
+        {
+          "id": "codebaseMentor.map",
+          "name": "Map"
+        },
+        {
+          "id": "codebaseMentor.changes",
+          "name": "Changes"
+        }
+      ]
+    },
+    "commands": [
+      { "command": "codebaseMentor.explainSelection", "title": "Codebase Mentor: Explain Selection" },
+      { "command": "codebaseMentor.openMentor", "title": "Codebase Mentor: Open Mentor" },
+      { "command": "codebaseMentor.askFollowUp", "title": "Codebase Mentor: Ask Follow-up" },
+      { "command": "codebaseMentor.cancelMentor", "title": "Codebase Mentor: Cancel Mentor Request" },
+      { "command": "codebaseMentor.openCitation", "title": "Codebase Mentor: Open Source Citation" },
+      { "command": "codebaseMentor.connectRepository", "title": "Codebase Mentor: Connect Repository" },
+      { "command": "codebaseMentor.refreshRepository", "title": "Codebase Mentor: Refresh Repository Context" },
+      { "command": "codebaseMentor.changeSnapshot", "title": "Codebase Mentor: Change Snapshot" },
+      { "command": "codebaseMentor.disconnectRepository", "title": "Codebase Mentor: Disconnect Repository" },
+      {
+        "command": "codebaseMentor.openWorkspace",
+        "title": "Codebase Mentor: Open Workspace"
+      },
+      {
+        "command": "codebaseMentor.checkConnection",
+        "title": "Codebase Mentor: Check Backend Connection",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "codebaseMentor.openSettings",
+        "title": "Codebase Mentor: Open Settings",
+        "icon": "$(gear)"
+      }
+    ],
+    "menus": {
+      "editor/context": [{ "command": "codebaseMentor.explainSelection", "when": "editorTextFocus", "group": "navigation@20" }],
+      "view/title": [
+        {
+          "command": "codebaseMentor.checkConnection",
+          "when": "view == codebaseMentor.focus",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codebaseMentor.openSettings",
+          "when": "view == codebaseMentor.focus",
+          "group": "navigation@2"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Codebase Mentor",
+      "properties": {
+        "codebaseMentor.apiBaseUrl": {
+          "type": "string",
+          "scope": "machine",
+          "default": "http://127.0.0.1:3001",
+          "description": "Backend root URL. HTTP is limited to loopback; other hosts require HTTPS. The current backend has no production authentication. In remote windows, localhost refers to the extension host."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "build": "npm run check && node scripts/build.mjs",
+    "build:dev": "npm run check && node scripts/build.mjs --development",
+    "watch": "node scripts/build.mjs --watch",
+    "test": "node scripts/test.mjs",
+    "test:host": "npm run build && node scripts/test-host.mjs",
+    "vscode:prepublish": "npm run build",
+    "package:vsix": "vsce package --allow-missing-repository",
+    "package:list": "vsce ls"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/vscode": "~1.100.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "@azure/msal-node": "7.1.1"
+  }
+}

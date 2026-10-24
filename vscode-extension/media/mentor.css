@@ -1,0 +1,29 @@
+:root { color-scheme: light dark; }
+body { padding: 0; color: var(--vscode-editor-foreground); background: var(--vscode-editor-background); font: var(--vscode-font-size)/1.6 var(--vscode-font-family); }
+main { max-width: 780px; margin: 0 auto; padding: 24px; }
+h1 { font-size: 1.45em; line-height: 1.4; margin: 6px 0 10px; font-weight: 600; overflow-wrap: anywhere; }
+h2 { font-size: 1.05em; font-weight: 600; margin: 0 0 8px; }
+p { margin: 8px 0; overflow-wrap: anywhere; }
+.eyebrow { color: var(--vscode-descriptionForeground); font-size: .85em; letter-spacing: .08em; }
+.muted, .notice { color: var(--vscode-descriptionForeground); }
+code { font: .9em var(--vscode-editor-font-family); overflow-wrap: anywhere; }
+section { margin-top: 28px; }
+.answer { white-space: pre-wrap; overflow-wrap: anywhere; }
+.scope { color: var(--vscode-descriptionForeground); }
+#status { padding: 10px 0; }
+#status[data-status="error"] { color: var(--vscode-errorForeground); }
+nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 18px; }
+button { font: inherit; cursor: pointer; border: 1px solid var(--vscode-button-border, transparent); padding: 5px 10px; background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+button:hover { background: var(--vscode-button-hoverBackground); }
+button:disabled { opacity: .5; cursor: default; }
+button:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
+.citations { padding: 0; list-style: none; }
+.citations li { margin: 6px 0; }
+.citation { text-align: left; max-width: 100%; white-space: normal; overflow-wrap: anywhere; color: var(--vscode-textLink-foreground); background: transparent; padding: 3px 0; }
+.citation:hover { color: var(--vscode-textLink-activeForeground); background: transparent; text-decoration: underline; }
+form { display: grid; gap: 8px; }
+form button { justify-self: start; }
+textarea { box-sizing: border-box; width: 100%; resize: vertical; min-height: 60px; padding: 8px; font: inherit; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, var(--vscode-contrastBorder, transparent)); }
+details { margin: 12px 0; }
+summary { cursor: pointer; color: var(--vscode-textLink-foreground); }
+body.vscode-high-contrast button, body.vscode-high-contrast-light button { border-color: var(--vscode-contrastBorder); }

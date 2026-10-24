@@ -4,6 +4,22 @@ Node.js 24+, Express, TypeScript Compiler API and built-in SQLite. See the [proj
 
 ## API
 
+The VS Code companion uses the same server. Phase 3 adds
+`POST /api/ide/resolve-selection` with `{snapshotId,file,startLine,endLine}`.
+Paths are repository-relative; line ranges are inclusive and 1-based. The route
+returns up to 20 actual stored component/reference IDs, plus `scope` and `notice`.
+Only containing source ranges qualify. Meaningful declarations take precedence
+over a containing module; module-only coverage is labelled explicitly. This
+route performs no parsing, source upload, external fetch or LLM call.
+
+Explanations continue through `POST /api/snapshots/:id/questions`
+(`{componentId,question}`), and pinned source through
+`GET /api/snapshots/:id/source?referenceId=...`. Source text is returned in
+`excerpt` with `complete:true`, snapshot/file identity and full-file bounds.
+Run `node --test test/ideSelection.test.js test/workspace.test.js` for focused
+resolver and existing Mentor regressions, or `npm.cmd test` for the full suite.
+The existing loopback/public-repository and authentication limitations remain.
+
 | Method | Path                                          | Result                                                                                               |
 | ------ | --------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | GET    | `/api/health`                                 | Health status                                                                                        |
