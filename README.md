@@ -20,6 +20,8 @@ Run `npm.cmd run verify:pr` in `backend` for read-only verification against a re
 
 The React/Vite app has a Node.js/Express backend for public repository analysis. Open **Repository** (`/#/repository`) to analyze a repository, then **Mentor workspace** (`/#/workspace`) to inspect real files and components in a separate editor workspace, follow callers and dependencies, ask source-grounded questions, and download local code drafts. Architecture and documentation stay on the Repository page. Both pages share one analysis session; the workspace restores it after reload and never substitutes demo data. Existing bundled learning/practice workflows use an explicit `/#/demo-workspace` route.
 
+The **Practice** page keeps its curated sample and adds repository-backed coding tasks and a separate short-quiz section. Configure `LLM_API_KEY` and `LLM_MODEL` in `backend/.env` for repository understanding and task generation; tasks are based on the selected analyzed snapshot and learner journey and appear as a roadmap beside the main editor. Quizzes do not call an LLM or depend on repository analysis: a built-in question bank adapts to learner difficulty, goals, and recently studied concepts, covering coding/testing practices and general collaboration etiquette without presenting them as repository or company policy. Submitted full-file drafts are saved per browser-local learner identifier and receive bounded syntax-only validation; syntactically valid code may still contain type errors or other defects. The practice feature does **not** execute repository tests or submitted code because arbitrary scripts are not safely sandboxed here. Quiz answers and concept-review schedules are persisted by the backend.
+
 Requires Node.js 24 or newer. On Windows PowerShell, use `npm.cmd` if script execution policy blocks `npm`.
 
 ## Run locally
@@ -41,7 +43,7 @@ npm.cmd install
 npm.cmd run dev
 ```
 
-Visit `http://127.0.0.1:5173/#/repository`. Vite proxies `/api` to `127.0.0.1:3001`. Try `https://github.com/heroku/node-js-getting-started` and optionally specify a branch, tag, or commit. Public GitHub access is required. No account or model key is required. Optional GitHub and LLM credentials belong in `backend/.env` only.
+Visit `http://127.0.0.1:5173/#/repository`. Vite proxies `/api` to `127.0.0.1:3001`. Try `https://github.com/heroku/node-js-getting-started` and optionally specify a branch, tag, or commit. Public GitHub access is required. Repository analysis does not require an account or model key; repository-backed practice generation does require `LLM_API_KEY` and `LLM_MODEL`. Optional GitHub and LLM credentials belong in `backend/.env` only.
 
 For a single local production server, run `npm.cmd run build` in `frontend`, then `npm.cmd start` in `backend`, and open `http://127.0.0.1:3001/#/repository`. The server binds to loopback; hosted multi-user authentication and deployment are outside this implementation.
 
