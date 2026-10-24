@@ -2,6 +2,110 @@
   color: #6f5d80;
   font-size: 12px;
 }
+.workspace-platform-icon,
+.discussion-platform-icon {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.component-discussion .discussion-mic-icon {
+  width: 76px;
+  height: 76px;
+  background: radial-gradient(circle, #e8ddff, #f7f3ff);
+  flex-shrink: 0;
+}
+.discussion-mic-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.component-discussion .discussion-microphone {
+  border-radius: 20px;
+  background: linear-gradient(135deg, #faf8ff, #eee8ff);
+  border: 1px solid #dfd4ff;
+  gap: 14px;
+  padding: 20px 16px;
+  flex-wrap: wrap;
+}
+.discussion-microphone > div {
+  flex: 1;
+  min-width: 150px;
+}
+.component-discussion .discussion-microphone strong {
+  color: #443663;
+  line-height: 1.5;
+}
+.component-discussion .discussion-microphone p {
+  color: #706184;
+  line-height: 1.7;
+}
+.discussion-call-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px 18px;
+}
+.discussion-call-dock.is-active {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: #fcfaff;
+  border-bottom: 1px solid #e9e1fa;
+  max-height: 65dvh;
+  overflow: auto;
+}
+/* The tab wrapper must not intercept sticky positioning while its outer
+   mentor pane is the scrolling container. */
+.workspace-right-panel-content:has(> .component-discussion) {
+  overflow: visible;
+  flex: 0 0 auto;
+}
+.discussion-call-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: #655482;
+}
+.discussion-call-status > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #7360e9;
+}
+.call-speaking .discussion-mic-icon {
+  box-shadow: 0 0 0 6px #c8bcff45;
+}
+.call-muted .discussion-mic-icon {
+  opacity: 0.55;
+}
+.component-discussion .discussion-microphone.is-call-active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 28px 20px;
+}
+.component-discussion .is-call-active .discussion-mic-icon {
+  width: 108px;
+  height: 108px;
+  border: 1px solid #ded5fc;
+}
+.is-call-active > div {
+  width: 100%;
+}
+.is-call-active .discussion-record-button {
+  background: #5741bd;
+}
+@media (max-width: 600px) {
+  .discussion-microphone .discussion-record-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
 .real-mentor-panel.conversation-centered {
   display: none;
 }

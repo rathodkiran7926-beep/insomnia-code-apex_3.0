@@ -284,6 +284,19 @@ try {
     );
     await pause(200);
   };
+  await tab('Overview');
+  await wait("document.querySelector('.pr-review-overview')");
+  assert(await evaluate("document.querySelectorAll('.pr-review-stats > div').length===3"),'Overview must consolidate redundant metrics');
+  assert(await evaluate("!document.querySelector('.pr-review-comparison-details').open"),'Technical commit details should be collapsed');
+  assert(await evaluate("document.querySelectorAll('.pr-review-file').length>0 && !document.querySelector('.pr-review-source .pr-component-link')"),'Source changes are not grouped by file');
+  await evaluate("document.querySelector('.pr-review-summary').scrollIntoView({block:'start'})");
+  await pause(350);
+  const overviewImage=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
+  writeFileSync(root+'/data/pr-overview-desktop.png',Buffer.from(overviewImage.data,'base64'));
+  await evaluate("document.querySelector('.pr-review-file footer button').click()");
+  await wait("document.querySelector('.pr-diff-layout')");
+  assert(await evaluate("document.querySelector('.pr-tabs [aria-selected=true]').textContent==='Changed files & diff'"),'Overview file action must open the actual diff');
+  await tab('Overview');
   await tab("Change impact");
   await wait("document.querySelector('.change-impact')");
   assert(
@@ -464,22 +477,18 @@ try {
     await evaluate("document.documentElement.scrollWidth<=innerWidth+1"),
     "PR UI must fit mobile width",
   );
+  await tab('Overview');
+  assert(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'Overview must fit mobile width');
+  assert(await evaluate("document.querySelector('.pr-discovery-toolbar label').getBoundingClientRect().height<120"),'PR search must not reserve a large empty vertical space on mobile');
+  const overviewMobile=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
+  writeFileSync(root+'/data/pr-overview-mobile.png',Buffer.from(overviewMobile.data,'base64'));
   await send("Page.reload");
   await wait("document.querySelector('.pr-summary-live')");
   await evaluate("location.hash='/workspace'");
   await wait("document.querySelector('.mentor-selection')");
-  await evaluate(
-    "Array.from(document.querySelectorAll('.mentor-selection button')).find(b=>b.textContent==='Change impact').click()",
-  );
-  await wait("document.querySelector('.impact-dialog .change-impact')");
-  assert(
-    await evaluate(
-      "document.querySelector('.impact-dialog').textContent.includes('Explore change impact')",
-    ),
-  );
-  await evaluate(
-    "document.querySelector('.impact-dialog [aria-label=\"Close dialog\"]').click();location.hash='/repository'",
-  );
+  await evaluate("document.querySelector('.impact-toggle input').click()");
+  await wait("document.querySelector('#impact-proposed-code')");
+  await evaluate("location.hash='/repository'");
   await wait(
     "document.querySelector('[aria-label=\"Public GitHub repository\"]')",
   );

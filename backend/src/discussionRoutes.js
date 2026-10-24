@@ -14,6 +14,7 @@ import {
 import {
   availableVoices,
   createSpeech,
+  streamSpeech,
   transcribe,
 } from "./discussionVoice.js";
 
@@ -40,6 +41,10 @@ const handler = (fn) => async (req, res, next) => {
   try {
     await fn(req, res);
   } catch (error) {
+    if (res.headersSent || res.destroyed) {
+      if (!res.destroyed) res.destroy();
+      return;
+    }
     next(error);
   }
 };
@@ -151,6 +156,7 @@ discussionRoutes.post(
         voiceId: z.string().max(150),
         messageId: z.string().max(150).optional(),
         preview: z.boolean().optional(),
+        stream: z.boolean().optional(),
       })
       .strict()
       .parse(req.body);
@@ -167,6 +173,8 @@ discussionRoutes.post(
     const text = body.preview
       ? "Hello, I'm your Codebase Mentor. Let's explore this component together."
       : JSON.parse(message.data).answer.spokenText;
+    if (body.stream)
+      return streamSpeech(body.voiceId, text, res, requestSignal(res));
     const audio = await createSpeech(body.voiceId, text, requestSignal(res));
     res.type("audio/mpeg").send(audio);
   }),

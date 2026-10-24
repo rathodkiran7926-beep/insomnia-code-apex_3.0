@@ -127,7 +127,7 @@ globalThis.fetch = async (url, options = {}) => {
       }),
     );
   if (target.includes("api.elevenlabs.io/v1/text-to-speech/")) {
-    trace.voiceIds.push(new URL(target).pathname.split("/").pop());
+    trace.voiceIds.push(new URL(target).pathname.split("/")[3]);
     persist();
     const data = Buffer.alloc(44 + 32000);
     data.write("RIFF");

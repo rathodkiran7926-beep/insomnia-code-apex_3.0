@@ -12,7 +12,7 @@ describe('voice activity', () => {
     for (let now = 80; now <= 800; now += 80) detect(0.05, now);
     expect(detect(0, 1500).finished).toBe(false);
     expect(detect(0.05, 1600).finished).toBe(false);
-    expect(detect(0, 2900).finished).toBe(false);
-    expect(detect(0, 3100)).toEqual({ heardSpeech: true, finished: true });
+    expect(detect(0, 2500).finished).toBe(false);
+    expect(detect(0, 2700)).toEqual({ heardSpeech: true, finished: true });
   });
 });

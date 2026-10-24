@@ -1,0 +1,525 @@
+.pr-changes .pr-review-summary {
+  padding: 24px;
+  align-items: flex-start;
+  gap: 20px;
+  border-radius: 16px;
+  background: #fff;
+}
+.pr-review-summary-copy {
+  min-width: 0;
+  flex: 1;
+}
+.pr-review-pr-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.pr-review-pr-number {
+  flex-shrink: 0;
+  padding: 5px 9px;
+  background: #f0ebff;
+  color: #6951cc;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.pr-changes .pr-review-pr-title a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.5;
+  color: #302d47;
+  overflow-wrap: anywhere;
+}
+.pr-review-pr-title svg {
+  flex-shrink: 0;
+}
+.pr-changes .pr-review-branches {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #7d748e;
+  margin: 12px 0;
+}
+.pr-review-pr-state {
+  padding: 3px 9px;
+  border-radius: 99px;
+  background: #f0ecfa;
+  color: #77608f;
+  font-size: 11px;
+  text-transform: capitalize;
+}
+.pr-review-pr-state.open {
+  background: #eaf6f0;
+  color: #42866e;
+}
+.pr-review-comparison-details {
+  font-size: 12px;
+  color: #80758e;
+}
+.pr-review-comparison-details summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.pr-review-comparison-details dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding-top: 8px;
+}
+.pr-review-comparison-details dl > div {
+  display: grid;
+  gap: 4px;
+}
+.pr-review-comparison-details dt {
+  font-size: 11px;
+  color: #91879d;
+}
+.pr-review-comparison-details dd {
+  margin: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+}
+.pr-changes .pr-tabs {
+  gap: 4px;
+  padding: 6px;
+  background: #eeebf6;
+  border: 1px solid #e5dfef;
+  border-radius: 12px;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+}
+.pr-changes .pr-tabs button {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  white-space: nowrap;
+  color: #7e718e;
+  padding: 9px 13px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.pr-changes .pr-tabs button[aria-selected='true'] {
+  background: white;
+  color: #654bcd;
+  box-shadow: 0 2px 5px #3f2d6410;
+}
+.pr-changes .pr-review-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 20px 0;
+  gap: 14px;
+}
+.pr-review-stats > div {
+  padding: 19px 22px;
+  border-radius: 14px;
+}
+.pr-review-stats strong {
+  font-size: 28px;
+  line-height: 1.4;
+  margin: 7px 0;
+  color: #43385c;
+}
+.pr-review-stats small {
+  font-size: 11px;
+  color: #8d829a;
+  line-height: 1.6;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.pr-review-stats > div > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #756782;
+}
+.pr-changes .pr-review-additions {
+  color: #458b71;
+}
+.pr-review-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.pr-review-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.pr-card .pr-review-section-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  color: #3b354d;
+}
+.pr-review-section-heading h2 svg {
+  color: #9a89bd;
+  flex-shrink: 0;
+}
+.pr-review-section-heading p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #8a7d99;
+  margin: 6px 0 0;
+}
+.pr-review-section-heading > button {
+  flex-shrink: 0;
+}
+.pr-review-source button,
+.pr-review-impact button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.5;
+}
+.pr-review-file-list {
+  display: grid;
+  gap: 14px;
+}
+.pr-review-file {
+  border: 1px solid #e9e2f4;
+  border-radius: 12px;
+  overflow: hidden;
+  min-width: 0;
+}
+.pr-review-file > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fbfaff;
+  padding: 14px 16px;
+  border-bottom: 1px solid #eee8f6;
+}
+.pr-review-file > header > svg {
+  flex-shrink: 0;
+  color: #9583b2;
+}
+.pr-review-file > header > div {
+  flex: 1;
+  min-width: 0;
+}
+.pr-card .pr-review-file h3 {
+  font-size: 13px;
+  margin: 0;
+  color: #4a405e;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.pr-review-file > header p {
+  margin: 3px 0 0;
+  font-size: 10px;
+  color: #a093af;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pr-review-file .pr-status {
+  flex-shrink: 0;
+  text-transform: capitalize;
+  font-size: 10px;
+}
+.pr-review-symbol {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #f2eef8;
+  min-width: 0;
+}
+.pr-review-symbol:last-child {
+  border-bottom: 0;
+}
+.pr-review-symbol-icon {
+  height: 28px;
+  width: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3effc;
+  color: #9b83be;
+  border-radius: 7px;
+  flex-shrink: 0;
+}
+.pr-review-symbol-copy {
+  flex: 1;
+  min-width: 0;
+}
+.pr-review-symbol-copy > strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 550;
+  color: #514362;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.pr-review-symbol-copy > small {
+  display: block;
+  margin-top: 3px;
+  font-size: 10px;
+  color: #a196ad;
+  line-height: 1.7;
+}
+.pr-review-change.added {
+  color: #498c74;
+}
+.pr-review-change.removed {
+  color: #ae6d81;
+}
+.pr-review-version-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.pr-changes .pr-review-version-actions button {
+  padding: 5px 8px;
+  font-size: 10px;
+  background: white;
+  border-color: #e8dff5;
+  min-height: 30px;
+}
+.pr-review-no-version {
+  width: 58px;
+  text-align: center;
+  color: #bdb3c7;
+  font-size: 11px;
+}
+.pr-review-file > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 16px;
+  background: #fdfcff;
+  border-top: 1px solid #eee8f6;
+}
+.pr-review-file-counts {
+  display: flex;
+  gap: 9px;
+  color: #a16c80;
+  font: 10px var(--font-mono, monospace);
+}
+.pr-changes .pr-review-file > footer button {
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  font-size: 11px;
+  color: #8e7ba9;
+}
+.pr-review-file-note {
+  font-size: 12px;
+  color: #9989a8;
+  padding: 0 16px;
+  line-height: 1.7;
+}
+.pr-review-impact .pr-version-tabs {
+  margin: 12px 0 18px;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: #f4f0fa;
+  border-radius: 9px;
+}
+.pr-review-impact .pr-version-tabs > button {
+  flex: 1;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  font-size: 11px;
+  padding: 7px 10px;
+}
+.pr-review-impact .pr-version-tabs > button[aria-pressed='true'] {
+  background: white;
+  box-shadow: 0 1px 5px #3f2d6410;
+  color: #7055ba;
+}
+.pr-review-impact-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.pr-review-impact-heading strong {
+  font-size: 12px;
+  color: #7f718f;
+}
+.pr-changes .pr-review-impact-heading button {
+  padding: 0;
+  background: none;
+  border: 0;
+  font-size: 11px;
+  color: #8266bd;
+}
+.pr-changes button.pr-review-dependent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 13px 0;
+  margin: 0;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid #f0eaf7;
+  border-radius: 0;
+  color: #a08bb8;
+  text-align: left;
+  min-width: 0;
+}
+.pr-review-dependent-copy {
+  flex: 1;
+  min-width: 0;
+}
+.pr-review-dependent-copy strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 550;
+  color: #645373;
+  overflow-wrap: anywhere;
+}
+.pr-review-dependent-copy > span {
+  display: block;
+  font-size: 10px;
+  color: #a091ad;
+  overflow-wrap: anywhere;
+  margin-top: 3px;
+}
+.pr-review-dependent-copy > small {
+  display: block;
+  font-size: 10px;
+  color: #9a8ba8;
+  line-height: 1.7;
+  margin-top: 3px;
+}
+.pr-review-dependent > svg {
+  flex-shrink: 0;
+}
+.pr-review-empty {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #9a8da7;
+  padding: 8px 0;
+}
+.pr-review-supporting {
+  border-top: 1px solid #eee6f6;
+  margin-top: 16px;
+  padding-top: 14px;
+}
+.pr-review-supporting > summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: #92829f;
+  line-height: 1.8;
+}
+.pr-review-supporting > summary > span {
+  margin-left: 5px;
+  padding: 2px 6px;
+  background: #f1ecf9;
+  border-radius: 4px;
+  font-size: 10px;
+}
+.pr-review-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1.8;
+  color: #9f90ad;
+  background: #faf8ff;
+  border-radius: 9px;
+  padding: 12px;
+  margin: 18px 0 0;
+}
+.pr-review-notice > svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.pr-review-more {
+  margin-top: 12px;
+  font-size: 11px;
+}
+@media (max-width: 1100px) {
+  .pr-review-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 620px) {
+  .pr-changes .pr-review-summary {
+    padding: 18px;
+    flex-direction: column;
+  }
+  .pr-changes .pr-review-pr-title a {
+    font-size: 16px;
+  }
+  .pr-review-pr-title {
+    gap: 8px;
+  }
+  .pr-changes .pr-review-stats {
+    gap: 8px;
+  }
+  .pr-review-stats > div {
+    padding: 12px;
+  }
+  .pr-review-stats strong {
+    font-size: 23px;
+  }
+  .pr-review-stats small {
+    display: none;
+  }
+  .pr-review-stats > div > span {
+    font-size: 10px;
+    line-height: 1.6;
+    display: block;
+  }
+  .pr-review-section-heading {
+    flex-wrap: wrap;
+  }
+  .pr-review-symbol {
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+  .pr-review-version-actions {
+    margin-left: 38px;
+    flex-basis: calc(100% - 38px);
+  }
+  .pr-review-symbol-copy {
+    min-width: calc(100% - 40px);
+  }
+  .pr-review-file > header {
+    padding: 12px;
+  }
+  .pr-review-impact-heading {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pr-review-supporting {
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 620px) {
+  .pr-changes .pr-input .pr-discovery-toolbar {
+    align-items: stretch;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+  .pr-changes .pr-discovery-toolbar label {
+    flex: 0 0 auto;
+    max-width: none;
+    width: 100%;
+  }
+  .pr-changes .pr-discovery-toolbar > span {
+    align-self: flex-start;
+    padding-bottom: 0;
+    font-size: 11px;
+  }
+}

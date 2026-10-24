@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, Bot, Copy, Download } from 'lucide-react';
+import { ArrowRight, Bot, Check, Copy, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button, PageHeading, PanelHeading } from '../components/UI';
+import { VSCodeIcon } from '../components/VSCodeIcon';
+import '../styles/agent-snapshot.css';
 import { RelearningCard } from '../components/RelearningCard';
 import { useRepositoryAnalysis } from '../state/RepositoryAnalysisContext';
 import { analysisApi } from '../services/analysisApi';
@@ -27,6 +29,22 @@ export default function AgentContext() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [copyError, setCopyError] = useState(false);
+  const [snapshotCopy, setSnapshotCopy] = useState<{
+    id: string;
+    status: 'copied' | 'error';
+  } | null>(null);
+  const activeSnapshotId = snapshot?.snapshotId;
+  const snapshotCopied = snapshotCopy?.id === activeSnapshotId && snapshotCopy?.status === 'copied';
+  async function copySnapshotId() {
+    if (!activeSnapshotId) return;
+    const id = activeSnapshotId;
+    try {
+      await navigator.clipboard.writeText(id);
+      setSnapshotCopy({ id, status: 'copied' });
+    } catch {
+      setSnapshotCopy({ id, status: 'error' });
+    }
+  }
   const generation = useRef(0);
   const [retrievedTask, setRetrievedTask] = useState('');
   useEffect(() => {
@@ -34,6 +52,7 @@ export default function AgentContext() {
     setContext(null);
     setLoading(false);
     setError('');
+    setSnapshotCopy(null);
     return () => {
       generation.current++;
     };
@@ -246,6 +265,49 @@ export default function AgentContext() {
         <aside className="stack-20">
           <section className="panel panel-body stack-12">
             <h2>Send this context to your coding agent.</h2>
+            <section className="agent-vscode-snapshot" aria-label="VS Code snapshot connection">
+              <header>
+                <span className="agent-vscode-mark">
+                  <VSCodeIcon size={25} />
+                </span>
+                <div>
+                  <h3>Connect in VS Code</h3>
+                  <span>Repository snapshot</span>
+                </div>
+              </header>
+              {activeSnapshotId ? (
+                <>
+                  <span className="agent-snapshot-label">Snapshot ID</span>
+                  <code id="vscode-snapshot-id" aria-label="VS Code snapshot ID">
+                    {activeSnapshotId}
+                  </code>
+                  <Button
+                    className="agent-snapshot-copy"
+                    icon={snapshotCopied ? Check : Copy}
+                    aria-label="Copy snapshot ID"
+                    onClick={() => void copySnapshotId()}
+                  >
+                    {snapshotCopied ? 'Copied' : 'Copy snapshot ID'}
+                  </Button>
+                  {snapshotCopied && (
+                    <span role="status" className="agent-snapshot-feedback">
+                      Snapshot ID copied.
+                    </span>
+                  )}
+                  {snapshotCopy?.id === activeSnapshotId && snapshotCopy.status === 'error' && (
+                    <p role="alert" className="agent-snapshot-feedback">
+                      Clipboard unavailable. Select and copy the ID above.
+                    </p>
+                  )}
+                  <p>
+                    In VS Code, run <strong>Codebase Mentor: Connect Repository</strong> and paste
+                    this ID. Use the same backend.
+                  </p>
+                </>
+              ) : (
+                <p>Analyze a repository to get its snapshot ID for VS Code.</p>
+              )}
+            </section>
             <p>
               Your agent can retrieve this snapshot directly over MCP. Select MCP request above,
               copy it, and paste it into Codex, Claude Code, OpenCode, Cursor, or another MCP
