@@ -710,6 +710,13 @@ try {
   await click('Next event');
   await wait("document.querySelector('.journey-canvas').innerText.includes('GET /health handler')", 'Playback node kept anonymous callback label');
   assert(!await evaluate("document.querySelector('.journey-canvas').innerText.includes('anonymous:')"),'Playback shows anonymous placeholder');
+  await evaluate("location.hash='/progress'");
+  await wait("document.querySelector('.progress-report-page') && document.querySelectorAll('.progress-skill-row').length===5", 'Merged progress report or skill map failed to render');
+  assert(await evaluate("document.querySelector('.mentor-navigation a[href=\"#/progress\"]').textContent.trim()==='My Progress'"), 'Existing My Progress navigation label was lost');
+  assert(await evaluate("document.documentElement.scrollWidth<=innerWidth+2"), 'Merged progress report overflows mobile width');
+  await send('Emulation.setEmulatedMedia', {media:'print'});
+  assert(await evaluate("getComputedStyle(document.querySelector('.progress-print-report')).display!=='none'"), 'Merged print report is unavailable');
+  await send('Emulation.setEmulatedMedia', {media:'screen'});
   assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
     "Repository CodeJourney browser checks passed: empty state without examples, actual parser/snapshot library, cross-file source highlighting, event questions, cursor resume, completion, alternate paths, mobile and reduced motion. No repository execution or paid provider calls.",

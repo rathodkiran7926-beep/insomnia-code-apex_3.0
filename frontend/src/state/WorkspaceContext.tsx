@@ -20,6 +20,7 @@ import {
   transitionDecision,
 } from '../domain/model';
 import { applyPracticeOutcome, finishScenario } from '../domain/progress';
+import type { LearningEvent } from '../domain/learningEvents';
 
 export interface WorkspaceState {
   schema: 1;
@@ -179,7 +180,13 @@ function loadState(): WorkspaceState {
 
 function useWorkspaceValue() {
   const [state, setState] = useState<WorkspaceState>(loadState);
+  const [learningEvents, setLearningEvents] = useState<LearningEvent[]>([]);
   const [notice, setNotice] = useState('');
+  useEffect(() => {
+    void import('../domain/learningEvents').then(({ readLearningEvents }) => {
+      setLearningEvents(readLearningEvents());
+    });
+  }, []);
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, playing: false }));
@@ -194,6 +201,12 @@ function useWorkspaceValue() {
   }, [notice]);
   function patch(value: Partial<WorkspaceState>) {
     setState((s) => ({ ...s, ...value }));
+  }
+  function logLearningEvent(event: Omit<LearningEvent, 'id' | 'schemaVersion' | 'timestamp'>) {
+    void import('../domain/learningEvents').then(({ readLearningEvents, recordLearningEvent }) => {
+      recordLearningEvent(event);
+      setLearningEvents(readLearningEvents());
+    });
   }
   function selectNode(id: string) {
     const node = graphNodes.find((x) => x.id === id);
@@ -258,6 +271,10 @@ function useWorkspaceValue() {
     scenario: Scenario = 'success',
     lessonId: string | null = null,
   ) {
+    logLearningEvent({
+      type: 'journey_started', evidence: 'activity', outcome: 'started',
+      journeyId: id, scenario, snapshot: state.snapshot, reference: lessonId ?? undefined,
+    });
     setState((s) => {
       const first = getJourneySteps(id, scenario, s.snapshot)[0];
       return {
@@ -293,6 +310,23 @@ function useWorkspaceValue() {
     });
   }
   function next() {
+    if (state.journeyId) {
+      const steps = getJourneySteps(state.journeyId, state.scenario, state.snapshot);
+      const active = steps[state.step];
+      const key = `${state.journeyId}:${state.scenario}:${state.snapshot}:${active?.id}`;
+      if (active && state.step === steps.length - 1 && canAdvance(Boolean(active.check), state.predictions[key])) {
+        logLearningEvent({
+          type: 'journey_completed', evidence: 'activity', outcome: 'completed',
+          journeyId: state.journeyId, scenario: state.scenario, snapshot: state.snapshot,
+        });
+        if (state.snapshot === 'head' && state.review.includes(state.journeyId)) {
+          logLearningEvent({
+            type: 'review_completed', evidence: 'activity', outcome: 'reviewed through completed journey',
+            journeyId: state.journeyId, scenario: state.scenario, snapshot: state.snapshot,
+          });
+        }
+      }
+    }
     setState((s) => {
       if (!s.journeyId) return s;
       const steps = getJourneySteps(s.journeyId, s.scenario, s.snapshot);
@@ -317,6 +351,23 @@ function useWorkspaceValue() {
     });
   }
   function predict(answer: string) {
+    if (state.journeyId) {
+      const step = getJourneySteps(state.journeyId, state.scenario, state.snapshot)[state.step];
+      if (step.check?.options.some((option) => option.id === answer)) {
+        const key = `${state.journeyId}:${state.scenario}:${state.snapshot}:${step.id}`;
+        const prediction = recordPrediction(state.predictions[key], answer);
+        const firstOutcome = prediction.first === step.check.correct ? 'correct' : 'incorrect';
+        const latestOutcome = prediction.latest === step.check.correct ? 'correct' : 'incorrect';
+        logLearningEvent({
+          type: 'checkpoint_answered', evidence: 'checkpoint',
+          outcome: latestOutcome,
+          firstOutcome,
+          latestOutcome,
+          journeyId: state.journeyId, scenario: state.scenario, snapshot: state.snapshot,
+          reference: step.id,
+        });
+      }
+    }
     setState((s) => {
       if (!s.journeyId) return s;
       const step = getJourneySteps(s.journeyId, s.scenario, s.snapshot)[s.step];
@@ -330,6 +381,16 @@ function useWorkspaceValue() {
     });
   }
   function setSnapshot(snapshot: Snapshot) {
+    if (snapshot === 'head' && state.snapshot !== 'head') {
+      const newlySuggested = conceptsNeedingReview(state.studied, ['signup', 'login', 'setup'], 'head')
+        .filter((concept) => !state.review.includes(concept));
+      for (const concept of newlySuggested) {
+        logLearningEvent({
+          type: 'review_suggested', evidence: 'activity', outcome: 'suggested',
+          journeyId: concept, snapshot: 'head', reference: 'PR #402 · synthetic sample update',
+        });
+      }
+    }
     setState((s) => {
       const steps = s.journeyId ? getJourneySteps(s.journeyId, s.scenario, snapshot) : [];
       const oldSteps = s.journeyId ? getJourneySteps(s.journeyId, s.scenario, s.snapshot) : [];
@@ -372,6 +433,12 @@ function useWorkspaceValue() {
     });
   }
   function complete(id: string) {
+    if (state.snapshot === 'head' && state.review.includes(id)) {
+      logLearningEvent({
+        type: 'review_completed', evidence: 'activity', outcome: 'reviewed',
+        journeyId: id, snapshot: state.snapshot,
+      });
+    }
     setState((s) => ({
       ...s,
       completed: [...new Set([...s.completed, id])],
@@ -395,14 +462,29 @@ function useWorkspaceValue() {
     submittedCode: string,
     result: 'baseline' | 'solution' | 'unsupported',
   ) {
+    if (state.practiceCode === submittedCode) {
+      logLearningEvent({
+        type: 'practice_submitted', evidence: 'activity', outcome: result,
+        snapshot: state.snapshot, reference: state.activeLesson ?? undefined,
+      });
+      if (result === 'solution') {
+        logLearningEvent({
+          type: 'practice_verified', evidence: 'local_assertion', outcome: 'local assertions passed',
+          snapshot: state.snapshot, reference: 'local schema assertions; API not executed',
+        });
+      }
+    }
     setState((s) => applyPracticeOutcome(s, submittedCode, result));
   }
   function reset() {
+    void import('../domain/learningEvents').then(({ clearLearningEvents }) => clearLearningEvents());
+    setLearningEvents([]);
     setState(initialState);
     setNotice('Local learning data reset.');
   }
   return {
     state,
+    learningEvents,
     patch,
     notice,
     notify: setNotice,

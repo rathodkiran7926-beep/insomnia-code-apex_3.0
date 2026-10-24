@@ -22,12 +22,12 @@ export function RelearningCard() {
       </h3>
       <p>
         {target === 'signup'
-          ? 'PR #402 creates an unverified account and requests a verification email. Revisit the signup flow you studied and inspect the new source.'
-          : 'PR #402 requires a verified email before token signing. Revisit the login guard you studied.'}
+          ? 'The prepared PR #402 demo creates an unverified account and requests a verification email. Revisit the signup flow you studied and inspect the updated source.'
+          : 'The prepared PR #402 demo requires a verified email before token signing. Revisit the login guard you studied.'}
       </p>
       <Badge tone={affected.length ? 'amber' : 'violet'}>
         {affected.length
-          ? `${affected.length} studied ${affected.length === 1 ? 'concept needs' : 'concepts need'} review`
+          ? `${affected.length} studied ${affected.length === 1 ? 'concept has' : 'concepts have'} review suggested`
           : 'Explore the verification update'}
       </Badge>
       <Button
