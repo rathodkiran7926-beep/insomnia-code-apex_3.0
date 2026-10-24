@@ -4,7 +4,6 @@ import {
   BookOpen,
   Bot,
   ChevronDown,
-  Code2,
   FlaskConical,
   GitBranch,
   GitPullRequest,
@@ -39,10 +38,7 @@ export const workspaceNavigation = [
   },
   {
     label: 'Changes',
-    links: [
-      { path: '/changes', label: 'PR Impact', icon: GitPullRequest },
-      { path: '/changes?tab=setup', label: 'Setup Changes', icon: Code2 },
-    ],
+    links: [{ path: '/changes', label: 'PR Changes', icon: GitPullRequest }],
   },
   {
     label: 'Collaborate',
@@ -71,6 +67,7 @@ export function MentorNavigation({
   const [closed, setClosed] = useState<string[]>([]);
   const repo = (snapshot?.repository || repositoryUrl).replace('https://github.com/', '');
   function active(path: string) {
+    if (path === '/changes') return location.pathname === '/changes';
     if (path === '/learn' && location.pathname.startsWith('/learn/')) return true;
     const [pathname, query = ''] = path.split('?');
     if (pathname === '/handoffs') return location.pathname.startsWith('/handoffs');
@@ -119,7 +116,7 @@ export function MentorNavigation({
                   aria-current={active(path) ? 'page' : false}
                   aria-label={label}
                   onClick={onNavigate}
-                  className={`nav-item ${active(path) ? 'active' : ''}`}
+                  className={() => `nav-item ${active(path) ? 'active' : ''}`}
                 >
                   <Icon size={17} strokeWidth={1.7} />
                   <span>{label}</span>

@@ -292,7 +292,15 @@ Any client that implements MCP tools over STDIO or Streamable HTTP can use the s
 
 ## Windows one-click setup
 
-From the extracted project, double-click `Install-Codebase-Mentor.bat` once. It checks Node.js 24+, installs backend/MCP dependencies, creates missing `.env` files from examples, safely updates only the `codebase_mentor` entry in the active Codex `config.toml`, backs up the previous config, and starts the backend. Reload VS Code once. Later, use `Start-Codebase-Mentor.bat` or `Stop-Codebase-Mentor.bat` to manage the local backend.
+Ensure the Codex CLI is installed and `codex --version` works in your terminal. From the extracted project, double-click `Install-Codebase-Mentor.bat` once. It checks Node.js 24+, installs backend/MCP dependencies, creates missing `.env` files from examples, backs up the active Codex `config.toml`, removes any UTF-8 BOM left by the old installer, registers `codebase_mentor` using `codex mcp add`, and starts the backend. It respects `CODEX_HOME` when set. The installer no longer edits TOML with regex or Windows PowerShell's BOM-producing UTF-8 writer. Reload VS Code once. Later, use `Start-Codebase-Mentor.bat` or `Stop-Codebase-Mentor.bat` to manage the local backend.
+
+The CLI has no timeout flags, so the installer adds missing `startup_timeout_sec = 30` and `tool_timeout_sec = 360` settings to the CLI-generated server table using BOM-free UTF-8, then validates it with `codex mcp get`. The longer tool limit allows first-use repository analysis to finish.
+
+To run the isolated installer regression test without changing your real Codex settings:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File mcp/scripts/test-codex-installer.ps1
+```
 
 After setup, open a public GitHub repository in Codex and ask your question. The bridge detects the current workspace's `origin` or `upstream` remote, selects its latest snapshot, and starts analysis if none exists. The first analysis may take several minutes. `snapshotId` can still be supplied to pin a question to a specific commit/snapshot.
 

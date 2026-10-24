@@ -21,7 +21,7 @@ harness -> mcp/ -> CODEBASE_MENTOR_API_URL -> backend/
 
 ## Simplest setup on Windows
 
-From the extracted project, double-click `Install-Codebase-Mentor.bat` once. It checks Node.js 24+, installs only the backend and MCP dependencies, creates local `.env` files from examples if absent, safely backs up and updates the Codebase Mentor entry in your Codex config, and starts the backend. It preserves other Codex MCP entries. Restart or reload VS Code once after installation. Then open a public GitHub repository in Codex and ask normal questions; Codebase Mentor resolves the workspace remote automatically and analyzes it on first use if needed.
+Ensure the Codex CLI is installed and `codex --version` works in your terminal. From the extracted project, double-click `Install-Codebase-Mentor.bat` once. It checks Node.js 24+, installs only the backend and MCP dependencies, creates local `.env` files from examples if absent, backs up the Codex config, repairs any UTF-8 BOM left by the old installer, registers Codebase Mentor using `codex mcp add`, and starts the backend. Codex handles the TOML update and preserves other MCP entries. Restart or reload VS Code once after installation. Then open a public GitHub repository in Codex and ask normal questions; Codebase Mentor resolves the workspace remote automatically and analyzes it on first use if needed.
 
 Use `Start-Codebase-Mentor.bat` to start the backend later and `Stop-Codebase-Mentor.bat` to stop the managed local backend. The MCP server can also start the local backend automatically if it is stopped.
 
