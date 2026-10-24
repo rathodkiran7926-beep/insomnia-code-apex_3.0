@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
-import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { learningJourneyLocation } from './domain/learningJourneyLocation';
 import { Shell } from './components/Shell';
 import { WorkspaceProvider } from './state/WorkspaceContext';
 import { RepositoryAnalysisProvider } from './state/RepositoryAnalysisContext';
@@ -9,7 +10,6 @@ const Home = lazy(() => import('./pages/Home'));
 const Workspace = lazy(() => import('./pages/Workspace'));
 const DemoWorkspace = lazy(() => import('./pages/DemoWorkspace'));
 const Repository = lazy(() => import('./pages/Repository'));
-const Journeys = lazy(() => import('./pages/Journeys'));
 const PreparedJourneys = lazy(() => import('./pages/PreparedJourneys'));
 const CodeJourneyTheater = lazy(() => import('./pages/CodeJourneyTheater'));
 const Learn = lazy(() => import('./pages/Learn'));
@@ -22,6 +22,10 @@ const PreparedAgentContext = lazy(() => import('./pages/PreparedAgentContext'));
 const Handoffs = lazy(() => import('./pages/Handoffs'));
 const TeamKnowledge = lazy(() => import('./pages/TeamKnowledge'));
 
+function LegacyJourneyRedirect() {
+  const location = useLocation();
+  return <Navigate replace to={learningJourneyLocation(location.pathname, location.search)} />;
+}
 export default function App() {
   return (
     <WorkspaceProvider>
@@ -56,8 +60,9 @@ export default function App() {
                   <Route path="workspace" element={<Workspace />} />
                   <Route path="demo-workspace" element={<DemoWorkspace />} />
                   <Route path="repository" element={<Repository />} />
-                  <Route path="journeys" element={<Journeys />} />
-                  <Route path="journeys/:id" element={<CodeJourneyTheater />} />
+                  <Route path="journeys" element={<LegacyJourneyRedirect />} />
+                  <Route path="journeys/:id" element={<LegacyJourneyRedirect />} />
+                  <Route path="learn/:id" element={<CodeJourneyTheater />} />
                   <Route path="prepared-journeys" element={<PreparedJourneys />} />
                   <Route path="learn" element={<Learn />} />
                   <Route path="practice" element={<Practice />} />

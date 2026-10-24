@@ -8,13 +8,27 @@ import { handoffApi } from '../services/handoffApi';
 import { useJourneyProgress } from '../state/useJourneyProgress';
 import { useRepositoryAnalysis } from '../state/RepositoryAnalysisContext';
 import { filterJourneys, journeyCompleted, type CodeJourney } from '../domain/codeJourney';
+import { useWorkspace } from '../state/WorkspaceContext';
+import {
+  journeySkills,
+  normalizeSkills,
+  recommendJourneys,
+} from '../domain/journeyRecommendations';
 import '../styles/codejourney.css';
+import '../styles/learning-path.css';
 export default function Journeys() {
   const { snapshot, loading: repositoryLoading } = useRepositoryAnalysis();
   const [page, setPage] = useState(1),
     [hasMore, setHasMore] = useState(false),
     [total, setTotal] = useState(0);
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  const { state } = useWorkspace();
+  const skills = normalizeSkills(state.skills);
+  const section = params.get('section') === 'all' ? 'all' : 'for-you';
+  const preferencesParams = new URLSearchParams(params);
+  preferencesParams.set('preferences', 'skills');
+  const preferencesLink = '/learn?' + preferencesParams.toString();
+  const [loadedSnapshot, setLoadedSnapshot] = useState('');
   const [journeys, setJourneys] = useState<CodeJourney[]>([]),
     [error, setError] = useState(''),
     [loading, setLoading] = useState(true);
@@ -27,6 +41,7 @@ export default function Journeys() {
   useEffect(() => {
     setPage(1);
     setJourneys([]);
+    setLoadedSnapshot('');
     setHasMore(false);
     setTotal(0);
   }, [snapshot?.snapshotId]);
@@ -49,6 +64,7 @@ export default function Journeys() {
               ? r.journeys
               : [...new Map([...old, ...r.journeys].map((j) => [j.id, j])).values()],
           );
+          setLoadedSnapshot(snapshot.snapshotId);
           setHasMore(r.hasMore);
           setTotal(r.total);
         }
@@ -66,24 +82,64 @@ export default function Journeys() {
   useEffect(() => {
     setTopic(params.get('topic') || 'all');
   }, [params]);
-  const visible = filterJourneys(journeys, progress, { search, topic, difficulty, status, sort });
-  const completed = journeys.filter((j) => journeyCompleted(j, progress[j.id])).length;
+  const scoped =
+    loadedSnapshot === snapshot?.snapshotId
+      ? journeys.filter(
+          (j) => j.snapshotId === snapshot.snapshotId && j.repository === snapshot.repository,
+        )
+      : [];
+  const recommendations = recommendJourneys(
+    scoped,
+    skills,
+    progress,
+    snapshot?.snapshotId || '',
+    snapshot?.repository || '',
+    state.personalized ? state.goal : undefined,
+  );
+  // Look beyond the first API page before declaring that a known framework has no matches.
+  useEffect(() => {
+    if (
+      section === 'for-you' &&
+      skills.length > 0 &&
+      hasMore &&
+      !loading &&
+      !error &&
+      loadedSnapshot === snapshot?.snapshotId &&
+      !recommendations.some((result) => result.relation === 'direct')
+    ) {
+      setPage((value) => value + 1);
+    }
+  }, [
+    section,
+    skills.join('|'),
+    hasMore,
+    loading,
+    error,
+    loadedSnapshot,
+    snapshot?.snapshotId,
+    recommendations.some((result) => result.relation === 'direct'),
+  ]);
+  const recommendationById = new Map(recommendations.map((r) => [r.journey.id, r]));
+  const library = section === 'all' ? scoped : recommendations.map((r) => r.journey);
+  const visible = filterJourneys(library, progress, { search, topic, difficulty, status, sort });
   function path(j: CodeJourney, failure = false) {
     const saved = progress[j.id],
       scenario = failure
         ? j.scenarios.find((s) => s.failure) || j.scenarios[1]
         : j.scenarios.find((s) => s.id === saved?.scenarioId) || j.scenarios[0];
-    return `/journeys/${j.id}?${new URLSearchParams({ scenario: scenario.id, ...(!failure && saved?.traceId && saved.snapshotId === j.snapshotId ? { trace: saved.traceId, ...(!saved.completed ? { resume: '1' } : {}) } : {}) })}`;
+    return `/learn/${j.id}?${new URLSearchParams({ scenario: scenario.id, ...(!failure && saved?.traceId && saved.snapshotId === j.snapshotId ? { trace: saved.traceId, ...(!saved.completed ? { resume: '1' } : {}) } : {}) })}`;
   }
   return (
     <div className="codejourney-page">
       <PageHeading
         eyebrow="CODEJOURNEY / LEARN THE FLOW"
-        title="Follow the thread. Understand the code."
+        title="My Learning Path"
         description={
           snapshot
-            ? `${snapshot.repository.replace('https://github.com/', '')} · ${snapshot.commit.slice(0, 12)} · Explore actual components and resolved source connections.`
-            : 'Analyze your repository to explore its real code paths.'
+            ? 'Follow source-linked journeys in ' +
+              snapshot.repository.replace('https://github.com/', '') +
+              '. Pick up where you left off or find your next path.'
+            : 'Explore your repository through guided code journeys.'
         }
         actions={
           <span className="codejourney-emblem">
@@ -92,35 +148,71 @@ export default function Journeys() {
           </span>
         }
       />
-      <section className="journey-companion-welcome" aria-label="Meet your journey companion">
-        <InteractiveBrandMentor mode="welcome" />
+      <section className="learning-skills-row" aria-label="Your skills">
+        <strong>Your skills</strong>
         <div>
-          <span className="eyebrow">A LITTLE GUIDANCE, AT EVERY STEP</span>
-          <h2>Let’s make sense of your code together.</h2>
-          <p>
-            {snapshot
-              ? 'Choose a component below. I’ll point you to its source, help you explore its connections, and stay with you when you pause to ask why.'
-              : 'Bring your repository, and we’ll follow its code one step at a time. Start with an analysis to meet your actual components.'}
-          </p>
-          <div className="journey-companion-promises">
-            <span>
-              <GitBranch size={13} /> Follow connections
-            </span>
-            <span>
-              <Search size={13} /> Inspect the source
-            </span>
-            <span>
-              <CodeJourneyMark /> Ask along the way
-            </span>
-          </div>
+          {skills.length ? (
+            skills.map((s) => (
+              <Badge key={s} tone="violet">
+                {s}
+              </Badge>
+            ))
+          ) : (
+            <span>No skills added yet</span>
+          )}
         </div>
+        <Link className="button button-ghost" to={preferencesLink}>
+          {skills.length ? 'Edit' : 'Add skills'}
+        </Link>
       </section>
+      <div className="learning-sections" role="group" aria-label="Learning path sections">
+        {[
+          ['for-you', 'For You'],
+          ['all', 'All Journeys'],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            aria-pressed={section === id}
+            onClick={() => {
+              const next = new URLSearchParams(params);
+              next.set('section', id);
+              setParams(next);
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {section === 'for-you' && !skills.length && (
+        <div className="journey-empty">
+          <h2>Add your skills to get personalized code journeys.</h2>
+          <Link className="button button-primary" to={preferencesLink}>
+            Add skills
+          </Link>
+          <Button onClick={() => setParams({ section: 'all' })}>Browse All Journeys</Button>
+        </div>
+      )}
+      {section === 'for-you' && recommendations.length > 0 && (
+        <p className="journey-library-honesty">
+          {recommendations.some((r) => r.relation === 'direct')
+            ? 'Skill matches come from saved source metadata. Connected paths are ranked ahead of isolated helpers.'
+            : 'No direct skill matches in the loaded journeys. These related HTTP/API paths are optional next steps, grounded in this repository.'}
+        </p>
+      )}
       <div className="journey-library-toolbar">
         <div className="journey-library-tabs">
           {[
-            ['all', 'All journeys', journeys.length],
-            ['new', 'Not completed', journeys.length - completed],
-            ['complete', 'Completed', completed],
+            ['all', 'All statuses', library.length],
+            [
+              'new',
+              'Not completed',
+              library.filter((j) => !journeyCompleted(j, progress[j.id])).length,
+            ],
+            [
+              'complete',
+              'Completed',
+              library.filter((j) => journeyCompleted(j, progress[j.id])).length,
+            ],
           ].map(([id, label, count]) => (
             <button key={id} aria-pressed={status === id} onClick={() => setStatus(String(id))}>
               {label}
@@ -184,8 +276,8 @@ export default function Journeys() {
       </p>
       {snapshot && total > 0 && (
         <p className="journey-library-honesty">
-          Showing {journeys.length} of {total} source components. Search and filters apply to loaded
-          cards.
+          {section === 'for-you' ? recommendations.length + ' recommended paths from ' : 'Showing '}
+          {scoped.length} of {total} source components. Search and filters apply to loaded cards.
         </p>
       )}
       {loading || repositoryLoading ? (
@@ -203,10 +295,24 @@ export default function Journeys() {
             Analyze repository
           </Link>
         </div>
-      ) : !visible.length ? (
+      ) : section === 'for-you' && !skills.length ? null : !visible.length ? (
         <div className="journey-empty">
           <InteractiveBrandMentor mode="debugging" />
-          <h2>No journeys match those filters</h2>
+          <h2>
+            {section === 'for-you' && !recommendations.length
+              ? 'No strong matches yet'
+              : 'No journeys match those filters'}
+          </h2>
+          {section === 'for-you' && (
+            <>
+              <p>
+                {skills.length
+                  ? 'No matching source paths were found for these skills. Try another skill or browse All Journeys.'
+                  : 'Choose All Journeys to browse without skills.'}
+              </p>
+              <Button onClick={() => setParams({ section: 'all' })}>Browse All Journeys</Button>
+            </>
+          )}
           <Button
             onClick={() => {
               setSearch('');
@@ -257,8 +363,29 @@ export default function Journeys() {
                       {j.origin === 'repository' ? j.commit?.slice(0, 7) : `${j.minutes} min`}
                     </span>
                   </div>
+                  {section === 'for-you' && (
+                    <Badge tone="violet">
+                      {recommendationById.get(j.id)?.relation === 'related'
+                        ? 'Related next step'
+                        : 'Skill match'}
+                    </Badge>
+                  )}
                   <h2>{j.title}</h2>
                   <p>{j.description}</p>
+                  <div className="learning-card-tags">
+                    {(
+                      recommendationById.get(j.id)?.relevantTags ||
+                      journeySkills(j).filter((t) =>
+                        ['TypeScript', 'JavaScript', 'Express', 'React', 'Node.js'].includes(t),
+                      )
+                    ).map((t) => (
+                      <Badge key={t}>{t}</Badge>
+                    ))}
+                    {j.difficulty !== 'unrated' && <Badge>{j.difficulty}</Badge>}
+                  </div>
+                  {section === 'for-you' && (
+                    <p className="learning-reason">{recommendationById.get(j.id)?.reason}</p>
+                  )}
                   <div className="codejourney-card-facts">
                     <span>{steps.length} source events</span>
                     <span>{j.scenarios.length} connection paths</span>

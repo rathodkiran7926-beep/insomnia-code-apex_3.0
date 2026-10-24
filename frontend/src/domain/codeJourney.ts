@@ -44,6 +44,7 @@ export type CodeJourney = {
   difficulty: string;
   minutes: number | null;
   tags: string[];
+  learningSkills?: string[];
   source: string;
   sourceHash: string;
   snapshotId: string;

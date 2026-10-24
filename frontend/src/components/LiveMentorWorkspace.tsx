@@ -299,7 +299,7 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
         <div className="mentor-layout-buttons">
           <Link
             className="button button-ghost"
-            to="/journeys"
+            to="/learn"
             title="Explore paths from this repository's analyzed source"
           >
             CodeJourney

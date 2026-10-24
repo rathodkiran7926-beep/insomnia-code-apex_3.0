@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import ts from "typescript";
 import { db } from "./storage.js";
+import { journeySkillReader } from "./journeySkills.js";
 
 const cache = new Map();
 export function repositoryGraph(snapshotId) {
@@ -120,6 +121,8 @@ export function repositoryJourneys(snapshotId, { page = 1, componentId } = {}) {
     outgoing.get(edge.source).push(edge);
   }
   const componentEvents = new Map();
+  const readSkills = journeySkillReader(snapshotId);
+  const componentSkills = new Map();
   function eventFor(component) {
     if (componentEvents.has(component.id))
       return componentEvents.get(component.id);
@@ -200,6 +203,24 @@ export function repositoryJourneys(snapshotId, { page = 1, componentId } = {}) {
     const sourceHash = createHash("sha256")
       .update(JSON.stringify({ commit: graph.commit, events }))
       .digest("hex");
+    const metadata = events.map((event) => {
+      if (!componentSkills.has(event.key))
+        componentSkills.set(
+          event.key,
+          readSkills(event.source.file, event.excerpt),
+        );
+      return componentSkills.get(event.key);
+    });
+    const skills = [
+      ...new Set([
+        ...metadata.flatMap((item) => item.skills),
+        ...(root.role === "route" ? ["HTTP"] : []),
+        ...(root.role === "route" &&
+        graph.report?.frameworks?.some((f) => f.startsWith("Express"))
+          ? ["Express"]
+          : []),
+      ]),
+    ];
     return {
       id: `repo-${snapshotId}-${root.id}`,
       origin: "repository",
@@ -211,7 +232,18 @@ export function repositoryJourneys(snapshotId, { page = 1, componentId } = {}) {
       topic: root.role === "route" ? "HTTP routes" : "Components",
       difficulty: "unrated",
       minutes: null,
-      tags: [root.name, root.role, refs.get(root.referenceId).file],
+      tags: [
+        root.name,
+        root.role,
+        refs.get(root.referenceId).file,
+        ...skills,
+        ...(root.role === "route" &&
+        graph.report?.frameworks?.some((f) => f.startsWith("Express"))
+          ? ["Express"]
+          : []),
+      ],
+      learningSkills: skills,
+      skillEvidence: metadata.flatMap((item) => item.evidence),
       source: "",
       sourceHash,
       snapshotId,

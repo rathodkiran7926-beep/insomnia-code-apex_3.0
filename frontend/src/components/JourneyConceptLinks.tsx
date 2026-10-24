@@ -9,7 +9,7 @@ export function JourneyConceptLinks({ practice = false }: { practice?: boolean }
         compact
         mode={practice ? 'practice' : 'reading'}
         onClick={() => {
-          location.hash = '/journeys';
+          location.hash = '/learn';
         }}
         message="Explore source-linked journeys"
       />
@@ -18,7 +18,7 @@ export function JourneyConceptLinks({ practice = false }: { practice?: boolean }
           ? 'Review the source behind your changes'
           : 'Follow your repository code step by step'}
       </span>
-      <Link to="/journeys">
+      <Link to="/learn">
         Repository journeys
         <ArrowRight size={13} />
       </Link>

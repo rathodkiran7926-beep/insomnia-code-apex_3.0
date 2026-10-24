@@ -27,6 +27,7 @@ import {
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { graphNodes, journeys, versions } from '../data/fixtures';
 import { getRoute } from '../domain/model';
+import { normalizeSkills } from '../domain/journeyRecommendations';
 import { useWorkspace } from '../state/WorkspaceContext';
 import { useRepositoryAnalysis } from '../state/RepositoryAnalysisContext';
 import { Badge, Button, IconButton, Modal, ProgressBar } from './UI';
@@ -37,7 +38,6 @@ const navigation = [
   { path: '/workspace', label: 'Mentor workspace', icon: LayoutGrid },
   { path: '/repository', label: 'Repository', icon: Code2 },
   { path: '/changes', label: 'Changes', icon: GitPullRequest, count: '2' },
-  { path: '/journeys', label: 'Code journeys', icon: Compass, count: '2' },
   { path: '/learn', label: 'My learning path', icon: BookOpen },
   { path: '/practice', label: 'Practice', icon: FlaskConical },
   { path: '/agent-context', label: 'Agent Context Bridge', icon: Bot },
@@ -87,6 +87,14 @@ export function Shell() {
   const [query, setQuery] = useState('');
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  useEffect(() => {
+    const query = new URLSearchParams(location.search);
+    if (query.get('preferences') === 'skills') {
+      setSettingsOpen(true);
+      query.delete('preferences');
+      go(location.pathname + (query.size ? '?' + query.toString() : ''), { replace: true });
+    }
+  }, [location.search]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [updatesOpen, setUpdatesOpen] = useState(false);
   const [progressNotification, setProgressNotification] = useState<
@@ -126,8 +134,8 @@ export function Shell() {
     setProgressNotification('dismissed');
     setProgressPopupOpen(false);
   };
-  const current = location.pathname.startsWith('/journeys')
-    ? 'CodeJourney'
+  const current = location.pathname.startsWith('/learn')
+    ? 'My Learning Path'
     : location.pathname === '/demo-workspace'
       ? 'Demo workspace'
       : location.pathname.startsWith('/handoffs')
@@ -143,7 +151,7 @@ export function Shell() {
     location.pathname === '/changes' ||
     location.pathname.startsWith('/handoffs') ||
     location.pathname === '/knowledge' ||
-    location.pathname.startsWith('/journeys');
+    location.pathname.startsWith('/learn');
   const learningRoute = getRoute(
     state.personalized ? state.profile : 'beginner',
     state.personalized ? state.goal : 'contribute',
@@ -181,7 +189,7 @@ export function Shell() {
       label: j.title,
       group: 'Journey',
       description: `CodeJourney / ${j.topic} / ${j.tags.join(' ')}`,
-      action: () => go(`/journeys/${j.id}`),
+      action: () => go(`/learn/${j.id}`),
     })),
     ...navigation.map((x) => ({
       label: x.label,
@@ -269,7 +277,7 @@ export function Shell() {
               {analyzingRepository ? (
                 <span className="breadcrumb-repo">
                   <GitBranch size={13} />{' '}
-                  {location.pathname.startsWith('/journeys')
+                  {location.pathname.startsWith('/learn')
                     ? 'Repository source paths'
                     : location.pathname === '/changes'
                       ? 'Pull request analysis'
@@ -535,6 +543,31 @@ export function Shell() {
             </select>
           </label>
           <label className="field-label">
+            Your skills
+            <input
+              aria-label="Your skills"
+              placeholder="TypeScript, Express, Node.js"
+              defaultValue={state.skills.join(', ')}
+              onChange={(e) =>
+                patch({
+                  skills: normalizeSkills(e.target.value.split(',').map((v) => v.slice(0, 80))),
+                })
+              }
+            />
+            <small>Separate skills with commas. Saved in your existing learner preferences.</small>
+          </label>
+          <label className="field-label">
+            Learning goal
+            <select
+              value={state.goal}
+              onChange={(e) => patch({ goal: e.target.value as typeof state.goal })}
+            >
+              <option value="understand">Understand the codebase</option>
+              <option value="contribute">Make a contribution</option>
+              <option value="testing">Improve test coverage</option>
+            </select>
+          </label>
+          <label className="field-label">
             Explanation detail
             <select
               value={state.detail}
@@ -552,7 +585,7 @@ export function Shell() {
             />
             <span>
               Personalize my learning route
-              <small>Use my selected profile and goal to choose prerequisites.</small>
+              <small>Use my selected skills and learning goal for journey recommendations.</small>
             </span>
           </label>
           <Button

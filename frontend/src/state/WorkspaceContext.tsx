@@ -33,6 +33,7 @@ export interface WorkspaceState {
   scenario: Scenario;
   playing: boolean;
   profile: Profile;
+  skills: string[];
   goal: Goal;
   detail: 'beginner' | 'technical';
   predictions: Record<string, Prediction>;
@@ -61,6 +62,7 @@ export const initialState: WorkspaceState = {
   scenario: 'success',
   playing: false,
   profile: 'beginner',
+  skills: [],
   goal: 'contribute',
   detail: 'beginner',
   predictions: {},
@@ -112,6 +114,7 @@ function loadState(): WorkspaceState {
           ? value.selectedNode!
           : initialState.selectedNode),
       profile: value.profile === 'experienced' ? 'experienced' : 'beginner',
+      skills: Array.isArray(value.skills) ? value.skills.filter((v): v is string => typeof v === 'string' && v.length <= 80).slice(0,30) : [],
       detail: value.detail === 'technical' ? 'technical' : 'beginner',
       goal: ['understand', 'contribute', 'testing'].includes(value.goal ?? '')
         ? value.goal!

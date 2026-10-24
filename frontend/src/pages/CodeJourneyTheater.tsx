@@ -78,7 +78,7 @@ export default function CodeJourneyTheater() {
         <h1>This journey could not open</h1>
         <p role="alert">{error}</p>
         <Button onClick={() => setParams({})}>Open reviewed explained path</Button>
-        <Link to="/journeys">Back to library</Link>
+        <Link to="/learn">Back to library</Link>
       </div>
     );
   if (!data || !ready)
@@ -233,7 +233,7 @@ function Player({
       data-trace-id={trace.id}
       data-event-id={event.id}
     >
-      <Link to="/journeys" className="journey-back">
+      <Link to="/learn" className="journey-back">
         <ArrowLeft size={14} />
         Journey library
       </Link>
@@ -627,7 +627,7 @@ function Player({
           </p>
           <div className="journey-related">
             {journey.related.map((id) => (
-              <Link key={id} to={`/journeys/${id}`}>
+              <Link key={id} to={`/learn/${id}`}>
                 Explore {id}
                 <ArrowRight size={14} />
               </Link>

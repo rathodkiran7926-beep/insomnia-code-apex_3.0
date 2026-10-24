@@ -1,0 +1,64 @@
+.learning-skills-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 22px;
+  background: white;
+  border: 1px solid #e5dff4;
+  border-radius: 18px;
+  margin: 0 0 20px;
+  flex-wrap: wrap;
+}
+.learning-skills-row > div {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.learning-sections {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+.learning-sections button {
+  padding: 11px 22px;
+  border: 1px solid #e5dff4;
+  border-radius: 12px;
+  background: white;
+  color: #74678b;
+  cursor: pointer;
+}
+.learning-sections button[aria-pressed='true'] {
+  background: #eee9ff;
+  color: #5846dc;
+  border-color: #baaaff;
+}
+.learning-card-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.codejourney-card-content .learning-reason {
+  font-size: 12px;
+  color: #6854b5;
+  background: #f7f3ff;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.learning-skills-row .button {
+  margin-left: auto;
+}
+@media (max-width: 600px) {
+  .learning-skills-row {
+    padding: 16px;
+    gap: 12px;
+  }
+  .learning-skills-row > div {
+    flex-basis: 65%;
+  }
+  .learning-sections button {
+    flex: 1;
+  }
+}

@@ -5,7 +5,6 @@ import {
   Bot,
   ChevronDown,
   Code2,
-  Compass,
   FlaskConical,
   GitBranch,
   GitPullRequest,
@@ -25,7 +24,6 @@ export const workspaceNavigation = [
     label: 'Explore',
     links: [
       { path: '/repository', label: 'Architecture', icon: Layers },
-      { path: '/journeys', label: 'Code Journeys', icon: Compass },
       { path: '/repository?tab=documentation', label: 'Documentation', icon: BookOpen },
     ],
   },
@@ -71,7 +69,7 @@ export function MentorNavigation({
   const [closed, setClosed] = useState<string[]>([]);
   const repo = (snapshot?.repository || repositoryUrl).replace('https://github.com/', '');
   function active(path: string) {
-    if (path === '/journeys' && location.pathname.startsWith('/journeys/')) return true;
+    if (path === '/learn' && location.pathname.startsWith('/learn/')) return true;
     const [pathname, query = ''] = path.split('?');
     if (pathname === '/handoffs') return location.pathname.startsWith('/handoffs');
     return location.pathname === pathname && location.search === (query ? '?' + query : '');

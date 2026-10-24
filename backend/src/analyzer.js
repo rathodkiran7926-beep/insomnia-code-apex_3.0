@@ -1,4 +1,5 @@
 import ts from "typescript";
+import { functionLabel } from "./functionNames.js";
 import path from "node:path";
 import { createHash } from "node:crypto";
 
@@ -197,16 +198,13 @@ export function analyze(input) {
         ts.isFunctionExpression(node) ||
         ts.isClassDeclaration(node)
       ) {
-        const name =
-          node.name?.getText(sf) ||
-          (ts.isVariableDeclaration(node.parent)
-            ? node.parent.name.getText(sf)
-            : `anonymous:${sf.getLineAndCharacterOfPosition(node.getStart()).line + 1}`);
+        const { name, nameKind } = functionLabel(node, sf);
         const c = add(
           node,
           name,
           ts.isClassDeclaration(node) ? "class" : "function",
           {
+            nameKind,
             inputs: node.parameters?.map((p) => p.getText(sf)) || [],
             output: node.type?.getText(sf) || "Not statically determined",
             exported: Boolean(
@@ -477,6 +475,15 @@ export function analyze(input) {
                 });
               else if (target) {
                 target.role = "middleware";
+                if (
+                  target.nameKind === "callback_context" &&
+                  (ts.isArrowFunction(h) || ts.isFunctionExpression(h))
+                )
+                  target.name =
+                    receiver.name +
+                    ".use(" +
+                    JSON.stringify(routePath) +
+                    ") middleware";
                 target.evidence.push("Registered in Express use()");
                 edge(receiver, target, "uses_middleware", node, {
                   mountPath: routePath,
@@ -507,6 +514,15 @@ export function analyze(input) {
               if (target) {
                 target.role =
                   index === handlers.length - 1 ? "handler" : "middleware";
+                if (
+                  target.nameKind === "callback_context" &&
+                  (ts.isArrowFunction(h) || ts.isFunctionExpression(h))
+                )
+                  target.name =
+                    route.name +
+                    (target.role === "handler"
+                      ? " handler"
+                      : " middleware " + (index + 1));
                 target.evidence.push(
                   `Registered as ${target.role} for ${route.name}`,
                 );

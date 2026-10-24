@@ -23,10 +23,13 @@ const seed = spawnSync(
     `
   import {analyze} from './src/analyzer.js'; import {db,saveSnapshot} from './src/storage.js';
   const files={
-    'project/routes.ts': "import express from 'express'; import {validate,saveOrder} from './services'; const app=express(); app.post('/orders', handleOrder); function handleOrder(req,res) { validate(req.body); return res.json(saveOrder(req.body)); }",
+    'project/Account.tsx': "import {useState} from 'react'; export function Account(){const [name]=useState('');return <h1>{name}</h1>;}",
+    'project/routes.ts': "import express from 'express'; import {validate,saveOrder} from './services'; const app=express(); app.post('/orders', handleOrder); app.get('/health',(req,res)=>res.json({ok:true})); function handleOrder(req,res) { validate(req.body); return res.json(saveOrder(req.body)); }",
     'project/services.ts': "export function validate(input) { if (!input.id) throw new Error('Missing id'); return true; }\\nexport function saveOrder(input) { return stamp(input); }\\nfunction stamp(input) { return {...input, accepted:true}; }"
   };
   const graph=analyze({repository:'https://github.com/test/checkout-flow',commit:'d'.repeat(40),files});
+  // Keep one old-style callback label to verify saved snapshots need no reanalysis.
+  for(const c of graph.components) if(c.nameKind==='callback_context') {const ref=graph.references.find(r=>r.id===c.referenceId);c.name='anonymous:'+ref.startLine;delete c.nameKind;}
   saveSnapshot(graph,{snapshotId:graph.snapshotId},'',files);
   db.prepare('INSERT INTO analysis_jobs VALUES (?,?,?,?,?,?)').run('journey-ui','complete',100,'Ready',graph.snapshotId,new Date().toISOString());
   console.log(JSON.stringify({snapshotId:graph.snapshotId}));
@@ -175,6 +178,39 @@ try {
       `document.body.innerText.includes('test/checkout-flow') && !document.body.innerText.includes('separate from your selected')`,
     ),
   );
+  assert(await evaluate("location.hash.startsWith('#/learn')"), 'Old library URL did not redirect');
+  assert(await evaluate("!document.querySelector('.mentor-navigation a[href=\"#/journeys\"]')"), 'Separate journey navigation remains');
+  await evaluate("location.hash='/learn'");
+  await wait("document.body.innerText.includes('Add your skills to get personalized code journeys.')", 'Missing skills state absent');
+  assert(await evaluate("document.querySelector('.learning-sections button[aria-pressed=true]').textContent==='For You'"), 'For You must be default');
+  await click('Add skills');
+  await wait("document.querySelector('input[aria-label=\"Your skills\"]')", 'Existing learner preferences did not open');
+  await fill('input[aria-label="Your skills"]', 'express.js, TS');
+  await click('Save preferences');
+  await wait("document.querySelectorAll('.codejourney-card').length>0 && document.querySelector('.learning-reason')", 'Skills did not update recommendations');
+  assert(await evaluate("document.querySelector('.learning-skills-row').innerText.includes('Express') && document.querySelector('.learning-skills-row').innerText.includes('TypeScript')"), 'Skills aliases not normalized');
+  const libraryScreenshot = await send('Page.captureScreenshot', {format:'png',captureBeyondViewport:false});
+  writeFileSync(root+'/data/learning-path-desktop.png',Buffer.from(libraryScreenshot.data,'base64'));
+  await click('Edit');
+  await wait("document.querySelector('input[aria-label=\"Your skills\"]')", 'Preferences could not reopen');
+  await fill('input[aria-label="Your skills"]', 'Rust');
+  await click('Save preferences');
+  await wait("document.body.innerText.includes('No strong matches yet')", 'Weak skill matches were invented');
+  await click('Edit');
+  await wait("document.querySelector('input[aria-label=\"Your skills\"]')", 'Skills editor missing');
+  await fill('input[aria-label="Your skills"]', 'React');
+  await click('Save preferences');
+  await wait("Boolean([...document.querySelectorAll('.codejourney-card')].find(e=>e.innerText.includes('Explore Account') && e.innerText.includes('Skill match')))", 'React did not match real React component source');
+  assert(await evaluate("document.querySelector('.codejourney-card .learning-reason').innerText.includes('know React')"), 'React match reason missing');
+  await click('Edit');
+  await wait("document.querySelector('input[aria-label=\"Your skills\"]')", 'Skills editor missing');
+  await fill('input[aria-label="Your skills"]', 'Rust');
+  await click('Save preferences');
+  await wait("document.body.innerText.includes('No strong matches yet')", 'Unrelated skills were given React recommendations');
+  await click('All Journeys');
+  await wait("document.querySelectorAll('.codejourney-card').length>0", 'Missing skills blocked browsing');
+  await send('Page.reload');
+  await wait("document.querySelector('.learning-skills-row')?.innerText.includes('Rust')", 'Skills preference did not persist');
   await fill('input[aria-label="Find a CodeJourney"]', "POST /orders");
   await wait(
     `document.querySelectorAll('.codejourney-card').length===1`,
@@ -185,6 +221,10 @@ try {
     `document.querySelector('.journey-theater')`,
     "Theater did not open",
   );
+  const newPlayerHash = await evaluate('location.hash');
+  assert(newPlayerHash.startsWith('#/learn/'), 'New cards must use Learning Path player URLs');
+  await evaluate("location.hash="+JSON.stringify(newPlayerHash.replace('#/learn/','#/journeys/')));
+  await wait("location.hash.startsWith('#/learn/') && document.querySelector('.journey-theater')", 'Old player URL did not redirect');
   await wait(
     `document.querySelector('.journey-source-panel .source-focused-line')`,
     "Selected source was not highlighted",
@@ -651,6 +691,25 @@ try {
     `Boolean([...document.querySelectorAll('.journey-library-tabs button')].find(e=>e.textContent.replace(/\s/g,'')==='Completed1'))`,
     "Main path completion was lost after exploring an alternate path",
   );
+  assert(await evaluate('document.documentElement.scrollWidth <= innerWidth + 2'), 'Mobile Learning Path overflows');
+  const libraryMobile = await send('Page.captureScreenshot', {format:'png',captureBeyondViewport:false});
+  writeFileSync(root+'/data/learning-path-mobile.png',Buffer.from(libraryMobile.data,'base64'));
+  // A saved unfinished path must not bypass the current skill filter.
+  await evaluate("(()=>{const key='mentor-codejourney-progress-v1';const saved=JSON.parse(localStorage.getItem(key)||'{}');const entry=Object.values(saved)[0];if(!entry)throw Error('Expected saved progress');entry.completed=false;entry.completedScenarios=[];localStorage.setItem(key,JSON.stringify(saved));location.hash='/learn';})()");
+  await send('Page.reload');
+  await wait("document.body.innerText.includes('No strong matches yet')", 'Saved progress bypassed the unmatched Rust skill');
+  assert.equal(await evaluate("document.querySelectorAll('.codejourney-card').length"),0,'Unrelated journey recommended');
+  await click('All Journeys');
+  await wait("Boolean([...document.querySelectorAll('.codejourney-card-actions a')].find(e=>e.textContent.includes('Continue journey')))", 'Unmatched saved journey was lost from All Journeys');
+  const presentedSnapshot=await (await fetch(origin+'/api/snapshots/'+snapshotId)).json();
+  assert(!presentedSnapshot.components.some(c=>/^anonymous:/.test(c.name)), 'Old snapshot labels were not upgraded for display');
+  assert(presentedSnapshot.components.some(c=>c.name==='GET /health handler'), 'Source-derived handler label missing');
+  await fill('input[aria-label="Find a CodeJourney"]','GET /health');
+  await click('Start journey');
+  await wait("document.querySelector('.journey-theater')", 'Saved callback journey did not open');
+  await click('Next event');
+  await wait("document.querySelector('.journey-canvas').innerText.includes('GET /health handler')", 'Playback node kept anonymous callback label');
+  assert(!await evaluate("document.querySelector('.journey-canvas').innerText.includes('anonymous:')"),'Playback shows anonymous placeholder');
   assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
     "Repository CodeJourney browser checks passed: empty state without examples, actual parser/snapshot library, cross-file source highlighting, event questions, cursor resume, completion, alternate paths, mobile and reduced motion. No repository execution or paid provider calls.",

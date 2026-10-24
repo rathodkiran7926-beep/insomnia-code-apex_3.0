@@ -1,4 +1,5 @@
 import express from "express";
+import { componentNamesMiddleware } from "./componentPresentation.js";
 import { Worker } from "node:worker_threads";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -18,6 +19,7 @@ import { practiceRoutes } from "./practiceRoutes.js";
 import { agentContextRouter } from "./agentContextRoutes.js";
 const app = express();
 app.disable("x-powered-by");
+app.use("/api", componentNamesMiddleware(db));
 app.use("/api/practice", express.json({ limit: "128kb" }));
 app.use(express.json({ limit: "24kb" }));
 app.use("/api", (req, res, next) => {
@@ -127,19 +129,42 @@ app.get("/api/snapshots/latest", (req, res, next) => {
   try {
     let repository;
     if (req.query.repository !== undefined)
-      repository = parseRepository(z.string().max(300).parse(req.query.repository)).url;
+      repository = parseRepository(
+        z.string().max(300).parse(req.query.repository),
+      ).url;
     if (!repository) {
-      const repositories = db.prepare("SELECT DISTINCT repository_id FROM snapshots").all();
+      const repositories = db
+        .prepare("SELECT DISTINCT repository_id FROM snapshots")
+        .all();
       if (!repositories.length)
-        return res.status(404).json({ error: "No analyzed repository snapshot exists yet." });
+        return res
+          .status(404)
+          .json({ error: "No analyzed repository snapshot exists yet." });
       if (repositories.length > 1)
-        return res.status(400).json({ error: "Multiple repositories are analyzed. Supply the current repository URL." });
+        return res
+          .status(400)
+          .json({
+            error:
+              "Multiple repositories are analyzed. Supply the current repository URL.",
+          });
       repository = repositories[0].repository_id;
     }
-    const row = db.prepare("SELECT id, repository_id, commit_sha FROM snapshots WHERE repository_id=? ORDER BY rowid DESC LIMIT 1").get(repository);
+    const row = db
+      .prepare(
+        "SELECT id, repository_id, commit_sha FROM snapshots WHERE repository_id=? ORDER BY rowid DESC LIMIT 1",
+      )
+      .get(repository);
     if (!row)
-      return res.status(404).json({ error: "No analyzed snapshot exists for this repository yet." });
-    res.json({ snapshotId: row.id, repository: row.repository_id, commit: row.commit_sha });
+      return res
+        .status(404)
+        .json({
+          error: "No analyzed snapshot exists for this repository yet.",
+        });
+    res.json({
+      snapshotId: row.id,
+      repository: row.repository_id,
+      commit: row.commit_sha,
+    });
   } catch (error) {
     next(error);
   }
