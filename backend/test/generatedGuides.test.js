@@ -60,6 +60,7 @@ test("project scope separates frontend source and captures real backend manifest
     ),
   );
   assert(back.references.every((r) => r.file.startsWith("backend/")));
+  assert(back.facts.sourceReferences.every((r) => !('url' in r) && !('snapshotId' in r)));
 });
 test("documentation rejects fabricated citations and model-generated source URLs", () => {
   assert.throws(
@@ -69,6 +70,20 @@ test("documentation rejects fabricated citations and model-generated source URLs
   const guide = value(router.referenceId);
   guide.sections[0].content = "Go to https://invented.example";
   assert.throws(() => validateGuide(guide, graph.references), /coordinates/);
+});
+
+test("large project evidence is sampled honestly and keeps full citations outside the prompt", async () => {
+  const manyFiles = Object.fromEntries(Array.from({ length: 80 }, (_, i) => [
+    `src/group${i}/part.ts`,
+    `export function part${i}(){return '${'sample '.repeat(150)}';}`,
+  ]));
+  const large = analyze({ repository: "https://github.com/example/large", commit: "c".repeat(40), files: manyFiles });
+  const context = await guideContext(large, { scope: "all" });
+  assert.equal(context.facts.contextLimited, true);
+  assert(context.facts.counts.components > context.facts.components.length);
+  assert(JSON.stringify(context.facts).length < 16000);
+  assert(context.references.every((r) => r.url && r.snapshotId === large.snapshotId));
+  assert(context.facts.sourceReferences.every((r) => !('url' in r) && !('snapshotId' in r)));
 });
 test("AI provider guides are generated once, citation-checked, and cached per component", async () => {
   const fetchOriginal = globalThis.fetch,
@@ -83,6 +98,17 @@ test("AI provider guides are generated once, citation-checked, and cached per co
       request.messages[1].content,
     ).untrustedSourceEvidence;
     assert.equal(context.component.id, router.id);
+    // JSON mode alone permits the echoed source-reference object observed in production.
+    assert.equal(request.response_format.type, "json_schema");
+    const schema = request.response_format.json_schema.schema;
+    assert.deepEqual(schema.required, ["sections"]);
+    assert.equal(schema.additionalProperties, false);
+    const section = schema.properties.sections.items;
+    assert.deepEqual(section.required, ["title", "content", "referenceIds"]);
+    assert.deepEqual(
+      section.properties.referenceIds.items.enum,
+      context.sourceReferences.map((r) => r.id),
+    );
     return new Response(
       JSON.stringify({
         choices: [
@@ -179,6 +205,34 @@ test("temporary AI provider overload is retried once before a project guide is s
     assert.equal(result.componentId, null);
   } finally {
     globalThis.fetch = original;
+    if (key === undefined) delete process.env.LLM_API_KEY;
+    else process.env.LLM_API_KEY = key;
+  }
+});
+
+test("documentation allows longer generation without changing ordinary fetch timeouts", async () => {
+  const originalTimeout = AbortSignal.timeout;
+  const originalFetch = globalThis.fetch;
+  const key = process.env.LLM_API_KEY;
+  const timeouts = [];
+  const component = graph.components.find((c) => c.name === "App");
+  AbortSignal.timeout = (ms) => {
+    timeouts.push(ms);
+    return originalTimeout(ms);
+  };
+  process.env.LLM_API_KEY = "mock-key";
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    choices: [{ message: { content: JSON.stringify(value(component.referenceId)) } }],
+  }));
+  try {
+    const result = await generateGuide(graph, { componentId: component.id });
+    assert(result.sections.length >= 4);
+    const { boundedFetch } = await import("../src/github.js");
+    await boundedFetch("https://example.test/facts");
+    assert.deepEqual(timeouts, [120000, 30000]);
+  } finally {
+    AbortSignal.timeout = originalTimeout;
+    globalThis.fetch = originalFetch;
     if (key === undefined) delete process.env.LLM_API_KEY;
     else process.env.LLM_API_KEY = key;
   }

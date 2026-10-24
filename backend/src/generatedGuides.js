@@ -118,7 +118,9 @@ export async function guideContext(graph, request) {
         relationships: context.relationships.slice(0, 60),
         connected: related,
         containingFile: source,
-        sourceReferences: references,
+        sourceReferences: references.map(({ id, file, excerpt }) => ({
+          id, file, excerpt,
+        })),
         contextLimited:
           context.connected.length > 12 ||
           context.relationships.length > 60 ||
@@ -149,7 +151,7 @@ export async function guideContext(graph, request) {
       .file.split("/")
       .slice(0, -1)
       .join("/");
-    if (!folders.has(folder) && selected.length < 35) {
+    if (!folders.has(folder) && selected.length < 12) {
       selected.push(c);
       folders.add(folder);
     }
@@ -158,12 +160,12 @@ export async function guideContext(graph, request) {
     (a, b) =>
       Number(priority.includes(b.role)) - Number(priority.includes(a.role)),
   ))
-    if (selected.length < 70 && !selected.some((s) => s.id === c.id))
+    if (selected.length < 16 && !selected.some((s) => s.id === c.id))
       selected.push(c);
   const ids = new Set(selected.map((c) => c.id));
   const relationships = graph.relationships
     .filter((e) => ids.has(e.source) && ids.has(e.target))
-    .slice(0, 100);
+    .slice(0, 30);
   const refIds = new Set([
     ...selected.map((c) => c.referenceId),
     ...relationships.map((e) => e.referenceId),
@@ -194,6 +196,7 @@ export async function guideContext(graph, request) {
       excerpt: file.content.slice(0, 3000),
     });
   }
+  const excerptBudget = Math.max(100, Math.floor(6000 / references.length));
   return {
     references,
     facts: {
@@ -202,16 +205,25 @@ export async function guideContext(graph, request) {
         components: scoped.length,
         files: new Set(scoped.map((c) => refs.get(c.referenceId).file)).size,
       },
-      components: selected,
+      components: selected.map(({ id, name, role, referenceId }) => ({
+        id, name, role, referenceId,
+      })),
       relationships,
-      sourceReferences: references,
+      // Source coordinates are rendered from stored citations, never model prose.
+      // Keep the evidence small enough for local models rather than repeating metadata.
+      sourceReferences: references.map(({ id, file, excerpt }) => ({
+        id, file, excerpt: excerpt.slice(0, excerptBudget),
+      })),
       readmeAuthorClaim:
         request.scope === "all" ? graph.readmeClaim : undefined,
       report: {
         languages: graph.report.languages,
         limitations: graph.report.limitations,
       },
-      contextLimited: scoped.length > selected.length,
+      contextLimited:
+        scoped.length > selected.length ||
+        references.some((r) => r.excerpt.length > excerptBudget) ||
+        graph.relationships.filter((e) => ids.has(e.source) && ids.has(e.target)).length > relationships.length,
     },
   };
 }
@@ -254,9 +266,15 @@ export async function generateGuide(graph, body) {
           new Error("No source evidence is available for this selection."),
           { status: 422 },
         );
+      const schema = z.toJSONSchema(generated);
+      schema.properties.sections.items.properties.referenceIds.items = {
+        type: "string",
+        enum: context.references.map((r) => r.id),
+      };
       const raw = await requestAI(llmConfig().endpoint, {
         method: "POST",
         limit: 100000,
+        timeoutMs: 120000,
         headers: {
           Authorization: `Bearer ${llmConfig().apiKey}`,
           "Content-Type": "application/json",
@@ -264,7 +282,18 @@ export async function generateGuide(graph, body) {
         body: JSON.stringify({
           model: llmConfig().model,
           temperature: 0,
-          response_format: { type: "json_object" },
+          ...(process.env.LLM_JSON_MODE === "0"
+            ? {}
+            : {
+                response_format: {
+                  type: "json_schema",
+                  json_schema: {
+                    name: "source_documentation",
+                    strict: true,
+                    schema,
+                  },
+                },
+              }),
           messages: [
             {
               role: "system",

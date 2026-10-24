@@ -57,7 +57,13 @@ function githubErrorMessage(response, body, hostname) {
 
 export async function boundedFetch(
   url,
-  { limit = MAX_RESPONSE, binary = false, headers = {}, ...options } = {},
+  {
+    limit = MAX_RESPONSE,
+    binary = false,
+    headers = {},
+    timeoutMs = 30000,
+    ...options
+  } = {},
 ) {
   let response;
   let current = new URL(url);
@@ -67,8 +73,8 @@ export async function boundedFetch(
         ...options,
         redirect: "manual",
         signal: options.signal
-          ? AbortSignal.any([options.signal, AbortSignal.timeout(30000)])
-          : AbortSignal.timeout(30000),
+          ? AbortSignal.any([options.signal, AbortSignal.timeout(timeoutMs)])
+          : AbortSignal.timeout(timeoutMs),
         headers,
       });
     } catch (error) {
