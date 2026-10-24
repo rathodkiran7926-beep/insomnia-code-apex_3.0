@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { db } from "./storage.js";
 import { boundedFetch } from "./github.js";
+import { llmBaseUrl, llmHeaders, llmJsonMode, llmModel } from "./llmConfig.js";
 import { setTimeout as retryDelay } from "node:timers/promises";
 import { questionContext, readSource } from "./workspace.js";
 
@@ -256,9 +257,9 @@ export async function scopedEvidence(session, referenceId) {
   };
 }
 async function reason(messages, signal) {
-  if (!process.env.LLM_API_KEY || !process.env.LLM_MODEL)
+  if (!process.env.LLM_API_KEY)
     throw fail(
-      "Text discussion requires LLM_API_KEY and LLM_MODEL in backend/.env.",
+      "Text discussion requires LLM_API_KEY in backend/.env. Set LLM_MODEL if auto-discovery is unavailable.",
       503,
     );
   try {
@@ -266,19 +267,16 @@ async function reason(messages, signal) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         raw = await boundedFetch(
-          `${(process.env.LLM_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai").replace(/\/$/, "")}/chat/completions`,
+          `${llmBaseUrl()}/chat/completions`,
           {
             method: "POST",
             signal,
             limit: 64000,
-            headers: {
-              Authorization: `Bearer ${process.env.LLM_API_KEY}`,
-              "Content-Type": "application/json",
-            },
+            headers: llmHeaders(),
             body: JSON.stringify({
-              model: process.env.LLM_MODEL,
+              model: await llmModel(),
               temperature: 0,
-              response_format: { type: "json_object" },
+              ...llmJsonMode(),
               messages,
             }),
           },
@@ -298,24 +296,24 @@ async function reason(messages, signal) {
   } catch (error) {
     if (signal?.aborted) throw fail("Discussion request cancelled", 499);
     const message = [500, 502, 503, 504].includes(error.remoteStatus)
-      ? `Gemini is temporarily unavailable (HTTP ${error.remoteStatus}) after an automatic retry. Your question has not been answered; retry shortly.`
+      ? `LLM provider is temporarily unavailable (HTTP ${error.remoteStatus}) after an automatic retry. Your question has not been answered; retry shortly.`
       : error.remoteStatus === 429
-        ? "Gemini rate limit or quota reached. Wait and retry, or check your provider quota."
+        ? "LLM provider rate limit or quota reached. Wait and retry, or check your provider quota."
         : error.remoteStatus === 401
-          ? "Gemini rejected LLM_API_KEY (HTTP 401). Create a replacement Gemini API key in Google AI Studio, update backend/.env, and restart the backend. Run npm.cmd run check:llm in backend to verify it."
+          ? "LLM provider rejected LLM_API_KEY (HTTP 401). Check the key configured in backend/.env and run npm.cmd run check:llm to verify it."
           : error.remoteStatus === 403
-            ? "Gemini denied access (HTTP 403). Check the key's API restrictions, project permissions, and regional availability in Google AI Studio. Run npm.cmd run check:llm in backend for the provider's details."
+            ? "LLM provider denied access (HTTP 403). Check endpoint access, the API key, and provider permissions. Run npm.cmd run check:llm for details."
             : ["EACCES", "EPERM"].includes(error.code)
-              ? "Network access to Gemini was blocked. Restart the backend from a normal terminal and check firewall or proxy settings."
-              : "Gemini could not answer. Check your configured model, credentials, quota, or network and retry.";
+              ? "Network access to LLM provider was blocked. Restart the backend from a normal terminal and check firewall or proxy settings."
+              : "LLM provider could not answer. Check your configured model, credentials, quota, or network and retry.";
     throw Object.assign(fail(message, 502), { cause: error });
   }
 }
 const busy = new Set();
 export async function discussionTurn(id, question, signal) {
-  if (!process.env.LLM_API_KEY || !process.env.LLM_MODEL)
+  if (!process.env.LLM_API_KEY)
     throw fail(
-      "Text discussion requires LLM_API_KEY and LLM_MODEL in backend/.env.",
+      "Text discussion requires LLM_API_KEY in backend/.env. Set LLM_MODEL if auto-discovery is unavailable.",
       503,
     );
   const session = discussion(id);
@@ -377,7 +375,7 @@ export async function discussionTurn(id, question, signal) {
     } catch (error) {
       if (error.status) throw error;
       throw fail(
-        "Gemini returned invalid discussion evidence. Please retry.",
+        "LLM provider returned invalid discussion evidence. Please retry.",
         502,
       );
     }
@@ -442,9 +440,9 @@ export async function discussionTurn(id, question, signal) {
   }
 }
 export async function draftDecision(id, chosenOption, signal) {
-  if (!process.env.LLM_API_KEY || !process.env.LLM_MODEL)
+  if (!process.env.LLM_API_KEY)
     throw fail(
-      "Text discussion requires LLM_API_KEY and LLM_MODEL in backend/.env.",
+      "Text discussion requires LLM_API_KEY in backend/.env. Set LLM_MODEL if auto-discovery is unavailable.",
       503,
     );
   const session = discussion(id);
@@ -532,7 +530,7 @@ export async function draftDecision(id, chosenOption, signal) {
     return session.draft;
   } catch (error) {
     if (error.status) throw error;
-    throw fail("Gemini returned an invalid decision draft. Please retry.", 502);
+    throw fail("LLM provider returned an invalid decision draft. Please retry.", 502);
   } finally {
     busy.delete(id);
   }

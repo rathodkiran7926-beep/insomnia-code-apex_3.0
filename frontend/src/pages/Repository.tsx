@@ -465,6 +465,25 @@ export default function Repository() {
               <CheckCircle2 size={15} /> Analysis ready
             </span>
             <strong>{snapshot.repository.replace('https://github.com/', '')}</strong>
+            <span title="Use this snapshot ID to connect the Codebase Mentor VS Code extension">
+              Snapshot ID: <code>{snapshot.snapshotId}</code>{' '}
+              <button
+                type="button"
+                title="Copy snapshot ID for VS Code"
+                aria-label="Copy snapshot ID for VS Code"
+                onClick={() => {
+                  if (!navigator.clipboard?.writeText) {
+                    setError('Clipboard access is unavailable; select and copy the displayed snapshot ID.');
+                    return;
+                  }
+                  void navigator.clipboard.writeText(snapshot.snapshotId).catch(() => {
+                    setError('Clipboard access is unavailable; select and copy the displayed snapshot ID.');
+                  });
+                }}
+              >
+                Copy ID
+              </button>
+            </span>
             <a
               href={`${snapshot.repository}/tree/${snapshot.commit}`}
               target="_blank"

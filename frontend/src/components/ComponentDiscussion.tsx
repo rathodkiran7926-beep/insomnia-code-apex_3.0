@@ -627,7 +627,7 @@ export function ComponentDiscussion({
       )}
       {config && !config.textConfigured && (
         <p className="discussion-warning">
-          Set LLM_API_KEY and LLM_MODEL in backend/.env to enable Gemini discussion.
+          Set LLM_API_KEY and LLM_MODEL in backend/.env to enable AI discussion (model auto-detection is also supported).
         </p>
       )}
       <div className={`discussion-microphone ${status === 'listening' ? 'is-listening' : ''}`}>
@@ -941,7 +941,7 @@ export function ComponentDiscussion({
         </details>
       )}
       <footer>
-        Gemini reasons about the code; ElevenLabs transcribes and speaks. Citations identify
+        The configured LLM reasons about the code; ElevenLabs transcribes and speaks. Citations identify
         evidence to review, not proof of semantic correctness.
       </footer>
     </section>

@@ -51,7 +51,7 @@ function requestSignal(res) {
 }
 discussionRoutes.get("/config", (_req, res) =>
   res.json({
-    textConfigured: !!(process.env.LLM_API_KEY && process.env.LLM_MODEL),
+    textConfigured: !!process.env.LLM_API_KEY,
     voiceConfigured: !!process.env.ELEVENLABS_API_KEY,
     maxRecordingSeconds: 60,
   }),

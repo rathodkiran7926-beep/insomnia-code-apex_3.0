@@ -145,6 +145,50 @@ export class MentorApi {
     return this.parse(data, value => validateNeighborhood(value, snapshotId, componentId, limit));
   }
 
+  /** Connect accepts either the immutable snapshot ID or its completed analysis job ID.
+   *  Only the connection flow resolves jobs; all saved bindings stay pinned to snapshots. */
+  async snapshotForConnection(id: string, signal?: AbortSignal): Promise<SnapshotMetadata> {
+    if (!validSnapshotId(id)) throw new ApiError('configuration', 'Enter a valid snapshot or analysis job ID.');
+    try {
+      return await this.snapshot(id, signal);
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.kind !== 'http' || error.status !== 404) throw error;
+    }
+    let job: unknown;
+    try {
+      job = await this.get<unknown>(`/api/analyses/${encodeURIComponent(id)}`, signal);
+    } catch (error) {
+      if (error instanceof ApiError && error.kind === 'http' && error.status === 404) {
+        throw new ApiError('http',
+          `Neither a snapshot nor an analysis job with this ID exists on ${this.backendIdentity}. ` +
+          'Check that the web app and extension use the same backend and database, or analyze the repository again.', 404);
+      }
+      throw error;
+    }
+    if (!job || typeof job !== 'object' || Array.isArray(job) || !('status' in job)) {
+      throw new ApiError('response', 'Backend returned an invalid analysis job.');
+    }
+    if (job.status === 'running') {
+      throw new ApiError('response', 'Repository analysis is still running. Connect after it completes.');
+    }
+    if (job.status === 'failed') {
+      throw new ApiError('response', 'Repository analysis failed. Check the analysis progress in the web app and retry.');
+    }
+    if (job.status !== 'complete' || !('snapshot_id' in job) || !validSnapshotId(job.snapshot_id)) {
+      throw new ApiError('response', 'Analysis has no completed snapshot yet. Check the web app for its status.');
+    }
+    try {
+      return await this.snapshot(job.snapshot_id, signal);
+    } catch (error) {
+      if (error instanceof ApiError && error.kind === 'http' && error.status === 404) {
+        throw new ApiError('http',
+          `Analysis completed, but its snapshot is missing from ${this.backendIdentity}. ` +
+          'Check that the web app and extension use the same backend database, or analyze the repository again.', 404);
+      }
+      throw error;
+    }
+  }
+
   async snapshot(id: string, signal?: AbortSignal): Promise<SnapshotMetadata> {
     if (!validSnapshotId(id)) throw new ApiError('configuration', 'Enter a snapshot ID containing 1–150 letters, digits, underscores or hyphens.');
     const data = await this.get<unknown>(`/api/snapshots/${encodeURIComponent(id)}`, signal);

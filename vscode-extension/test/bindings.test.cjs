@@ -100,3 +100,16 @@ for (const operation of ['refresh', 'restore']) test(`${operation} during snapsh
   assert.equal(s.controller.context(s.folders[0]).binding.snapshotId, 'snap-2');
   assert.equal(s.store.read(s.folders[0].uri, s.api.backendIdentity).binding.snapshotId, 'snap-2'); s.controller.dispose();
 });
+
+test('connection stores resolved snapshot ID instead of analysis job ID', async () => {
+  const s = setup(); const jobId = 'job-unique';
+  s.api.snapshotForConnection = async id => {
+    assert.equal(id, jobId);
+    return snapshot;
+  };
+  await s.controller.connect(s.folders[0], jobId, async value => value.snapshotId === snapshot.snapshotId);
+  const bound = s.controller.context(s.folders[0]).binding;
+  assert.equal(bound.snapshotId, snapshot.snapshotId);
+  assert.equal(s.store.read(s.folders[0].uri, s.api.backendIdentity).binding.snapshotId, snapshot.snapshotId);
+  s.controller.dispose();
+});

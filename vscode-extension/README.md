@@ -42,11 +42,18 @@ The verified release environment is Windows VS Code1.143.1 and Node24.15.0.
    Invoke-RestMethod "http://127.0.0.1:3001/api/analyses/$($job.id)"
    ```
 
-   Check job status until completion; use its actual `snapshotId`. The extension
-   connects existing snapshots and does not start a separate repository analyzer.
+   Check job status until `status` is `complete`. The completed job returns
+   `snapshot_id` (not `snapshotId`). In the web app, copy the snapshot ID shown
+   beside **Analysis ready**. The extension also accepts the completed analysis
+   **job ID** and resolves it to its stored snapshot automatically.
+   Both must refer to the **same backend instance and SQLite database** as the
+   extension's `codebaseMentor.apiBaseUrl` setting. A healthy server on a
+   different port or database does not contain the snapshot. The extension
+   does not start a separate repository analyzer.
 
 5. Open and trust the local repository folder. Run **Codebase Mentor: Connect
-   Repository**, enter that snapshot ID, and review its repository/commit.
+   Repository**, enter the snapshot ID (or completed analysis job ID), and
+   review its repository/commit.
    Multi-root workspaces retain a separate binding per folder. Missing or
    ambiguous Git identity stays unverified. Different revisions are explicit.
 

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 process.env.DATABASE_PATH = ":memory:";
+process.env.LLM_MODEL ||= "test-provider-model";
 const { db, saveSnapshot } = await import("../src/storage.js");
 const { readSource, questionContext, validateAnswer, answerQuestion } =
   await import("../src/workspace.js");

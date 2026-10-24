@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { db } from "./storage.js";
 import { boundedFetch, parseRepository } from "./github.js";
+import { llmBaseUrl, llmHeaders, llmJsonMode, llmModel } from "./llmConfig.js";
 
 export async function readSource(graph, referenceId) {
   const reference = graph.references.find(
@@ -166,18 +167,15 @@ export async function answerQuestion(graph, componentId, question) {
   if (process.env.LLM_API_KEY) {
     try {
       const raw = await boundedFetch(
-        `${(process.env.LLM_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai").replace(/\/$/, "")}/chat/completions`,
+        `${llmBaseUrl()}/chat/completions`,
         {
           method: "POST",
           limit: 48000,
-          headers: {
-            Authorization: `Bearer ${process.env.LLM_API_KEY}`,
-            "Content-Type": "application/json",
-          },
+          headers: llmHeaders(),
           body: JSON.stringify({
-            model: process.env.LLM_MODEL || "gemini-3.5-flash",
+            model: await llmModel(),
             temperature: 0,
-            response_format: { type: "json_object" },
+            ...llmJsonMode(),
             messages: [
               {
                 role: "system",

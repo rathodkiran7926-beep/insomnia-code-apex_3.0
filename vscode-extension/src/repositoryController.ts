@@ -14,6 +14,8 @@ export interface FolderContext {
 interface SnapshotClient {
 	readonly backendIdentity: string;
 	snapshot(id: string, signal?: AbortSignal): Promise<SnapshotMetadata>;
+	/** Optional for test adapters; production client resolves completed analysis job IDs. */
+	snapshotForConnection?(id: string, signal?: AbortSignal): Promise<SnapshotMetadata>;
 }
 interface Environment {
 	folders(): readonly FolderContext[];
@@ -227,7 +229,9 @@ export class RepositoryController {
 			message: "Fetching snapshot metadata…",
 		});
 		try {
-			const snapshot = await this.api.snapshot(snapshotId, controller.signal);
+			const snapshot = await (this.api.snapshotForConnection
+				? this.api.snapshotForConnection(snapshotId, controller.signal)
+				: this.api.snapshot(snapshotId, controller.signal));
 			if (!this.current(folder, controller, backend)) return false;
 			const local = this.env.git(folder.uri);
 			const comparison = compareRepository(local, snapshot);

@@ -27,7 +27,7 @@ export function registerRepositoryCommands(context: vscode.ExtensionContext, rep
     await git.initialize();
     const id = await vscode.window.showInputBox({
       title: 'Codebase Mentor: Connect Repository',
-      prompt: 'Enter an existing snapshot ID from the Codebase Mentor web platform.',
+      prompt: 'Paste the snapshot ID or completed analysis job ID from the same backend as this extension.',
       ignoreFocusOut: true,
       validateInput: value => validSnapshotId(value.trim()) ? undefined : 'Use 1–150 letters, digits, underscores or hyphens.',
     });

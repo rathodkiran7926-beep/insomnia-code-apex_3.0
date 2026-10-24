@@ -85,3 +85,42 @@ test('subsequent requests read updated configuration and unreachable servers fai
   await new Promise(resolve => closed.close(resolve));
   await assert.rejects(api.health(), hasKind('network'));
 });
+
+test('repository connection accepts snapshot IDs and completed analysis job IDs, pinning the actual snapshot', async t => {
+  const snapshotId = '0123456789abcdef01234567';
+  const jobId = '6e2c648d-2c2d-414e-b2b6-86edec13be85';
+  const calls = [];
+  const snapshot = { snapshotId, repository: 'https://github.com/owner/repo', commit: 'a'.repeat(40),
+    components: [], references: [], relationships: [], report: { limitations: [] }, documentation: { snapshotId } };
+  const base = await server(t, (req, res) => {
+    calls.push(req.url);
+    res.setHeader('content-type', 'application/json');
+    if (req.url === `/api/snapshots/${snapshotId}`) return res.end(JSON.stringify(snapshot));
+    if (req.url === `/api/analyses/${jobId}`) return res.end(JSON.stringify({ id: jobId, status: 'complete', snapshot_id: snapshotId }));
+    res.statusCode = 404; res.end('{"error":"Snapshot not found"}');
+  });
+  const api = new MentorApi(() => base);
+  assert.equal((await api.snapshotForConnection(snapshotId)).snapshotId, snapshotId);
+  assert.equal((await api.snapshotForConnection(jobId)).snapshotId, snapshotId);
+  assert.deepEqual(calls, [ `/api/snapshots/${snapshotId}`, `/api/snapshots/${jobId}`, `/api/analyses/${jobId}`, `/api/snapshots/${snapshotId}` ]);
+});
+
+test('snapshot connection reports pending, failed, missing, and inconsistent jobs with actionable errors', async t => {
+  let status = 'running';
+  let snapshotId;
+  const jobId = 'e14fc7d5-33fb-42d2-aefc-9379ab634710';
+  const base = await server(t, (req, res) => {
+    res.setHeader('content-type', 'application/json');
+    if (req.url === `/api/analyses/${jobId}` && status !== 'missing')
+      return res.end(JSON.stringify({ id: jobId, status, snapshot_id: snapshotId }));
+    res.statusCode = 404; res.end('{"error":"Snapshot not found"}');
+  });
+  const api = new MentorApi(() => base);
+  await assert.rejects(api.snapshotForConnection(jobId), /still running/);
+  status = 'failed'; await assert.rejects(api.snapshotForConnection(jobId), /analysis failed/i);
+  status = 'complete'; await assert.rejects(api.snapshotForConnection(jobId), /no completed snapshot/i);
+  snapshotId = '0123456789abcdef01234567';
+  await assert.rejects(api.snapshotForConnection(jobId), /snapshot is missing/i);
+  status = 'missing';
+  await assert.rejects(api.snapshotForConnection(jobId), /same backend and database/i);
+});

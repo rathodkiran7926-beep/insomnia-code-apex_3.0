@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 process.env.DATABASE_PATH = ":memory:";
+process.env.LLM_MODEL ||= "test-provider-model";
 const { db, saveSnapshot } = await import("../src/storage.js");
 const { analyze } = await import("../src/analyzer.js");
 const { generateGuide, guideContext, validateGuide } =
@@ -70,7 +71,7 @@ test("documentation rejects fabricated citations and model-generated source URLs
   guide.sections[0].content = "Go to https://invented.example";
   assert.throws(() => validateGuide(guide, graph.references), /coordinates/);
 });
-test("Gemini guides are generated once, citation-checked, and cached per component", async () => {
+test("LLM provider guides are generated once, citation-checked, and cached per component", async () => {
   const fetchOriginal = globalThis.fetch,
     key = process.env.LLM_API_KEY;
   process.env.LLM_API_KEY = "mock-key";
@@ -137,7 +138,7 @@ test("missing keys and invalid responses fail explicitly and do not cache fake d
     assert.equal(
       db
         .prepare(
-          "SELECT count(*) AS n FROM generated_guides WHERE cache_key='v1:project:frontend'",
+          "SELECT count(*) AS n FROM generated_guides WHERE cache_key LIKE 'v2:%:project:frontend'",
         )
         .get().n,
       0,
@@ -153,7 +154,7 @@ test("missing keys and invalid responses fail explicitly and do not cache fake d
   }
 });
 
-test("temporary Gemini overload is retried once before a project guide is saved", async () => {
+test("temporary LLM provider overload is retried once before a project guide is saved", async () => {
   const key = process.env.LLM_API_KEY,
     original = globalThis.fetch;
   process.env.LLM_API_KEY = "mock-key";

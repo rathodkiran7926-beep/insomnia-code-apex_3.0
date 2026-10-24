@@ -77,7 +77,7 @@ export function useGeneratedGuide(selection: Selection, active = true) {
 }
 export function generatedGuideMarkdown(guide: GeneratedGuide) {
   return [
-    '## Gemini source-based documentation',
+    '## AI source-based documentation',
     '',
     ...guide.sections.flatMap((s) => [
       `### ${s.title}`,

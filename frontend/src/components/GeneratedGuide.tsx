@@ -17,7 +17,7 @@ export function GeneratedGuide({
     <div className="gemini-guide" data-generated-snapshot={guide?.snapshotId}>
       <div className="gemini-guide-heading">
         <Sparkles size={15} />
-        <strong>Gemini documentation</strong>
+        <strong>AI documentation</strong>
         {guide && <span>Source-linked explanation</span>}
       </div>
       {loading && (

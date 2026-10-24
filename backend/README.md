@@ -128,14 +128,15 @@ Configuration: `PORT`, optional `DATABASE_PATH`, `GITHUB_TOKEN`, `LLM_API_KEY`, 
 
 If analysis reports `EACCES` or `EPERM` when reaching GitHub, the backend process is being denied network access. Start it from a normal terminal with `cd backend` and `npm.cmd run dev`, and check firewall/proxy rules if the error persists. A GitHub token does not fix operating-system network restrictions. If port 3001 is already occupied, stop the older backend first: the UI connects to whichever process owns that port.
 
-Gemini Flash is the default model configuration. Put your Google AI Studio API key in `LLM_API_KEY` in the ignored `backend/.env` file. Keep `.env.example` credential-free.
+The backend now uses an **OpenAI-compatible chat-completions server**, with the supplied ngrok endpoint as its default. The implementation is Node.js and already speaks the same REST protocol as `OpenAI(base_url=..., api_key=...)`; a Python/OpenAI SDK is not required. Put your actual API key **only** in ignored `backend/.env`:
 
 ```dotenv
-LLM_API_KEY=your_gemini_api_key
-LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-LLM_MODEL=gemini-3.5-flash
+LLM_API_KEY=put_your_private_key_here
+LLM_BASE_URL=https://studio-unmapped-vicinity.ngrok-free.dev/v1
+LLM_MODEL=
+LLM_JSON_MODE=1
 ```
 
-This uses Google's [OpenAI-compatible endpoint](https://ai.google.dev/gemini-api/docs/openai) with the existing validated documentation adapter. Google's [model page](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash) currently marks Gemini 3.5 Flash deprecated and says requests are routed to Gemini 3.6 Flash. The requested model ID remains configurable. Restart the backend and run a new repository analysis to generate new explanations; saved snapshots retain their earlier documentation.
+`LLM_MODEL` may be blank only when `GET /v1/models` returns exactly one model. If zero or multiple model IDs are offered, set `LLM_MODEL` to the exact ID returned by your server. With an ngrok-free.dev URL, the backend sends `ngrok-skip-browser-warning: 1` to avoid the browser interstitial. All Mentor answers, component discussions, generated guides and optional documentation use this one endpoint. If your server rejects `response_format: {type: "json_object"}`, set `LLM_JSON_MODE=0`; citation validation remains enabled. The provider must return valid JSON in `choices[0].message.content` for these features.
 
-To diagnose mentor or voice reply failures, run `npm.cmd run check:llm` from `backend`. It loads `.env` and sends a tiny prompt without repository contents, reporting the provider's error with configured credentials redacted. HTTP 401 means the configured credentials were rejected: create a replacement key in [Google AI Studio](https://aistudio.google.com/api-keys), update `LLM_API_KEY` in `.env`, run the check again, then restart the backend. HTTP 403 indicates access restrictions or permissions; HTTP 429 indicates quota or rate limits. Environment variables already set in the terminal override `.env`, so remove any stale `LLM_API_KEY` from that terminal before restarting. Live voice also needs Gemini for mentor replies, in addition to ElevenLabs for transcription and speech. Never put real credentials in `.env.example`; rotate any keys previously shared in it.
+Run `npm.cmd run check:llm` inside `backend` before starting the application. The script sends a tiny diagnostic prompt only (no repository source) and never displays the key. HTTP 401 indicates rejected credentials, 403 indicates denied access, and 429 indicates a provider-side limit. Environment variables already set in the terminal override `.env`. After changing the configuration restart the backend; regenerate documentation if you need fresh AI text, since saved snapshots may contain previously generated content. ElevenLabs is still used for optional speech/transcription. This is a user-supplied third-party endpoint: send only repository data you are authorized to send. Never put the real key in `.env.example` or a packaged archive; rotate keys shared publicly.

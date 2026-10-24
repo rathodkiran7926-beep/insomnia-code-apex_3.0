@@ -91,7 +91,7 @@ const reply = () => ({
     openQuestions: ["Deployment topology"],
   },
 });
-async function fakeGemini(fn, run) {
+async function fakeLlm(fn, run) {
   const original = globalThis.fetch,
     key = process.env.LLM_API_KEY,
     model = process.env.LLM_MODEL;
@@ -141,9 +141,9 @@ test("discussion is bound to the selected component/snapshot and includes counte
     /Unknown source/,
   );
 });
-test("Gemini uses configured model, supplied evidence, rolling memory, and bounded history", async () => {
+test("LLM provider uses configured model, supplied evidence, rolling memory, and bounded history", async () => {
   const view = startDiscussion(graph, component.id);
-  await fakeGemini(
+  await fakeLlm(
     async (_url, options) => {
       const body = JSON.parse(options.body);
       assert.equal(body.model, "configured-test-model");
@@ -172,10 +172,10 @@ test("Gemini uses configured model, supplied evidence, rolling memory, and bound
     },
   );
 });
-test("temporary Gemini overload retries once and persists a single conversation turn", async () => {
+test("temporary LLM provider overload retries once and persists a single conversation turn", async () => {
   const view = startDiscussion(graph, component.id);
   let attempts = 0;
-  await fakeGemini(
+  await fakeLlm(
     async () =>
       ++attempts === 1
         ? new Response("", { status: 503 })
@@ -188,30 +188,30 @@ test("temporary Gemini overload retries once and persists a single conversation 
   );
 });
 
-test("Gemini authentication failures are not retried", async () => {
+test("LLM provider authentication failures are not retried", async () => {
   const view = startDiscussion(graph, component.id);
   let attempts = 0;
-  await fakeGemini(
+  await fakeLlm(
     async () => {
       attempts++;
       return new Response("", { status: 401 });
     },
     async () => {
-      await assert.rejects(discussionTurn(view.id, "Explain"), /HTTP 401.*replacement.*restart/);
+      await assert.rejects(discussionTurn(view.id, "Explain"), /HTTP 401.*check:llm/);
       assert.equal(attempts, 1);
       assert.equal(sessionView(discussion(view.id)).messages.length, 0);
     },
   );
 });
 
-test("Gemini permission and network failures have distinct recovery instructions", async () => {
+test("LLM provider permission and network failures have distinct recovery instructions", async () => {
   for (const [response, expected] of [
-    [() => new Response("", { status: 403 }), /HTTP 403.*restrictions/],
-    [() => { throw Object.assign(new Error("blocked"), { cause: { code: "EACCES" } }); }, /Network access to Gemini was blocked/],
+    [() => new Response("", { status: 403 }), /HTTP 403.*permissions/],
+    [() => { throw Object.assign(new Error("blocked"), { cause: { code: "EACCES" } }); }, /Network access to LLM provider was blocked/],
   ]) {
     const view = startDiscussion(graph, component.id);
     let attempts = 0;
-    await fakeGemini(async () => { attempts++; return response(); }, async () => {
+    await fakeLlm(async () => { attempts++; return response(); }, async () => {
       await assert.rejects(discussionTurn(view.id, "Explain"), expected);
       assert.equal(attempts, 1);
       assert.equal(sessionView(discussion(view.id)).messages.length, 0);
@@ -223,7 +223,7 @@ test("ending a discussion request cancels a pending overload retry", async () =>
   const view = startDiscussion(graph, component.id);
   const controller = new AbortController();
   let attempts = 0;
-  await fakeGemini(
+  await fakeLlm(
     async () => {
       attempts++;
       controller.abort();
@@ -242,7 +242,7 @@ test("ending a discussion request cancels a pending overload retry", async () =>
 
 test("invalid evidence and provider failures never create fabricated conversation messages", async () => {
   const view = startDiscussion(graph, component.id);
-  await fakeGemini(
+  await fakeLlm(
     async () =>
       jsonResponse({
         ...reply(),
@@ -256,7 +256,7 @@ test("invalid evidence and provider failures never create fabricated conversatio
       assert.equal(sessionView(discussion(view.id)).messages.length, 0);
     },
   );
-  await fakeGemini(
+  await fakeLlm(
     async () => new Response("", { status: 503 }),
     async () => {
       await assert.rejects(
@@ -278,7 +278,7 @@ test("invalid evidence and provider failures never create fabricated conversatio
 });
 test("decision drafts remain pending and are saved only by an explicit save operation", async () => {
   const view = startDiscussion(graph, component.id);
-  await fakeGemini(
+  await fakeLlm(
     async () => jsonResponse(reply()),
     () => discussionTurn(view.id, "No Redis available."),
   );
@@ -299,7 +299,7 @@ test("decision drafts remain pending and are saved only by an explicit save oper
     verification: ["Test boundaries and burst behavior"],
     evidenceIds: [component.referenceId],
   };
-  await fakeGemini(
+  await fakeLlm(
     async () => jsonResponse(decision),
     async () => {
       const draft = await draftDecision(view.id, undefined);

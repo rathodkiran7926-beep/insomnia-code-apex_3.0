@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { boundedFetch } from "./github.js";
+import { llmBaseUrl, llmHeaders, llmJsonMode, llmModel } from "./llmConfig.js";
 
 const Explanation = z
   .object({
@@ -52,7 +53,7 @@ export async function documentGraph(graph, { generateAI = true } = {}) {
   };
   if (!generateAI)
     ai.message =
-      "PR comparison uses deterministic source facts. Gemini guides can be requested separately.";
+      "PR comparison uses deterministic source facts. AI guides can be requested separately.";
   if (generateAI && process.env.LLM_API_KEY) {
     try {
       const components = graph.components
@@ -66,18 +67,15 @@ export async function documentGraph(graph, { generateAI = true } = {}) {
         source: graph.references.find((r) => r.id === c.referenceId),
       }));
       const body = await boundedFetch(
-        `${(process.env.LLM_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai").replace(/\/$/, "")}/chat/completions`,
+        `${llmBaseUrl()}/chat/completions`,
         {
           method: "POST",
           limit: 128000,
-          headers: {
-            Authorization: `Bearer ${process.env.LLM_API_KEY}`,
-            "Content-Type": "application/json",
-          },
+          headers: llmHeaders(),
           body: JSON.stringify({
-            model: process.env.LLM_MODEL || "gemini-3.5-flash",
+            model: await llmModel(),
             temperature: 0,
-            response_format: { type: "json_object" },
+            ...llmJsonMode(),
             messages: [
               {
                 role: "system",

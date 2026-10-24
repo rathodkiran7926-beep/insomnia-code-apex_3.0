@@ -1,10 +1,12 @@
 import { z } from "zod";
+import { createHash } from "node:crypto";
 import { db } from "./storage.js";
 import { boundedFetch } from "./github.js";
+import { llmBaseUrl, llmHeaders, llmJsonMode, llmModel } from "./llmConfig.js";
 import { questionContext, readSource } from "./workspace.js";
 import { setTimeout as delay } from "node:timers/promises";
 
-async function requestGemini(url, options) {
+async function requestLlm(url, options) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       return await boundedFetch(url, options);
@@ -223,7 +225,12 @@ export async function generateGuide(graph, body) {
     !graph.components.some((c) => c.id === request.componentId)
   )
     throw Object.assign(new Error("Component not found"), { status: 404 });
-  const key = `v1:${request.componentId ? "component:" + request.componentId : "project:" + request.scope}`;
+  // Invalidate Gemini-era and other-provider caches when the endpoint/model changes.
+  // Never store the API key in cache identifiers.
+  const providerFingerprint = createHash("sha256")
+    .update(JSON.stringify([llmBaseUrl(), process.env.LLM_MODEL || "auto", process.env.LLM_JSON_MODE || "1"]))
+    .digest("hex").slice(0, 16);
+  const key = `v2:${providerFingerprint}:${request.componentId ? "component:" + request.componentId : "project:" + request.scope}`;
   const cached = db
     .prepare(
       "SELECT data FROM generated_guides WHERE snapshot_id=? AND cache_key=?",
@@ -235,7 +242,7 @@ export async function generateGuide(graph, body) {
   if (!process.env.LLM_API_KEY)
     throw Object.assign(
       new Error(
-        "Gemini documentation requires LLM_API_KEY in backend/.env. Source facts remain available.",
+        "LLM provider documentation requires LLM_API_KEY in backend/.env. Source facts remain available.",
       ),
       { status: 503 },
     );
@@ -253,19 +260,16 @@ export async function generateGuide(graph, body) {
           new Error("No source evidence is available for this selection."),
           { status: 422 },
         );
-      const raw = await requestGemini(
-        `${(process.env.LLM_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai").replace(/\/$/, "")}/chat/completions`,
+      const raw = await requestLlm(
+        `${llmBaseUrl()}/chat/completions`,
         {
           method: "POST",
           limit: 100000,
-          headers: {
-            Authorization: `Bearer ${process.env.LLM_API_KEY}`,
-            "Content-Type": "application/json",
-          },
+          headers: llmHeaders(),
           body: JSON.stringify({
-            model: process.env.LLM_MODEL || "gemini-3.5-flash",
+            model: await llmModel(),
             temperature: 0,
-            response_format: { type: "json_object" },
+            ...llmJsonMode(),
             messages: [
               {
                 role: "system",
@@ -291,7 +295,7 @@ export async function generateGuide(graph, body) {
         snapshotId: graph.snapshotId,
         componentId: request.componentId || null,
         scope: request.scope,
-        provider: "Gemini",
+        provider: "OpenAI-compatible",
         inferred: true,
         generatedAt: new Date().toISOString(),
         contextLimited: context.facts.contextLimited,
@@ -310,10 +314,10 @@ export async function generateGuide(graph, body) {
       throw Object.assign(
         new Error(
           [500, 502, 503, 504].includes(error.remoteStatus)
-            ? "Gemini is temporarily busy. Retry generation shortly. Source facts remain available."
+            ? "LLM provider is temporarily busy. Retry generation shortly. Source facts remain available."
             : error.remoteStatus === 429
-              ? "Gemini quota or rate limit reached. Check your provider quota or retry later. Source facts remain available."
-              : "Gemini could not generate validated documentation. Check the model, API key, provider quota, or network access, then retry. Source facts remain available.",
+              ? "LLM provider quota or rate limit reached. Check your provider quota or retry later. Source facts remain available."
+              : "LLM provider could not generate validated documentation. Check the model, API key, provider quota, or network access, then retry. Source facts remain available.",
         ),
         { status: 502, cause: error },
       );
