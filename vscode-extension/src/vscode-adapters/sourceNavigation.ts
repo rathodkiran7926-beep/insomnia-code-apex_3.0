@@ -12,16 +12,17 @@ import type { RepositoryController } from '../repositoryController';
 import { relativeRepositoryPath, sameRepositoryUri } from './workspaceContext';
 
 const normalizedText = (text: string) => text.replace(/\r\n/g, '\n');
+type SourceTarget = Pick<MentorResult, 'binding' | 'snapshot' | 'sourceContext'>;
 const bindingKey = (binding: RepositoryBinding | undefined) => binding && JSON.stringify([binding.backendUrl, binding.workspaceUri, binding.snapshotId, binding.repositoryIdentity, binding.indexedCommit, binding.connectedAt]);
 
 export class SourceNavigation implements vscode.TextDocumentContentProvider, vscode.Disposable {
   private readonly documents = new Map<string, { text: string; backend: string }>();
   private pending?: { controller: AbortController; binding: RepositoryBinding };
   private disposed = false;
-  constructor(private readonly api: Pick<MentorApi, 'source' | 'backendIdentity'>, private readonly git: Pick<GitContext, 'read' | 'fileModified'>, private readonly repositories: Pick<RepositoryController, 'bindingFor'>) {}
+  constructor(private readonly api: Pick<MentorApi, 'source' | 'backendIdentity'>, private readonly git: Pick<GitContext, 'read' | 'fileModified'>, private readonly repositories: { bindingFor(uri: string, expected?: RepositoryBinding): RepositoryBinding | undefined }) {}
 
   private bound(binding: RepositoryBinding): void {
-    if (this.disposed || !vscode.workspace.isTrusted || this.api.backendIdentity !== binding.backendUrl || bindingKey(this.repositories.bindingFor(binding.workspaceUri)) !== bindingKey(binding)) throw new Error('This answer belongs to an unavailable or changed repository binding. Reconnect and explain the selection again.');
+    if (this.disposed || !vscode.workspace.isTrusted || this.api.backendIdentity !== binding.backendUrl || bindingKey(this.repositories.bindingFor(binding.workspaceUri, binding)) !== bindingKey(binding)) throw new Error('This answer belongs to an unavailable or changed repository binding. Reconnect and explain the selection again.');
   }
   private active(controller: AbortController, binding: RepositoryBinding): void {
     if (controller.signal.aborted) throw new ApiError('cancelled', 'Source navigation cancelled.');
@@ -92,6 +93,37 @@ export class SourceNavigation implements vscode.TextDocumentContentProvider, vsc
     this.bound(result.binding);
     const raw = result.answer.citations.find(item => item.id === referenceId);
     if (!raw) throw new Error('This answer has no such indexed source citation.');
+    return this.openReference(result, raw);
+  }
+
+  private indexedDocument(result: SourceTarget, reference: SourceReference, text: string, side = 'indexed'): vscode.Uri {
+    const extension = path.posix.extname(reference.file);
+    const label = `${path.posix.basename(reference.file, extension)} (${side} ${result.snapshot.indexedCommit.slice(0, 12)})${extension}`;
+    const uri = vscode.Uri.from({ scheme: 'codebase-mentor-source', path: `/${randomUUID()}/${label}`, query: `commit=${result.snapshot.indexedCommit}&snapshot=${result.snapshot.snapshotId}` });
+    this.documents.set(uri.toString(), { text, backend: result.binding.backendUrl });
+    while (this.documents.size > 16) this.documents.delete(this.documents.keys().next().value!);
+    return uri;
+  }
+
+  async openDiff(before: SourceTarget, beforeRaw: SourceReference, after: SourceTarget, afterRaw: SourceReference, labels = { before: 'before merge base', after: 'after head' }): Promise<void> {
+    this.bound(before.binding); this.bound(after.binding);
+    if (before.binding.backendUrl !== after.binding.backendUrl || before.binding.workspaceUri !== after.binding.workspaceUri) throw new Error('Diff sides belong to different workspace or backend contexts.');
+    const beforeRef = validateCitation(beforeRaw, before.snapshot); const afterRef = validateCitation(afterRaw, after.snapshot);
+    this.cancel(); const controller = new AbortController(); this.pending = { controller, binding: before.binding };
+    try {
+      const responses = await Promise.all([this.api.source(before.snapshot, beforeRef, controller.signal), this.api.source(after.snapshot, afterRef, controller.signal)]);
+      this.active(controller, before.binding); this.bound(after.binding);
+      const left = validateSource(responses[0], before.snapshot, beforeRef); const right = validateSource(responses[1], after.snapshot, afterRef);
+      const leftUri = this.indexedDocument(before, beforeRef, left.excerpt, labels.before);
+      const rightUri = this.indexedDocument(after, afterRef, right.excerpt, labels.after);
+      await Promise.all([vscode.workspace.openTextDocument(leftUri), vscode.workspace.openTextDocument(rightUri)]);
+      this.active(controller, before.binding); this.bound(after.binding);
+      await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, `${beforeRef.file} @ ${before.snapshot.indexedCommit.slice(0, 12)} ↔ ${afterRef.file} @ ${after.snapshot.indexedCommit.slice(0, 12)}`, { preview: true });
+    } finally { if (this.pending?.controller === controller) this.pending = undefined; }
+  }
+
+  async openReference(result: SourceTarget, raw: SourceReference): Promise<'local' | 'indexed' | 'external' | undefined> {
+    this.bound(result.binding);
     const reference = validateCitation(raw, result.snapshot);
     this.cancel(); const controller = new AbortController(); this.pending = { controller, binding: result.binding };
     try {
@@ -114,7 +146,8 @@ export class SourceNavigation implements vscode.TextDocumentContentProvider, vsc
         if (this.localMatches(result.binding, file) && await this.safeLocal(root, folder, file)) {
           try {
             const document = await vscode.workspace.openTextDocument(file);
-            if (!document.isDirty && normalizedText(document.getText()) === normalizedText(source.excerpt)) {
+            this.active(controller, result.binding);
+            if (!document.isDirty && this.localMatches(result.binding, file) && normalizedText(document.getText()) === normalizedText(source.excerpt)) {
               const version = document.version;
               const editor = await vscode.window.showTextDocument(document, { preview: true, viewColumn: result.sourceContext.viewColumn ?? vscode.ViewColumn.One });
               this.active(controller, result.binding);
@@ -128,11 +161,7 @@ export class SourceNavigation implements vscode.TextDocumentContentProvider, vsc
         }
       }
       this.active(controller, result.binding);
-      const extension = path.posix.extname(reference.file);
-      const label = `${path.posix.basename(reference.file, extension)} (indexed ${result.snapshot.indexedCommit.slice(0, 12)})${extension}`;
-      const uri = vscode.Uri.from({ scheme: 'codebase-mentor-source', path: `/${randomUUID()}/${label}`, query: `commit=${result.snapshot.indexedCommit}&snapshot=${result.snapshot.snapshotId}` });
-      this.documents.set(uri.toString(), { text: source.excerpt, backend: result.binding.backendUrl });
-      while (this.documents.size > 16) this.documents.delete(this.documents.keys().next().value!);
+      const uri = this.indexedDocument(result, reference, source.excerpt);
       const document = await vscode.workspace.openTextDocument(uri);
       this.active(controller, result.binding);
       const editor = await vscode.window.showTextDocument(document, { preview: true, viewColumn: result.sourceContext.viewColumn ?? vscode.ViewColumn.One });

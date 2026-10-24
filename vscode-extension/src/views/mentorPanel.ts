@@ -32,6 +32,8 @@ export class MentorPanel implements vscode.Disposable {
     try {
       if (message.type === 'ready') { this.ready = true; this.render(); }
       else if (message.type === 'ask' && typeof message.question === 'string' && message.question.length <= 1500 && message.answerId === this.mentor.state.result?.id) await this.mentor.ask(message.question);
+      else if (message.type === 'handoff' && message.answerId === this.mentor.state.result?.id) await vscode.commands.executeCommand('codebaseMentor.askSeniorMentor');
+      else if (message.type === 'related' && message.answerId === this.mentor.state.result?.id) await vscode.commands.executeCommand('codebaseMentor.showMentorRelated');
       else if (message.type === 'citation' && typeof message.answerId === 'string' && typeof message.referenceId === 'string' && message.referenceId.length <= 200) {
         const result = this.mentor.getResult(message.answerId);
         if (!result) throw new Error('That answer is no longer available. Explain the selection again.');

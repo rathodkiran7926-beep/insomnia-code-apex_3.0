@@ -1,10 +1,14 @@
+import type { HandoffState } from '../handoffController';
+import { savedHandoffItems } from './savedHandoffs';
 import * as vscode from 'vscode';
 import type { ConnectionState, ConnectionStatus } from '../connection';
 import type { RepositoryController, FolderContext } from '../repositoryController';
 import type { EditorContext } from '../vscode-adapters/editorContext';
 import type { MentorState } from '../mentorController';
+import type { CheckpointState } from '../checkpointController';
+import { savedTaskItems } from './savedTasks';
 
-type Surface = 'focus' | 'map' | 'changes';
+type Surface = 'focus';
 const labels: Record<ConnectionStatus, [string, string]> = {
   connecting: ['Connecting', 'sync~spin'], connected: ['Connected', 'pass'],
   disconnected: ['Disconnected', 'debug-disconnect'], 'server-error': ['Server error', 'error'],
@@ -26,25 +30,20 @@ export class MentorTree implements vscode.TreeDataProvider<vscode.TreeItem>, vsc
 
   constructor(private readonly surface: Surface, private readonly state: () => ConnectionState,
     private readonly repositories?: RepositoryController, private readonly editorContext?: () => EditorContext | undefined,
-    private readonly mentorState?: () => MentorState) {}
+    private readonly mentorState?: () => MentorState, private readonly checkpoints?: () => CheckpointState, private readonly handoffs?: () => HandoffState) {}
 
   refresh(): void { this.changed.fire(undefined); }
   getTreeItem(item: vscode.TreeItem): vscode.TreeItem { return item; }
   getChildren(parent?: vscode.TreeItem): vscode.TreeItem[] {
+    if (parent?.id === 'codebaseMentor.savedHandoffs') return this.handoffs ? savedHandoffItems(this.handoffs()) : [];
+    if (parent?.id === 'codebaseMentor.savedTasks') return this.checkpoints ? savedTaskItems(this.checkpoints()) : [];
     if (parent) return this.children.get(parent) ?? [];
     const folders = vscode.workspace.workspaceFolders ?? [];
-    const activeBinding = this.editorContext?.()?.binding;
-    if (this.surface === 'map') return [
-      row(activeBinding ? `Snapshot: ${activeBinding.snapshotId}` : 'No architecture loaded', 'map', 'Architecture information requires a validated repository snapshot. Select a file in a connected folder.'),
-      row('Architecture Atlas is planned', 'info', 'Architecture exploration will be added in a later phase.'),
-    ];
-    if (this.surface === 'changes') return [
-      row('No pull request selected', 'git-pull-request', activeBinding ? `Repository: ${activeBinding.repositoryIdentity}` : 'PR analysis requires a connected repository snapshot and a selected pull request.'),
-      row('Change insights are planned', 'info', 'PR analysis and impact tracking will be added in a later phase.'),
-    ];
     const state = this.state();
     const [label, icon] = labels[state.status];
     const workspace = vscode.workspace.name ?? vscode.workspace.workspaceFolders?.map(folder => folder.name).join(', ');
+    const tasks = row('Saved Tasks', 'history'); tasks.id = 'codebaseMentor.savedTasks'; tasks.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
+    const handoffs = row('Saved Handoffs', 'export'); handoffs.id = 'codebaseMentor.savedHandoffs'; handoffs.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
     return [
       row('Codebase Mentor', 'book', 'Your IDE companion to the shared Codebase Mentor platform.'),
       row(label, icon, state.message),
@@ -52,6 +51,7 @@ export class MentorTree implements vscode.TreeDataProvider<vscode.TreeItem>, vsc
       row('Understand your repository in the IDE', 'lightbulb', 'Connect an existing analyzed snapshot to compare indexed and local repository context.'),
       ...(this.mentorState ? [row('Explain Selection', 'comment-discussion', 'Explain the indexed component enclosing the current code selection.', 'codebaseMentor.explainSelection'),
         row('Open Mentor', 'book', this.mentorState().result ? `Latest component: ${this.mentorState().result!.component.name}` : 'View source-grounded explanations and citations.', 'codebaseMentor.openMentor')] : []),
+      ...(this.checkpoints ? [tasks] : []), ...(this.handoffs ? [handoffs] : []),
       ...(!this.repositories || folders.length === 0 ? [row('No repository snapshot connected', 'info', 'Open a workspace folder to connect an existing snapshot.')] : folders.flatMap(folder => {
         const entries = this.repositoryRows({ uri: folder.uri.toString(), name: folder.name });
         if (folders.length === 1) return entries;

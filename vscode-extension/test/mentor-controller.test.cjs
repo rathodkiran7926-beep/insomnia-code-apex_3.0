@@ -6,6 +6,19 @@ const component = { id: 'c0', name: 'first', role: 'function', referenceId: 'ref
 const ref = { id: 'ref0', snapshotId: 'snap', file: 'src/a.ts', startLine: 1, endLine: 3, url: `https://github.com/a/b/blob/${sha}/src/a.ts#L1-L3` };
 const evidence = { snapshotId: 'snap', repositoryIdentity: 'https://github.com/a/b', indexedCommit: sha, limitations: [], components: [component], references: [ref] };
 const binding = { ...evidence, version: 1, workspaceUri: 'file:///repo', backendUrl: 'http://127.0.0.1:3001/' };
+test('Map resolution reuses the selection picker without Q&A or changing Mentor answer context', async () => {
+  const s = setup(); await s.controller.explain(); const old = s.controller.state.result;
+  const resolved = await s.controller.resolveContext(s.editor(), new AbortController().signal);
+  assert.equal(resolved.component.id, 'c0'); assert.equal(s.controller.state.result.id, old.id);
+  assert.equal(s.calls.filter(c => c[0] === 'question').length, 1);
+});
+test('explicit Map component explanation bypasses selection resolution and preserves its exact component ID', async () => {
+  const s = setup(); const c1 = { ...component, id: 'c1', name: 'related' };
+  s.api.evidence = async () => ({ ...evidence, components: [component, c1] });
+  await s.controller.explainComponent({ binding, snapshot: evidence, component: c1, sourceContext: s.editor(), scopeNotice: 'Explicit Map target' });
+  assert.equal(s.controller.state.result.component.id, 'c1'); assert.equal(s.calls.filter(c => c[0] === 'resolve').length, 0);
+  assert.equal(s.calls.find(c => c[0] === 'question')[1], 'c1');
+});
 function setup() {
   let editor = { workspaceUri: binding.workspaceUri, repositoryRootUri: binding.workspaceUri, documentUri: 'file:///repo/src/a.ts', documentVersion: 1, file: 'src/a.ts', selection: { start: { line: 1, character: 0 }, end: { line: 1, character: 0 } }, hasSelection: false, hasUnsavedChanges: false, binding, revision: 'matched' };
   let currentBinding = binding; let trusted = true; let verified = true; let allow = true; let calls = []; let error;

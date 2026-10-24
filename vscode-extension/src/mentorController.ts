@@ -12,12 +12,21 @@ import { backendLineRange } from "./selection";
 
 export const initialQuestion =
 	"Explain what this component does, its role in the repository, and any important behavior supported by the available evidence.";
+export interface ResolvedComponentContext {
+  binding: RepositoryBinding;
+  snapshot: SnapshotMetadata;
+  component: Component;
+  sourceContext: EditorContext;
+  scopeNotice: string;
+  reference?: SourceReference;
+}
 export interface MentorResult {
 	id: string;
 	binding: RepositoryBinding;
 	sourceContext: EditorContext;
 	snapshot: SnapshotMetadata;
 	component: Component;
+	componentSource: SourceReference;
 	answer: MentorAnswer;
 	question: string;
 	scopeNotice: string;
@@ -33,7 +42,7 @@ export interface MentorState {
 interface MentorEnvironment {
 	trusted(): boolean;
 	editor(): EditorContext | undefined;
-	binding(workspaceUri: string): RepositoryBinding | undefined;
+	binding(workspaceUri: string, expected?: RepositoryBinding): RepositoryBinding | undefined;
 	choose(
 		candidates: Candidate[],
 		evidence: SnapshotEvidence,
@@ -131,7 +140,7 @@ export class MentorController {
 			throw new Error("Trust the workspace before asking the Mentor.");
 		if (
 			!binding ||
-			identity(this.env.binding(binding.workspaceUri)) !== identity(binding) ||
+			identity(this.env.binding(binding.workspaceUri, binding)) !== identity(binding) ||
 			this.api.backendIdentity !== binding.backendUrl
 		)
 			throw new Error(
@@ -232,6 +241,50 @@ export class MentorController {
 			);
 	}
 
+    private async resolveEvidence(context: EditorContext, signal: AbortSignal, ensure: () => void) {
+        const binding = context.binding;
+        this.guard(binding);
+        const evidence = await this.api.evidence(binding.snapshotId, signal);
+        ensure(); this.checkEvidence(evidence, binding);
+        const range = backendLineRange(context.selection);
+        const resolved = await this.api.resolveSelection(evidence, context.file, range.startLine, range.endLine, signal);
+        ensure();
+        const candidate = resolved.candidates.length === 1 ? resolved.candidates[0] : resolved.candidates.length ? await this.env.choose(resolved.candidates, evidence) : undefined;
+        ensure();
+        const component = candidate && evidence.components.find(item => item.id === candidate.componentId && item.referenceId === candidate.referenceId);
+        if (candidate && !component) throw new Error("The selected component no longer belongs to this snapshot.");
+        return { evidence, resolved, component };
+    }
+
+    async resolveContext(context: EditorContext | undefined, signal: AbortSignal): Promise<ResolvedComponentContext | undefined> {
+        this.guard(context?.binding);
+        if (!context) throw new Error("Open a supported source file inside a connected workspace.");
+        const initial = selection(this.env.editor()); const version = this.env.sourceVersion?.(context);
+        const ensure = () => {
+            this.guard(context.binding);
+            if (this.disposed || signal.aborted || initial !== selection(this.env.editor()) || version !== this.env.sourceVersion?.(context)) throw new ApiError("cancelled", "Editor context changed. Run Show Related Code again.");
+        };
+        const { evidence, resolved, component } = await this.resolveEvidence(context, signal, ensure);
+        if (!component) return;
+        const { snapshotId, repositoryIdentity, indexedCommit, limitations } = evidence;
+        return { binding: context.binding!, snapshot: { snapshotId, repositoryIdentity, indexedCommit, limitations }, component, reference: evidence.references.find(r => r.id === component.referenceId), sourceContext: context, scopeNotice: resolved.notice };
+    }
+
+    async explainComponent(target: ResolvedComponentContext): Promise<void> {
+        if (this.disposed) return;
+        try {
+            this.guard(target.binding);
+            this.retryAction = () => this.explainComponent(target);
+            await this.run(target.binding, target.sourceContext, async pending => {
+                const evidence = await this.api.evidence(target.binding.snapshotId, pending.controller.signal);
+                this.ensure(pending); this.checkEvidence(evidence, target.binding);
+                const component = evidence.components.find(c => c.id === target.component.id && c.referenceId === target.component.referenceId);
+                if (!component) throw new Error("The Map component is unavailable in this snapshot.");
+                await this.answer(pending, evidence, component, target.sourceContext, initialQuestion, target.scopeNotice);
+            });
+        } catch (error) { this.reportError(error instanceof Error ? error.message : "Cannot explain this Map component."); }
+    }
+
 	async explain(context = this.env.editor()): Promise<void> {
 		if (this.disposed) return;
 		try {
@@ -243,43 +296,11 @@ export class MentorController {
 			const binding = context.binding;
 			this.retryAction = () => this.explain(this.env.editor() ?? context);
 			await this.run(binding, context, async (pending) => {
-				const evidence = await this.api.evidence(
-					binding.snapshotId,
-					pending.controller.signal,
-				);
-				this.ensure(pending);
-				this.checkEvidence(evidence, binding);
-				const range = backendLineRange(context.selection);
-				const resolved = await this.api.resolveSelection(
-					evidence,
-					context.file,
-					range.startLine,
-					range.endLine,
-					pending.controller.signal,
-				);
-				this.ensure(pending);
-				if (!resolved.candidates.length) {
-					this.publish("empty", resolved.notice);
-					return;
-				}
-				const candidate =
-					resolved.candidates.length === 1
-						? resolved.candidates[0]
-						: await this.env.choose(resolved.candidates, evidence);
-				this.ensure(pending);
-				if (!candidate) {
-					this.publish("cancelled", "Component selection cancelled.");
-					return;
-				}
-				const component = evidence.components.find(
-					(item) =>
-						item.id === candidate.componentId &&
-						item.referenceId === candidate.referenceId,
-				);
-				if (!component)
-					throw new Error(
-						"The selected component no longer belongs to this snapshot.",
-					);
+                const { evidence, resolved, component } = await this.resolveEvidence(context, pending.controller.signal, () => this.ensure(pending));
+                if (!component) {
+                    this.publish(resolved.candidates.length ? "cancelled" : "empty", resolved.candidates.length ? "Component selection cancelled." : resolved.notice);
+                    return;
+                }
 				await this.answer(
 					pending,
 					evidence,
@@ -345,6 +366,7 @@ export class MentorController {
 			sourceContext: context,
 			snapshot: { snapshotId, repositoryIdentity, indexedCommit, limitations },
 			component,
+			componentSource: ref,
 			answer,
 			question,
 			scopeNotice,
@@ -412,6 +434,8 @@ export class MentorController {
 				binding: result.binding,
 				snapshot: result.snapshot,
 				component: result.component,
+				sourceContext: result.sourceContext,
+				scopeNotice: result.scopeNotice,
 			};
 		} catch {
 			return;

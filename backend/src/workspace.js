@@ -80,6 +80,8 @@ export function questionContext(graph, componentId) {
   const references = graph.references.filter(
     (r) => ids.has(r.id) && r.snapshotId === graph.snapshotId,
   );
+  // Preserve the selected declaration's evidence in bounded citation/prompt lists.
+  references.sort((a, b) => Number(b.id === component.referenceId) - Number(a.id === component.referenceId));
   const connected = graph.components.filter((c) =>
     relationships.some((e) => e.source === c.id || e.target === c.id),
   );
@@ -213,6 +215,12 @@ export async function answerQuestion(graph, componentId, question) {
       notice =
         "AI response unavailable. Showing recorded source facts for this component.";
     }
+  }
+  // Large call neighborhoods can exceed the IDE response contract even without AI.
+  if (result.answer.length > 16000) {
+    const suffix = '\n\n[Response limited; use Map to inspect more stored relationships.]';
+    result.answer = result.answer.slice(0, 16000 - suffix.length) + suffix;
+    notice += ' Response limited to fit the Mentor view.';
   }
   return {
     ...result,

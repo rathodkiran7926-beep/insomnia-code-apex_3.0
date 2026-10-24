@@ -207,3 +207,26 @@ test("valid AI answers keep selected component and exact source citation", async
     else process.env.LLM_API_KEY = key;
   }
 });
+
+test("high-degree facts stay bounded and cite the selected component first", async () => {
+  const key = process.env.LLM_API_KEY;
+  delete process.env.LLM_API_KEY;
+  const neighbors = Array.from({ length: 250 }, (_, i) => ({
+    id: `neighbor-${i}`, name: `caller-${i}-${'x'.repeat(100)}`,
+    role: 'function', referenceId: `ref-${i}`,
+  }));
+  const selected = { id: 'selected', name: 'selected', role: 'function', referenceId: 'selected-ref' };
+  const large = { ...graph, components: [...neighbors, selected],
+    relationships: neighbors.map(n => ({ id: `edge-${n.id}`, source: n.id, target: selected.id, type: 'calls', referenceId: n.referenceId })),
+    references: [...neighbors, selected].map((n, i) => ({ ...graph.references[0], id: n.referenceId, startLine: i + 1, endLine: i + 1, url: `${graph.repository}/blob/${graph.commit}/service.ts#L${i + 1}-L${i + 1}` })),
+  };
+  try {
+    const response = await answerQuestion(large, selected.id, 'What calls this?');
+    assert(response.answer.length <= 16000, `answer length ${response.answer.length}`);
+    assert.match(response.notice, /limited|truncat/i);
+    assert.equal(response.referenceIds[0], selected.referenceId);
+    assert.equal(response.citations[0].id, selected.referenceId);
+  } finally {
+    if (key !== undefined) process.env.LLM_API_KEY = key;
+  }
+});

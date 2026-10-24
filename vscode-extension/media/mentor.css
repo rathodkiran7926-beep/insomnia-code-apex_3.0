@@ -1,6 +1,7 @@
-:root { color-scheme: light dark; }
+:root { color-scheme: light; }
+body.vscode-dark, body.vscode-high-contrast { color-scheme: dark; }
 body { padding: 0; color: var(--vscode-editor-foreground); background: var(--vscode-editor-background); font: var(--vscode-font-size)/1.6 var(--vscode-font-family); }
-main { max-width: 780px; margin: 0 auto; padding: 24px; }
+main { max-width: 780px; margin: 0 auto; padding: 24px; min-width: 0; }
 h1 { font-size: 1.45em; line-height: 1.4; margin: 6px 0 10px; font-weight: 600; overflow-wrap: anywhere; }
 h2 { font-size: 1.05em; font-weight: 600; margin: 0 0 8px; }
 p { margin: 8px 0; overflow-wrap: anywhere; }
@@ -13,7 +14,7 @@ section { margin-top: 28px; }
 #status { padding: 10px 0; }
 #status[data-status="error"] { color: var(--vscode-errorForeground); }
 nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 18px; }
-button { font: inherit; cursor: pointer; border: 1px solid var(--vscode-button-border, transparent); padding: 5px 10px; background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+button { font: inherit; cursor: pointer; border: 1px solid var(--vscode-button-border, transparent); padding: 5px 10px; background: var(--vscode-button-background); color: var(--vscode-button-foreground); max-width: 100%; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 button:hover { background: var(--vscode-button-hoverBackground); }
 button:disabled { opacity: .5; cursor: default; }
 button:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
@@ -24,6 +25,17 @@ button:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2
 form { display: grid; gap: 8px; }
 form button { justify-self: start; }
 textarea { box-sizing: border-box; width: 100%; resize: vertical; min-height: 60px; padding: 8px; font: inherit; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, var(--vscode-contrastBorder, transparent)); }
+input:not([type="checkbox"]) { box-sizing: border-box; width: 100%; padding: 8px; font: inherit; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, var(--vscode-contrastBorder, transparent)); }
+input:focus-visible { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
+fieldset { min-width: 0; border: 1px solid var(--vscode-input-border, var(--vscode-contrastBorder, transparent)); }
+fieldset label { display: block; margin: 8px 0; overflow-wrap: anywhere; }
+li, legend, h2, h3, summary { overflow-wrap: anywhere; }
+nav button:not(:first-child) { background: var(--vscode-button-secondaryBackground, var(--vscode-button-background)); color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground)); }
+nav button:not(:first-child):hover { background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-hoverBackground)); }
+nav .citation { background: transparent; }
+@media (max-width: 420px) { main { padding: 16px 12px; } }
 details { margin: 12px 0; }
 summary { cursor: pointer; color: var(--vscode-textLink-foreground); }
 body.vscode-high-contrast button, body.vscode-high-contrast-light button { border-color: var(--vscode-contrastBorder); }
+
+pre.answer { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--vscode-editor-font-family); }

@@ -51,6 +51,10 @@ module.exports = {
     onDidChangeTextDocument: localEvents.event, onDidSaveTextDocument: localEvents.event, onDidGrantWorkspaceTrust: localEvents.event,
   },
   window: {
+    createTreeView(id, options) {
+      const registration = this.registerTreeDataProvider(id, options.treeDataProvider); const events = new EventEmitter();
+      return { visible: false, onDidChangeVisibility: events.event, dispose() { registration.dispose(); events.dispose(); } };
+    },
     async showTextDocument(document) { const editor = { document, selection: undefined, revealRange: () => {} }; shown.push(editor); return editor; },
     onDidChangeActiveTextEditor: localEvents.event, onDidChangeTextEditorSelection: selections.event,
     registerTreeDataProvider(id, provider) {

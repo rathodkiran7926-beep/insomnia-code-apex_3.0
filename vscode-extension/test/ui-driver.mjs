@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 /** CDP controls only the isolated Extension Development Host workbench. */
-export async function driveWorkbench(port, stepFile, snapshots, screenshotFile) {
+export async function driveWorkbench(port, stepFile, snapshots, screenshotFile, backendControl) {
   let socket; let sequence = 0;
   const pending = new Map();
   const contexts = new Map();
@@ -67,13 +67,180 @@ export async function driveWorkbench(port, stepFile, snapshots, screenshotFile) 
     if (result.exceptionDetails) throw new Error(result.exceptionDetails.text);
     return result.result.value;
   };
+  const checkpointEvaluate = async expression => {
+    const context = await waitFor(async () => {
+      for (const context of [...contexts.values()].reverse()) {
+        try { const response = await send('Runtime.evaluate', { expression: '!!document.getElementById("checkpoint-root") && document.documentElement.dataset.checkpointReady === "true"', returnByValue: true, contextId: context.id }, context.sessionId); if (response.result?.value) return context; } catch {}
+      }
+      return false;
+    }, 'checkpoint webview frame');
+    const response = await send('Runtime.evaluate', { expression, returnByValue: true, contextId: context.id }, context.sessionId);
+    if (response.exceptionDetails) throw new Error('Checkpoint UI evaluation failed'); return response.result.value;
+  };
+  const handoffEvaluate = async expression => {
+    const context = await waitFor(async () => {
+      for (const context of [...contexts.values()].reverse()) {
+        try { const response = await send('Runtime.evaluate', { expression: '!!document.getElementById("handoff-root") && document.documentElement.dataset.handoffReady === "true"', returnByValue: true, contextId: context.id }, context.sessionId); if (response.result?.value) return context; } catch {}
+      }
+      return false;
+    }, 'handoff webview frame');
+    const response = await send('Runtime.evaluate', { expression, returnByValue: true, contextId: context.id }, context.sessionId);
+    if (response.exceptionDetails) throw new Error('Handoff UI evaluation failed'); return response.result.value;
+  };
   let lastStep = '';
   try {
     while (true) {
       const step = await waitFor(async () => {
         try { const data = JSON.parse(await readFile(stepFile, 'utf8')); return data.step !== lastStep ? data : false; } catch { return false; }
-      }, 'next host test UI step', 40000);
+      }, 'next host test UI step', 200000);
       lastStep = step.step;
+      if (step.type === 'backend') {
+        if (!backendControl) throw new Error('Backend test control unavailable');
+        await backendControl(step.action); await writeFile(`${stepFile}.${step.step}.complete`, 'done');
+        console.log(`MENTOR_BACKEND_RECOVERY_STEP: ${step.action}`); continue;
+      }
+      if (step.type === 'handoff') {
+        if (step.action === 'preserved') {
+          const values=await handoffEvaluate(`({question:document.getElementById('handoff-question')?.value,attemptedSteps:document.getElementById('handoff-attemptedSteps')?.value})`);
+          if(values.question!==step.question||values.attemptedSteps!==step.attemptedSteps)throw new Error('Same-repository connectivity check discarded the draft');
+          await writeFile(`${stepFile}.${step.step}.complete`,'done');continue;
+        }
+        if (step.action === 'offline-preview') {
+          await handoffEvaluate(`document.getElementById('handoff-compose').requestSubmit()`);
+          await waitFor(()=>handoffEvaluate(`document.getElementById('status')?.dataset.status==='error'`),'offline preview error');
+          await writeFile(`${stepFile}.${step.step}.complete`,'done');continue;
+        }
+
+        if (step.action === 'native-open') {
+          await evaluate(`Array.from(document.querySelectorAll('.pane-header')).filter(el => ['Map', 'Changes'].includes(el.innerText.trim()) && el.getAttribute('aria-expanded') !== 'false').forEach(el => el.click())`);
+          await evaluate(`Array.from(document.querySelectorAll('.pane-header')).filter(el => el.innerText.trim() === 'Focus' && el.getAttribute('aria-expanded') === 'false').forEach(el => el.click())`);
+          const row = `Array.from(document.querySelectorAll('.monaco-list-row')).find(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent === ${JSON.stringify(step.question)}))`;
+          await waitFor(() => evaluate(`!!(${row})`), 'native persisted Saved Handoffs row');
+          await evaluate(`${row}.click()`);
+        } else if (step.action === 'fill') {
+          await waitFor(() => handoffEvaluate(`!!document.getElementById('handoff-compose')`), 'handoff compose form');
+          if (!await handoffEvaluate(`['question','attemptedSteps','additionalContext'].every(name => document.getElementById('handoff-compose').elements.namedItem(name).value === '')`)) throw new Error('Handoff authored fields must start empty');
+          if (!await handoffEvaluate(`document.body.innerText.includes('backend endpoint') && !document.querySelector('[data-action="save"]')`)) throw new Error('Destination must precede Preview and Save');
+          await handoffEvaluate(`document.getElementById('handoff-question').value=${JSON.stringify(step.question)};document.getElementById('handoff-attemptedSteps').value=${JSON.stringify(step.attemptedSteps)}`);
+        } else if (step.action === 'preview') {
+          if (!await handoffEvaluate(`document.getElementById('handoff-question').value===${JSON.stringify(step.question)} && document.getElementById('handoff-attemptedSteps').value===${JSON.stringify(step.attemptedSteps)}`)) throw new Error('Unsent handoff fields were lost');
+          await handoffEvaluate(`document.getElementById('handoff-compose').requestSubmit()`);
+          await waitFor(() => handoffEvaluate(`!!document.getElementById('handoff-selection') && !!document.querySelector('pre.answer') && document.querySelector('[data-action="save"]')?.disabled===false`), 'backend canonical review');
+          if (await handoffEvaluate(`Array.from(document.querySelectorAll('input[name="excerptReferenceIds"],input[name="includeCheckpointNotes"],input[name="includeDocumentation"]')).some(input=>input.checked)`)) throw new Error('Optional source context must default off');
+        } else if (step.action === 'refine') {
+          await handoffEvaluate(`const input=document.querySelector('input[name="referenceIds"][value="${step.removed}"]');input.checked=false;input.dispatchEvent(new Event('change',{bubbles:true}));`);
+          if (!await handoffEvaluate(`document.querySelector('[data-action="save"]').disabled`)) throw new Error('Dirty selection must disable Save');
+          await handoffEvaluate(`document.getElementById('handoff-selection').requestSubmit()`);
+          await waitFor(() => handoffEvaluate(`document.querySelector('[data-action="save"]')?.disabled===false && document.querySelector('input[name="referenceIds"][value="${step.removed}"]')?.checked===false`), 'rebuilt selection');
+        } else if (step.action === 'cleared') {
+          await waitFor(() => handoffEvaluate(`!document.querySelector('pre.answer') && !document.querySelector('[data-action="save"]') && !document.querySelector('[data-action="copy"]') && !document.body.innerText.includes(${JSON.stringify(step.question)})`), 'unconnected repository clears handoff content and actions');
+        } else if (step.action === 'canonical') {
+          if(step.theme)await waitFor(()=>handoffEvaluate(`document.body.classList.contains(${JSON.stringify(step.theme)})`),'actual high-contrast webview theme');
+          if(step.narrow)await send('Emulation.setDeviceMetricsOverride',{width:960,height:900,deviceScaleFactor:1,mobile:false});
+          if(!await handoffEvaluate(`!!document.querySelector('main h1') && Array.from(document.querySelectorAll('button')).every(button=>button.textContent.trim()||button.getAttribute('aria-label'))`))throw new Error('Unnamed handoff controls or missing landmark heading');
+          if(step.narrow)await waitFor(()=>handoffEvaluate(`document.documentElement.scrollWidth<=window.innerWidth+2`),'narrow handoff avoids horizontal document overflow');
+
+          await waitFor(() => handoffEvaluate(`document.querySelector('pre.answer')?.textContent===${JSON.stringify(step.markdown)}`), 'exact full canonical Markdown');
+          const proof = await send('Page.captureScreenshot', { format: 'png' }); await writeFile(screenshotFile.replace('focus.png', `${step.step}.png`), Buffer.from(proof.data, 'base64')); if(step.narrow)await send('Emulation.clearDeviceMetricsOverride');
+        } else {
+          const selector = `[data-action="${step.action}"]${step.referenceId ? `[data-reference="${step.referenceId}"]` : ''}`;
+          await waitFor(() => handoffEvaluate(`document.querySelector(${JSON.stringify(selector)})?.disabled===false`), 'enabled explicit handoff action');
+          await handoffEvaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
+          if (step.action === 'export') {
+            await waitFor(() => evaluate(`!!document.querySelector('.quick-input-widget input') && document.querySelector('.quick-input-widget')?.style.display !== 'none'`), 'native simple Save dialog');
+            await evaluate(`document.querySelector('.quick-input-widget input').focus();document.querySelector('.quick-input-widget input').select()`);
+            await send('Input.insertText', { text: step.file.replaceAll('\\', '/') });
+            await pause(400); await enter(); await pause(400);
+            if (await evaluate(`document.querySelector('.quick-input-widget')?.style.display !== 'none'`)) {
+              await enter();
+            }
+          }
+          if (step.action === 'delete') {
+            await waitFor(() => evaluate(`Array.from(document.querySelectorAll('.monaco-dialog-box .monaco-button')).some(el=>el.textContent.includes('Delete handoff'))`), 'handoff deletion confirmation');
+            await evaluate(`Array.from(document.querySelectorAll('.monaco-dialog-box .monaco-button')).find(el=>el.textContent.includes('Delete handoff')).click()`);
+          }
+        }
+        await writeFile(`${stepFile}.${step.step}.complete`, 'done'); console.log(`MENTOR_PHASE7_UI_PASS: ${step.step}`); continue;
+      }
+      if (step.type === 'checkpoint') {
+        if (step.action === 'native-resume') {
+          await evaluate(`Array.from(document.querySelectorAll('.pane-header')).filter(el => ['Map', 'Changes'].includes(el.innerText.trim()) && el.getAttribute('aria-expanded') !== 'false').forEach(el => el.click())`);
+          await evaluate(`Array.from(document.querySelectorAll('.pane-header')).filter(el => el.innerText.trim() === 'Focus' && el.getAttribute('aria-expanded') === 'false').forEach(el => el.click())`);
+          await waitFor(() => evaluate(`Array.from(document.querySelectorAll('.label-name')).some(el => el.textContent === ${JSON.stringify(step.title)})`), 'native persisted saved task');
+          const nativeRow = `Array.from(document.querySelectorAll('.monaco-list-row')).find(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent === ${JSON.stringify(step.title)}))`;
+          await evaluate(`${nativeRow}.click()`);
+          await pause(300);
+          const nativeProof = await send('Page.captureScreenshot', { format: 'png' });
+          await writeFile(stepFile.replace(/-steps\.json$/, '-native-resume.png'), Buffer.from(nativeProof.data, 'base64'));
+        } else if (step.action === 'fill') {
+          await waitFor(() => checkpointEvaluate(`!!document.getElementById('checkpoint-draft')`), 'checkpoint form');
+          const empty = await checkpointEvaluate(`['taskTitle','discovery','unresolved','nextStep'].every(name => document.getElementById('checkpoint-draft').elements.namedItem(name).value === '')`);
+          if (!empty) throw new Error('Checkpoint notes must begin empty');
+          await checkpointEvaluate(`document.getElementById('checkpoint-taskTitle').value = ${JSON.stringify(step.title)}; document.getElementById('checkpoint-discovery').value = ${JSON.stringify(step.discovery)}; document.getElementById('checkpoint-unresolved').value = ${JSON.stringify(step.unresolved)}; document.getElementById('checkpoint-nextStep').value = ''`);
+        } else if (step.action === 'preview') {
+          const preserved = await checkpointEvaluate(`document.getElementById('checkpoint-discovery').value === ${JSON.stringify(step.discovery)} && document.getElementById('checkpoint-unresolved').value === ${JSON.stringify(step.unresolved)}`);
+          if (!preserved) throw new Error('Refreshing the list erased an unsent checkpoint draft');
+          await checkpointEvaluate(`document.getElementById('checkpoint-draft').requestSubmit()`);
+          await waitFor(() => checkpointEvaluate(`document.body.innerText.includes('Review your checkpoint') && !!document.querySelector('[data-action="save"]')`), 'explicit checkpoint preview');
+        } else if (step.action === 'save') {
+          await checkpointEvaluate(`document.querySelector('[data-action="save"]').click()`);
+        } else if (step.action === 'changes') {
+          await waitFor(() => checkpointEvaluate(`!!document.querySelector('[data-action="changes"]')`), 'checkpoint exact-pair Review Changes');
+          await checkpointEvaluate(`document.querySelector('[data-action="changes"]').click()`);
+        } else if (['source', 'map', 'mentor'].includes(step.action)) {
+          if (step.expectedViewId) await waitFor(() => checkpointEvaluate(`document.querySelector('[data-action="${step.action}"][data-reference="${step.referenceId}"]')?.dataset.view === ${JSON.stringify(step.expectedViewId)}`), 'current checkpoint action rendered');
+          await checkpointEvaluate(`document.querySelector('[data-action="${step.action}"][data-reference="${step.referenceId}"]${step.componentId ? '[data-component="' + step.componentId + '"]' : ''}').click()`);
+        } else if (step.action === 'delete') {
+          if (step.expectedViewId) await waitFor(() => checkpointEvaluate(`document.querySelector('[data-action="delete"]')?.dataset.view === ${JSON.stringify(step.expectedViewId)}`), 'current checkpoint delete rendered');
+          await checkpointEvaluate(`document.querySelector('[data-action="delete"]').click()`);
+          await waitFor(() => evaluate(`Array.from(document.querySelectorAll('.monaco-dialog-box .monaco-button')).some(el => el.textContent.includes('Delete checkpoint'))`), 'explicit checkpoint deletion confirmation');
+          await evaluate(`Array.from(document.querySelectorAll('.monaco-dialog-box .monaco-button')).find(el => el.textContent.includes('Delete checkpoint')).click()`);
+        } else if (step.action === 'inspect') {
+          await waitFor(() => checkpointEvaluate(`document.body.innerText.includes(${JSON.stringify(step.title)}) && document.body.innerText.includes(${JSON.stringify(step.discovery)}) && document.body.innerText.includes(${JSON.stringify(step.unresolved)})`), 'exact saved notes');
+          const proof = await send('Page.captureScreenshot', { format: 'png' }); await writeFile(screenshotFile.replace('focus.png', `${step.step}.png`), Buffer.from(proof.data, 'base64')); if(step.narrow)await send('Emulation.clearDeviceMetricsOverride');
+        }
+        await writeFile(`${stepFile}.${step.step}.complete`, 'done'); console.log(`MENTOR_PHASE6_UI_PASS: ${step.step}`); continue;
+      }
+      if (step.type === 'pr') {
+        await evaluate(`Array.from(document.querySelectorAll('.pane-header')).filter(el => ['Focus', 'Map'].includes(el.innerText.trim()) && el.getAttribute('aria-expanded') !== 'false').forEach(el => el.click())`);
+        await evaluate(`Array.from(document.querySelectorAll('.pane-header')).filter(el => el.innerText.trim() === 'Changes' && el.getAttribute('aria-expanded') === 'false').forEach(el => el.click())`);
+        if (step.action === 'select') {
+          await waitFor(() => evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).some(el => el.innerText.includes('Pull Requests'))`), 'native PR listing group');
+          await evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).find(el => el.innerText.includes('Pull Requests')).querySelector('.monaco-tl-twistie').click()`);
+          await waitFor(() => evaluate(`Array.from(document.querySelectorAll('.label-name')).some(el => el.textContent.startsWith('#106 '))`), 'actual PR 106 row');
+          await evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).find(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent.startsWith('#106 '))).click()`);
+        }
+        if (step.action === 'start') {
+          await evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).filter(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent.startsWith('Pull Requests'))).forEach(el => { const toggle = el.querySelector('.monaco-tl-twistie'); if (toggle?.classList.contains('expanded') || el.getAttribute('aria-expanded') === 'true') toggle?.click(); })`);
+
+          await waitFor(() => evaluate(`Array.from(document.querySelectorAll('.label-name')).some(el => el.textContent === 'Start Analysis')`), 'native explicit Start Analysis');
+          await evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).find(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent === 'Start Analysis')).click()`);
+        }
+        if (step.action === 'diff-proof') { const proof = await send('Page.captureScreenshot', { format: 'png' }); await writeFile(screenshotFile.replace('focus.png', 'pr-diff.png'), Buffer.from(proof.data, 'base64')); }
+        if (step.action === 'inspect') {
+          await waitFor(() => evaluate(`document.body.innerText.includes('Changed Files') && document.body.innerText.includes('Potential Impact')`), 'real stored PR comparison sections');
+          const proof = await send('Page.captureScreenshot', { format: 'png' }); await writeFile(screenshotFile.replace('focus.png', 'pr-changes.png'), Buffer.from(proof.data, 'base64'));
+        }
+        await writeFile(`${stepFile}.${step.step}.complete`, 'done'); console.log(`MENTOR_PHASE5_UI_PASS: ${step.step}`); continue;
+      }
+      if (step.type === 'atlas') {
+        await evaluate(`Array.from(document.querySelectorAll('.pane-header')).filter(el => ['Focus', 'Changes'].includes(el.innerText.trim()) && el.getAttribute('aria-expanded') !== 'false').forEach(el => el.click())`);
+        await evaluate(`Array.from(document.querySelectorAll('.pane-header')).filter(el => el.innerText.trim() === 'Map' && el.getAttribute('aria-expanded') === 'false').forEach(el => el.click())`);
+        await waitFor(() => evaluate(`(() => { const labels = Array.from(document.querySelectorAll('.label-name')).map(el => el.textContent); return labels[labels.indexOf('Selected Component') + 1] === ${JSON.stringify(step.component)} && labels.includes('Indexed static relationships; not observed execution.'); })()`), 'real native Map data');
+        if (step.action === 'evidence') {
+          await waitFor(() => evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).some(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent === ${JSON.stringify(step.related)}))`), 'relationship row');
+          await evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).find(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent === ${JSON.stringify(step.related)})).querySelector('.monaco-tl-twistie').click()`);
+          await waitFor(() => evaluate(`Array.from(document.querySelectorAll('.label-name')).some(el => el.textContent.startsWith('Relationship evidence:'))`), 'relationship evidence row');
+          await evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).find(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent.startsWith('Relationship evidence:'))).click()`);
+        } else if (step.action === 'explore') {
+          await waitFor(() => evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).some(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent === ${JSON.stringify(step.related)}))`), 'related native Map row');
+          await evaluate(`Array.from(document.querySelectorAll('.monaco-list-row')).find(el => Array.from(el.querySelectorAll('.label-name')).some(label => label.textContent === ${JSON.stringify(step.related)})).click()`);
+        } else {
+          const proof = await send('Page.captureScreenshot', { format: 'png' });
+          await writeFile(screenshotFile.replace('focus.png', 'atlas.png'), Buffer.from(proof.data, 'base64'));
+        }
+        await writeFile(`${stepFile}.${step.step}.complete`, 'done'); console.log(`MENTOR_PHASE4_UI_PASS: ${step.step}`); continue;
+      }
       if (step.type === 'mentor') {
         await waitFor(() => mentorEvaluate(`document.body.innerText.includes('Facts-only explanation') && document.body.innerText.includes(${JSON.stringify(step.component ?? 'greet')})`), 'grounded Mentor response');
         if (step.expectedAnswer) await waitFor(() => mentorEvaluate(`document.getElementById('follow-up')?.dataset.answer === ${JSON.stringify(step.expectedAnswer)}`), 'current answer rendered');
@@ -81,6 +248,7 @@ export async function driveWorkbench(port, stepFile, snapshots, screenshotFile) 
         if (step.action === 'citation') await mentorEvaluate(`document.querySelector('[data-action="citation"][data-reference="${step.referenceId}"]').click()`);
         if (step.action === 'followup') await mentorEvaluate(`document.getElementById('question').value = ${JSON.stringify(step.question)}; document.getElementById('follow-up').requestSubmit()`);
         if (step.action === 'previous' || step.action === 'latest') await mentorEvaluate(`document.querySelector('[data-action="${step.action}"]').click()`);
+        if (step.action === 'related') await mentorEvaluate(`document.querySelector('[data-action="related"]').click()`);
         if (step.action === 'inspect') {
           await mentorEvaluate(`document.getElementById('evidence-title').scrollIntoView({block:'center'})`);
           const proof = await send('Page.captureScreenshot', { format: 'png' });

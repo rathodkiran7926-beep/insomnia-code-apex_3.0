@@ -30,6 +30,26 @@ test('verified local source opens the real file and converts exact cited lines t
   assert.equal(shown.document.uri.toString(), s.fileUri);
   assert.equal(shown.selection.start.line, 1); assert.equal(shown.selection.end.line, 2);
 });
+
+test('Atlas relationship evidence reuses exact navigation independently of Mentor citations', async t => {
+  const s = await setup(t); const edgeRef = { ...s.reference, id: 'edge-real', startLine: 1, endLine: 1, url: `https://github.com/a/b/blob/${sha}/src/a.ts#L1-L1` };
+  assert.equal(await s.nav.openReference(s.result, edgeRef), 'local');
+  assert.equal(editor.testState.shown.at(-1).selection.start.line, 0);
+  await assert.rejects(() => s.nav.openReference(s.result, { ...edgeRef, snapshotId: 'other' }));
+});
+test('native PR diff uses exact read-only source for both immutable sides, never current editor or patch text', async t => {
+  const s = await setup(t); const otherSha = 'b'.repeat(40);
+  const right = { ...s.result, binding: { ...s.result.binding, snapshotId: 'after', indexedCommit: otherSha, connectedAt: 'temporary-after' }, snapshot: { ...s.result.snapshot, snapshotId: 'after', indexedCommit: otherSha } };
+  const rightRef = { ...s.reference, snapshotId: 'after', url: `https://github.com/a/b/blob/${otherSha}/src/a.ts#L2-L3` };
+  const nav = new SourceNavigation({ ...s.api, source: async (snapshot) => ({ ...s.source, snapshotId: snapshot.snapshotId, excerpt: snapshot.snapshotId === 'after' ? 'new\nsecond\nthird\n' : s.source.excerpt, url: `https://github.com/a/b/blob/${snapshot.indexedCommit}/src/a.ts#L1` }) }, { read: () => ({}), fileModified: () => false }, { bindingFor: (_uri, expected) => expected });
+  const registration = editor.workspace.registerTextDocumentContentProvider('codebase-mentor-source', nav);
+  t.after(() => { registration.dispose(); nav.dispose(); });
+  await nav.openDiff(s.result, s.reference, right, rightRef);
+  const call = editor.testState.calls.at(-1); assert.equal(call[0], 'vscode.diff');
+  assert.equal(call[1].scheme, 'codebase-mentor-source'); assert.equal(call[2].scheme, 'codebase-mentor-source');
+  assert((await nav.provideTextDocumentContent(call[1])).includes('one')); assert((await nav.provideTextDocumentContent(call[2])).includes('new'));
+  await assert.rejects(() => nav.openDiff(s.result, s.reference, right, { ...rightRef, snapshotId: 'wrong' }));
+});
 test('different HEAD, modified files and missing files use immutable read-only backend text', async t => {
   const s = await setup(t);
   s.setLocal({ identity: 'https://github.com/a/b', head: 'b'.repeat(40) });
@@ -60,4 +80,33 @@ test('unavailable indexed source offers only a validated immutable GitHub fallba
   assert.equal(await s.nav.open(s.result, 'ref0'), 'external');
   assert.equal(editor.testState.external.at(-1), s.reference.url);
   await assert.rejects(s.nav.provideTextDocumentContent(editor.Uri.parse('codebase-mentor-source:/unregistered.ts')));
+});
+
+test('repository switch while loading a local citation cannot reveal the obsolete editor', async t => {
+  const s = await setup(t);
+  const original = editor.workspace.openTextDocument;
+  editor.workspace.openTextDocument = async uri => {
+    const document = await original.call(editor.workspace, uri);
+    if (uri.toString() === s.fileUri) {
+      s.setBinding({ ...s.result.binding, snapshotId: 'different-snapshot' });
+      s.nav.contextChanged();
+    }
+    return document;
+  };
+  t.after(() => { editor.workspace.openTextDocument = original; });
+  await assert.rejects(() => s.nav.open(s.result, 'ref0'));
+  assert.equal(editor.testState.shown.length, 0, 'Cancelled source must be checked before revealing an editor');
+});
+
+test('checkout change while loading a local citation opens only its immutable indexed source', async t => {
+  const s = await setup(t);
+  const original = editor.workspace.openTextDocument;
+  editor.workspace.openTextDocument = async uri => {
+    const document = await original.call(editor.workspace, uri);
+    if (uri.toString() === s.fileUri) s.setLocal({ rootUri: s.result.binding.workspaceUri, identity: s.result.binding.repositoryIdentity, head: 'b'.repeat(40) });
+    return document;
+  };
+  t.after(() => { editor.workspace.openTextDocument = original; });
+  assert.equal(await s.nav.open(s.result, 'ref0'), 'indexed');
+  assert.deepEqual(editor.testState.shown.map(item => item.document.uri.scheme), ['codebase-mentor-source']);
 });

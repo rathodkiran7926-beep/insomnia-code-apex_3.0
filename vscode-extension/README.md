@@ -1,160 +1,169 @@
-# Codebase Mentor for VS Code — Phase 3
+# Codebase Mentor for VS Code
 
-A desktop IDE companion using the **same backend** as the web platform.
-Focus connects each workspace folder to an existing analyzed snapshot and shows
-Git identity, branch, HEAD, indexed revision and local/unsaved changes. Explain
-Selection opens a small Mentor panel beside the editor, with grounded answers,
-follow-ups, provenance and clickable source citations. Map and Changes retain
-honest empty states for future architecture and PR features.
+A local desktop companion to the **same backend used by the web platform**.
+Connect a workspace to an analyzed public GitHub snapshot, understand indexed
+code, explore relationships, review PRs, resume saved tasks, and prepare context
+for manual sharing. One Activity Bar container contains **Focus**, **Map** and
+**Changes**; larger Mentor, checkpoint and handoff forms open beside the editor.
 
-## Development
+## Install and connect
 
-Use Node 24+ and npm. From `vscode-extension/`:
+Requires desktop VS Code1.100+ with a Node24+ shared backend and Git on its PATH.
+The extension uses the built-in VS Code Git API; it never runs repository scripts.
+The verified release environment is Windows VS Code1.143.1 and Node24.15.0.
 
-```powershell
-npm.cmd ci
-npm.cmd run check
-npm.cmd test
-npm.cmd run build
-npm.cmd run test:host
-npm.cmd run package:list
-npm.cmd run package:vsix
+1. Install `codebase-mentor-0.1.1.vsix` using **Extensions: Install from VSIX?**, or:
+
+   ```powershell
+   code --install-extension .\codebase-mentor-0.1.1.vsix --force
+   ```
+
+2. Start the existing backend from this project's `backend/` directory:
+
+   ```powershell
+   npm.cmd ci
+   npm.cmd run dev
+   ```
+
+   Configure optional provider credentials in the backend environment only.
+   Fact-based Mentor answers work without an LLM key. Keep the server's loopback
+   binding and retain its SQLite database path across restarts.
+
+3. Set `codebaseMentor.apiBaseUrl` in User/Remote settings if needed. The default
+   is `http://127.0.0.1:3001`. It is a machine setting; repository settings cannot
+   override it. Open **Codebase Mentor** in the Activity Bar and check connection.
+
+4. Obtain an analyzed snapshot. Start the existing frontend and open
+   `http://127.0.0.1:5173/#/repository` to analyze a public GitHub repository, or
+   use the same backend API:
+
+   ```powershell
+   $job = Invoke-RestMethod http://127.0.0.1:3001/api/analyses -Method Post -ContentType application/json -Body '{"url":"https://github.com/sindresorhus/p-limit"}'
+   Invoke-RestMethod "http://127.0.0.1:3001/api/analyses/$($job.id)"
+   ```
+
+   Check job status until completion; use its actual `snapshotId`. The extension
+   connects existing snapshots and does not start a separate repository analyzer.
+
+5. Open and trust the local repository folder. Run **Codebase Mentor: Connect
+   Repository**, enter that snapshot ID, and review its repository/commit.
+   Multi-root workspaces retain a separate binding per folder. Missing or
+   ambiguous Git identity stays unverified. Different revisions are explicit.
+
+## Daily workflows
+
+| Goal | Action |
+| --- | --- |
+| Understand code | Select a declaration and run **Explain Selection** |
+| Ask more | Use the Mentor panel's component-scoped follow-up |
+| Open evidence | Click a source citation for the exact indexed location |
+| Explore architecture | Run **Show Related Code** or open **Map** |
+| Review a PR | Open **Changes**, select/enter a matching PR, then **Start Analysis** |
+| Resume work | Use **Save Task Checkpoint** and Focus ? **Saved Tasks** |
+| Prepare a question | Use **Ask Senior with Context** and Focus ? **Saved Handoffs** |
+
+Mentor and Map reuse the backend resolver and candidate picker. Relationships
+retain their stored type, direction and uncertainty. They are static evidence,
+not observed execution. Citations open local files only when repository, commit,
+path, dirty state and actual text agree; otherwise they open read-only indexed
+source or offer a validated immutable permalink. Unsaved buffers are not uploaded.
+
+PR results distinguish merge base, target tip and head. Before/after Source,
+Map, Mentor and handoff actions retain the exact comparison side, including forks,
+without changing your saved workspace binding. **Stop Local Waiting** stops local
+requests, not the backend worker. Resume waiting explicitly. **Refresh** reads the
+stored comparison; **Reanalyze Selected PR** explicitly creates a new job.
+Unavailable complete source offers the real PR files page rather than a patch
+presented as full source. GitHub availability and API quotas can limit live PRs.
+
+**Open Full Architecture Atlas** opens the web workspace configured by
+`codebaseMentor.webBaseUrl` (default `http://127.0.0.1:5173`). Select the repository
+there; that browser route does not restore the IDE's selected component.
+
+## Local checkpoints and handoffs
+
+Both features are **disabled by default**. Deliberately enable each one in the
+backend environment and restart the same server:
+
+```dotenv
+CODEBASE_MENTOR_LOCAL_CHECKPOINTS=1
+CODEBASE_MENTOR_LOCAL_HANDOFFS=1
 ```
 
-Open this directory in VS Code and press F5 to launch an Extension Development
-Host. The build task runs first. `npm.cmd run watch` rebuilds while developing.
-The host test uses the installed VS Code desktop executable; set
-`VSCODE_EXECUTABLE_PATH` if it is installed elsewhere. It launches isolated
-empty, single-folder, reopened and multi-root windows, using generated Git
-fixtures with hooks disabled. The existing backend analyzes deterministic test
-fixtures and stores snapshots in an in-memory database. No provider credentials
-or GitHub access are needed. A generated test-only companion permits real modal
-confirmation testing outside VS Code's dialog-blocking extension-test mode.
-CDP drives the actual picker, input, confirmation and rendered sidebar; artifacts
-live under ignored `.host-test/`. The runner stops its backend and test windows.
+The flags are independent. All data routes require direct safe loopback requests;
+forwarding headers and unsafe Host/Origin are rejected. Localhost is not per-user
+authentication. Do not enable these features on a hosted/proxied deployment.
 
-Start the existing backend separately using `npm.cmd start` from `backend/`.
-Its default URL is `http://127.0.0.1:3001`; health is `GET /api/health` returning
-`{"ok":true}`. Health needs no LLM credentials; repository connection needs an
-existing analyzed snapshot from the web platform.
+**Checkpoints:** write your own task title, discoveries, unresolved question and
+next step. Review optional source references and indexed/local Git metadata before
+Save. Focus lists backend records; Resume restores original notes and snapshot.
+Stored-file comparison is bounded text comparison, not semantic impact or a local
+checkout diff. Unknown evidence stays unknown. Delete requires confirmation and
+retains repository snapshots. Branch/HEAD are explicitly extension-reported.
 
-## Commands and settings
+**Handoffs:** start from Editor, Mentor, Map, PR side or checkpoint. Enter your own
+question and attempts. The form shows the backend destination before **Build
+Preview** transmits fields. Review the complete backend-generated Markdown and
+exclude unnecessary evidence. Excerpts, inferred documentation and checkpoint
+notes default off. **Apply selection** rebuilds the preview; Save requires that
+exact approval. There is no extra AI agent or silent source upload.
 
-- **Codebase Mentor: Open Workspace** opens the Mentor sidebar and Focus view.
-- **Codebase Mentor: Check Backend Connection** checks health and revalidates saved bindings.
-- **Codebase Mentor: Open Settings** opens this extension's settings.
-- **Codebase Mentor: Connect Repository** selects a folder (in multi-root
-  workspaces), asks for an existing snapshot ID, and previews identity/revision
-  before explicit confirmation. A confirmed repository mismatch is rejected.
-- **Codebase Mentor: Change Snapshot** repeats that workflow for another snapshot.
-- **Codebase Mentor: Refresh Repository Context** re-reads Git metadata and
-  revalidates the selected folder's snapshot. It never starts analysis.
-- **Codebase Mentor: Disconnect Repository** removes only that folder's local
-  binding and cancels its requests. Backend snapshots and Git are unchanged.
-- **Codebase Mentor: Explain Selection** resolves selected lines (or the cursor)
-  to an indexed component, then calls the existing shared Mentor Q&A endpoint.
-  Available in the Command Palette, editor context menu and Focus view.
-- **Codebase Mentor: Open Mentor** shows the latest answer in the singleton panel.
-- **Codebase Mentor: Ask Follow-up** asks a new question about that component.
-- **Codebase Mentor: Open Source Citation** chooses a citation to inspect.
-- **Codebase Mentor: Cancel Mentor Request** cancels explanation/source requests.
+Saved handoffs survive restarts. **Copy Markdown** and **Export Markdown file**
+require explicit actions and use exact canonical content; export is not delivery.
+Deletion retains checkpoints and snapshots. No email, issue, PR comment, chat
+message, public link or authenticated senior response is created. Fork handoffs
+belong to the original fork repository; reconnect that repository to list them
+later. Missing historical snapshots keep approved Markdown readable/exportable
+through a current same-repository binding, with source unavailable when missing.
 
-## Grounded explanations and source navigation
+Title200 chars; checkpoint notes2000 each. Handoff question1500 chars; attempts/
+extra context2000 each; up to16 reference candidates, five direct relationships
+and four selected excerpts (20 lines/3000 chars each). Package and Markdown64KB
+limits apply. Sensitive paths are excluded and suspicious strings raise warnings;
+these checks cannot detect every secret. Review all content before manual sharing.
 
-Analyze the repository in the web platform, connect its snapshot in Focus, then
-select a function or place the cursor inside it and run Explain Selection. The
-backend's `/api/ide/resolve-selection` uses stored source ranges: containing
-declarations rank by specificity; ambiguity offers a picker. If only an enclosing
-module covers a broad selection, the UI labels that scope explicitly. It never
-claims expression-level analysis or guesses symbols inside the extension.
+## Recovery and privacy
 
-Answers use the existing `POST /api/snapshots/:id/questions` service. The panel
-shows the actual facts-only/AI-assisted mode and backend notice. It keeps at most
-five answers in memory, with Previous/Latest actions. Follow-ups are independent
-component-scoped questions, not persistent chat history. Failed requests retain
-the previous answer. Retry, cancellation and stale-context guards are supported.
+- Backend offline: **Check Backend Connection**, then refresh the intended view.
+  Same-repository drafts survive temporary revalidation; actions remain blocked
+  until the snapshot is ready. Actual workspace/backend/snapshot changes clear
+  obsolete private context. Normal tab switches preserve local drafts.
+- Save/Delete unconfirmed: the server may have completed it. Refresh before
+  deliberate retry. Identical approved Save retries retain the same request ID.
+  Mutating POSTs are never automatically retried.
+- Missing snapshot: reconnect an existing analyzed version. The extension never
+  guesses identity from names or silently substitutes the current checkout.
+- Different/dirty revision: acknowledge indexed explanations and inspect indexed
+  source. Reanalyze committed source in the shared platform to update evidence.
+- PR failures: inspect the actual backend message and GitHub quotas. Retry
+  explicitly; no fabricated comparison or successful test execution is shown.
+- Remote window: localhost refers to the extension host's machine. WSL, SSH and
+  containers require endpoint reachability and are not verified release targets.
 
-Different revisions, dirty files, unsaved buffers or unknown identity require
-explicit acknowledgement before explaining the **indexed** component. No buffer
-is uploaded. Git HEAD, file state and editor version changes cancel obsolete
-requests, including when a follow-up is submitted from the panel.
+HTTP is restricted to loopback; other destinations require HTTPS. Embedded URL
+credentials, query/fragment configuration and redirects are rejected. HTTPS alone
+does not add authentication. Webviews use escaped text, local assets and nonce
+CSPs; no command URLs or direct webview HTTP. No telemetry, credentials, terminal
+history, editor buffers or whole repositories are uploaded by the extension.
+User-authored preview fields go only to the explicitly configured backend.
 
-Citations are checked against stored snapshot reference IDs, file/range metadata
-and exact immutable GitHub locations. Complete indexed text comes from
-`GET /api/snapshots/:id/source?referenceId=...`. Local files open at cited lines
-only when repository, revision, path, file state and actual text agree. Text
-comparison accepts LF/CRLF differences and rejects symlink redirection. Otherwise,
-a read-only **indexed SHA** tab displays the actual backend text without shifting
-its lines. Unavailable source can offer an explicitly chosen validated permalink.
+This release supports the **local single-user public-repository MVP**. Hosted
+identity/ACLs, secure team sharing, private-repository assurances, authenticated
+senior replies and runtime tracing are absent. macOS/Linux and remote extension
+hosts are unverified. The local publisher ID is not a Marketplace release; no
+publication or third-party redistribution permission is implied.
 
-The panel uses no framework, direct HTTP or command URLs. Backend text is escaped,
-scripts use a nonce CSP, assets stay local, and messages carry only checked
-actions/answer/reference IDs or bounded questions.
+## Development and verification
 
-Git identity uses the official built-in `vscode.git` API v1, preferring the
-branch's upstream remote, then origin, then an unambiguous single remote. HTTPS,
-SSH and `.git` GitHub forms normalize to credential-free canonical identities.
-Missing/ambiguous Git evidence stays **Unverified**, requiring acknowledgement.
-Matching repositories with different commits remain connectable and show
-**Different revision**. Only full, equal commit SHAs establish **Matched**;
-uncommitted and unsaved changes receive separate warnings.
+From `vscode-extension/`, use `npm.cmd ci`, `npm.cmd run check`, `npm.cmd test`,
+`npm.cmd run build:dev` and `npm.cmd run package:vsix`. The prepublish hook runs the
+production build. `npm.cmd run package:list` shows shipped files.
 
-Bindings use versioned `workspaceState` records keyed by workspace-folder URI.
-Only snapshot ID, canonical identity, indexed commit, normalized backend base
-URL and connection time are saved. They survive restart and are revalidated.
-Changing backend host **or URL prefix** hides old bindings until you switch back
-or explicitly connect another snapshot. No graph or source content is persisted.
-
-Configure `codebaseMentor.apiBaseUrl` in User/Remote settings. This machine
-setting cannot be overridden by repository workspace settings. The backend
-root URL may include a reverse-proxy prefix; `/api/health` is appended to it.
-Only loopback HTTP or HTTPS is accepted. Embedded credentials, query strings
-and fragments are rejected. Redirects are not followed. Checks time out after
-five seconds for health; questions allow 45 seconds and indexed-source retrieval
-35 seconds to accommodate existing backend limits. All can be cancelled. No
-retries or polling run automatically:
-checks run at activation, configuration changes and explicit user requests.
-In SSH, WSL or containers, localhost means the extension host's machine.
-
-## Privacy and current limits
-
-The extension sends health/snapshot/source GETs and explicit resolver or Q&A
-POSTs. Resolver payloads contain only snapshot ID, relative file and line range;
-Q&A contains only component ID and question. Local Git URLs, absolute paths and
-source contents are never uploaded. Git metadata
-comes from the built-in API; the extension runs no shell commands or repository
-scripts, stores no secrets and adds no telemetry. Restricted Mode allows health
-and settings; snapshot restoration/connection and Git/editor context require trust.
-
-`src/vscode-adapters/editorContext.ts` exposes metadata for later phases, with
-0-based editor positions and an explicit 1-based line-range conversion. It reads
-no document text. URI containment checks handle Windows casing and remote
-authority boundaries. Nested repositories cannot inherit a parent's binding.
-Selection events debounce local UI refresh and do not request backend data.
-Source text is read locally only during an explicit explanation or citation
-action to compare it with indexed text; it is never sent back to the server.
-
-The current backend has **no production authentication or repository ACLs**.
-Keep its loopback binding. HTTPS configuration alone does not add authorization.
-Future authentication can supply transport headers from VS Code SecretStorage;
-no login or fake token system is included here.
-
-Architecture/PR analysis, checkpoints and handoffs remain outside Phase 3. No demo results
-are rendered. The publisher ID is for local packaging; obtain the project's
-publication identity and redistribution permission before distributing.
-
-The bundle has no runtime npm dependencies. The VSIX contains the manifest,
-bundle, monochrome Activity Bar icon, Mentor JS/CSS, README and license notice. Sources,
-development dependencies, test profiles and logs are excluded.
-
-The MSAL dependency override pins a security fix for VSIX development tooling.
-It crosses Azure Identity's declared major range; local packaging is verified,
-but Marketplace sign-in/publishing is not tested or part of Phase 3.
-
-Implementation references: [Tree View API](https://code.visualstudio.com/api/extension-guides/tree-view),
-[Workspace Trust](https://code.visualstudio.com/api/extension-guides/workspace-trust),
-[Bundling extensions](https://code.visualstudio.com/api/working-with-extensions/bundling-extension).
-Git compatibility references: [API v1 in VS Code 1.100](https://github.com/microsoft/vscode/blob/1.100.0/extensions/git/src/api/git.d.ts)
-and [current Git API declarations](https://github.com/microsoft/vscode/blob/main/extensions/git/src/api/git.d.ts).
-See also [Webview security](https://code.visualstudio.com/api/extension-guides/webview)
-and [read-only virtual documents](https://code.visualstudio.com/api/extension-guides/virtual-documents).
+`npm.cmd run test:host` exercises development source. After packaging,
+`npm.cmd run test:vsix` installs the actual archive in clean isolated profiles and
+runs the integrated desktop suite. Tests create ignored clones/databases, use the
+shared backend, and drive native confirmations. They never target your workspace
+Git history or normal VS Code profile. Optional `MENTOR_TEST_LIVE_PR=1` exercises
+live public PR analysis; normal tests label controlled PR fixtures clearly.
+Source maps, dependencies, source trees, tests, profiles, logs and environment
+files are excluded from the VSIX. See `docs/phase-8-release.md` for final evidence.
