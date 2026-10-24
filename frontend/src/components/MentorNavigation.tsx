@@ -32,7 +32,7 @@ export const workspaceNavigation = [
     links: [
       { path: '/learn', label: 'My Learning Path', icon: BookOpen },
       { path: '/practice', label: 'Practice', icon: FlaskConical },
-      { path: '/progress', label: 'Progress & Updates', icon: TrendingUp },
+      { path: '/progress', label: 'My Progress & Updates', icon: TrendingUp },
     ],
   },
   {
