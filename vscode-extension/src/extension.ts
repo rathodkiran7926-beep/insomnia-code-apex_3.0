@@ -94,7 +94,7 @@ export function activate(context: vscode.ExtensionContext) {
     bindings: () => folders().flatMap(folder => {
       const binding = repositories.bindingFor(folder.uri); return binding ? [binding] : [];
     }),
-    current: binding => repositories.bindingFor(binding.workspaceUri, binding),
+    current: binding => repositories.bindingFor(binding.workspaceUri),
     focus: async (binding, component, reference, graph) => {
       const target = {
         binding,
