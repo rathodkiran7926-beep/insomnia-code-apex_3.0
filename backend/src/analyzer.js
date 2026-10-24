@@ -629,6 +629,8 @@ export function analyze(input) {
     snapshotId,
     repository,
     commit,
+    branch: input.branch || null,
+    revision: input.revision || null,
     components,
     relationships,
     references,

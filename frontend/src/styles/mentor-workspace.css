@@ -281,9 +281,9 @@
   color: #ddaa65;
 }
 .mentor-tree-components {
-  margin: 0 0 8px 15px;
+  margin: 5px 0 10px 15px;
   border-left: 1px solid #e6deef;
-  padding-left: 5px;
+  padding: 3px 0 3px 7px;
 }
 .mentor-tree-components button {
   font-size: 10px;

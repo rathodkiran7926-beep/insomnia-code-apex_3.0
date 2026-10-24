@@ -1,5 +1,7 @@
 import type { DocumentationSnapshot } from './repositoryDocumentation';
 export type RepositorySnapshot = Omit<DocumentationSnapshot, 'relationships' | 'report'> & {
+  branch?: string | null;
+  revision?: string | null;
   relationships: (DocumentationSnapshot['relationships'][number] & { mountPath?: string })[];
   report: DocumentationSnapshot['report'] & {
     supported: boolean;

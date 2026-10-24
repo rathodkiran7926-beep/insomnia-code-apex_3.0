@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db, saveSnapshot } from "./storage.js";
 import { parsePullRequest, listPullRequests } from "./prGithub.js";
 import { simulateFile } from "./mergeSimulator.js";
+import { comparisonSetupPlan } from "./setupPlans.js";
 export const prRoutes = express.Router();
 db.exec(`CREATE TABLE IF NOT EXISTS pr_jobs(id TEXT PRIMARY KEY,status TEXT NOT NULL,progress INTEGER NOT NULL,message TEXT,comparison_id TEXT,created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS pr_comparisons(id TEXT PRIMARY KEY,base_snapshot_id TEXT NOT NULL,head_snapshot_id TEXT NOT NULL,data TEXT NOT NULL);`);
@@ -112,6 +113,7 @@ prRoutes.post("/analyses", (req, res, next) => {
               snapshot.docs,
               snapshot.markdown,
               snapshot.files,
+              snapshot.setupMetadata,
             );
           const r = event.result;
           db.prepare("INSERT INTO pr_comparisons VALUES (?,?,?,?)").run(
@@ -150,6 +152,33 @@ prRoutes.get("/comparisons/:id", (req, res) => {
     : res.status(404).json({ error: "PR comparison not found" });
 });
 let simulations = 0;
+let setupScans = 0;
+prRoutes.get("/comparisons/:id/setup", async (req, res, next) => {
+  const controller = new AbortController();
+  res.on("close", () => {
+    if (!res.writableEnded) controller.abort();
+  });
+  let acquired = false;
+  try {
+    const row = db
+      .prepare("SELECT data FROM pr_comparisons WHERE id=?")
+      .get(req.params.id);
+    if (!row) return res.status(404).json({ error: "PR comparison not found" });
+    if (setupScans >= 2)
+      return res
+        .status(429)
+        .json({ error: "Setup scan is busy. Retry shortly." });
+    setupScans++;
+    acquired = true;
+    res.json(
+      await comparisonSetupPlan(JSON.parse(row.data), controller.signal),
+    );
+  } catch (error) {
+    next(error);
+  } finally {
+    if (acquired) setupScans--;
+  }
+});
 prRoutes.post("/comparisons/:id/simulate", async (req, res, next) => {
   const controller = new AbortController();
   res.on("close", () => {

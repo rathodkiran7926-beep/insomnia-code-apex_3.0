@@ -85,7 +85,15 @@ README purpose statements are presented as author claims. Code findings document
 - Dynamic paths/calls, route chains, arrays, wrappers, unsupported CommonJS export patterns, framework-specific routers and database clients beyond the explicit `pg` rule can remain unresolved. Conditional registration, middleware order, runtime mutation and virtual dispatch are not modeled.
 - The first tsconfig's direct compiler options are used; config inheritance/project references are not expanded. Missing dependency types limit symbol resolution. Business purpose, exact response schemas and validation behavior are not invented when unavailable.
 - AI commentary covers at most 20 components and requires a configured compatible endpoint/key. The live LLM path is not exercised without credentials.
-- No runtime tracing, repository execution, deployment discovery or microservice inference. No authentication, job cancellation, retention UI, or cross-user access control is included; the service runs locally.
+- No runtime tracing, repository execution, deployment discovery or microservice inference. Repository analysis remains a local public-source tool. Team handoffs have separate account and workspace access controls; job cancellation and a retention UI are not included.
+
+## Smart Context Handoff
+
+Open **Collaborate → Context Handoffs** to create an account and invite a senior reviewer through **Team access**. In Workspace, select a component or click source line numbers (Shift-click for a range), then choose **Create Handoff Snapshot**. Developers can ask questions and follow up; senior reviewers can answer, annotate code, request clarification and propose solutions. The author confirms an answer, and a maintainer can approve it for searchable Team Knowledge.
+
+Snapshots and conversations persist in SQLite and stay pinned to their original commit. Shared links require team membership. Both teammates must connect to the same backend; a localhost link only works on its own computer. Optional Gemini briefings reuse the existing `LLM_*` configuration; human discussion works without AI credentials.
+
+See [the implementation and setup guide](docs/smart-context-handoff.md) for permissions, APIs, migrations, verification and limitations. The original prepared knowledge demo and Agent Context Bridge remain under Settings & Integrations.
 
 ## Verify
 

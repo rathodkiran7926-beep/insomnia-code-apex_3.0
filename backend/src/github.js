@@ -2,6 +2,7 @@ import { gunzipSync } from "node:zlib";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import tar from "tar-stream";
+import { isSetupPath } from "./setupRequirements.js";
 const MAX_RESPONSE = 8 * 1024 * 1024;
 export async function boundedFetch(
   url,
@@ -22,13 +23,19 @@ export async function boundedFetch(
     } catch (error) {
       const code = error.cause?.code || error.code;
       if (code === "EACCES" || code === "EPERM") {
-        throw Object.assign(new Error(
-          `Network access to ${current.hostname} was denied by the operating system (${code}). Restart the backend from a normal terminal outside the restricted environment: cd backend, then npm.cmd run dev. If access is still denied, check your firewall or proxy settings.${current.hostname === "api.github.com" ? " A GitHub token cannot fix this network permission error." : ""}`,
-        ), { code });
+        throw Object.assign(
+          new Error(
+            `Network access to ${current.hostname} was denied by the operating system (${code}). Restart the backend from a normal terminal outside the restricted environment: cd backend, then npm.cmd run dev. If access is still denied, check your firewall or proxy settings.${current.hostname === "api.github.com" ? " A GitHub token cannot fix this network permission error." : ""}`,
+          ),
+          { code },
+        );
       }
-      throw Object.assign(new Error(
-        `Cannot reach ${current.hostname}: ${error.cause?.code || error.message}. Check network access and retry.`,
-      ), { code });
+      throw Object.assign(
+        new Error(
+          `Cannot reach ${current.hostname}: ${error.cause?.code || error.message}. Check network access and retry.`,
+        ),
+        { code },
+      );
     }
     if (![301, 302, 307, 308].includes(response.status)) break;
     const next = new URL(response.headers.get("location"), current);
@@ -173,5 +180,21 @@ export async function downloadRepository(url, revision, progress) {
     55,
     `Loaded ${Object.keys(files).length} eligible files from commit archive`,
   );
-  return { repository: repo.url, commit, files, exclusions };
+  return {
+    repository: repo.url,
+    commit,
+    branch: revision ? null : metadata.default_branch,
+    revision: revision || metadata.default_branch,
+    files,
+    exclusions,
+    setupMetadata: {
+      paths: tree.tree
+        .filter(
+          (e) =>
+            e.type === "blob" && e.mode !== "120000" && isSetupPath(e.path),
+        )
+        .map((e) => e.path),
+      limited: !!tree.truncated,
+    },
+  };
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useRepositoryAnalysis } from '../state/RepositoryAnalysisContext';
 import { analysisApi } from '../services/analysisApi';
 import { directedLayout } from '../domain/graphLayout';
@@ -89,6 +89,7 @@ function FolderGroup({ data }: { data: { label?: string } }) {
 }
 const analysisNodeTypes = { folderGroup: FolderGroup };
 export default function Repository() {
+  const [routeParams] = useSearchParams();
   const {
     snapshot,
     job,
@@ -106,7 +107,8 @@ export default function Repository() {
   const [folder, setFolder] = useState('all');
   const [showUnresolved, setShowUnresolved] = useState(false);
   const [view, setView] = useState('system');
-  const [tab, setTab] = useState('architecture');
+  const [tab, setTab] = useState(routeParams.get('tab') === 'documentation' ? 'documentation' : 'architecture');
+  useEffect(() => { setTab(routeParams.get('tab') === 'documentation' ? 'documentation' : 'architecture'); }, [routeParams]);
   const [selected, setSelected] = useState('');
   const busy = starting || loading || job?.status === 'running';
   useEffect(() => {

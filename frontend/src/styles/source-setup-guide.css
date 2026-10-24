@@ -1,0 +1,216 @@
+.setup-guide-heading,
+.setup-guide-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.setup-guide-heading h2 {
+  font-size: 24px;
+  margin: 10px 0;
+  color: #56436b;
+  letter-spacing: -0.5px;
+}
+.setup-guide-controls label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #917ba4;
+}
+.setup-guide-controls select,
+.setup-manager-choice select {
+  height: 40px;
+  min-width: 170px;
+  padding: 0 12px;
+  border: 1px solid #dfd2ed;
+  background: #fff;
+  color: #77558f;
+  border-radius: 8px;
+}
+.source-setup-guide .pr-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.source-setup-guide .pr-stats strong {
+  font-size: 26px;
+  overflow-wrap: anywhere;
+}
+.setup-not-run {
+  padding: 12px 16px;
+  border-left: 3px solid #ae97d9;
+  background: #f7f1fd;
+  border-radius: 6px;
+}
+.setup-checkout {
+  margin: 18px 0;
+}
+.source-setup-guide summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: #8b6ba3;
+}
+.setup-projects {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin: 22px 0;
+}
+.setup-project > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.setup-project > header h2 {
+  font-size: 20px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.setup-requirement-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 18px 0 8px;
+}
+.setup-requirement-pills > span {
+  padding: 6px 9px;
+  border: 1px solid #e6dcf1;
+  border-radius: 6px;
+  background: #faf7ff;
+  font-size: 11px;
+  color: #9a7eb2;
+  overflow-wrap: anywhere;
+}
+.setup-project-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 30px;
+  margin-top: 16px;
+}
+.setup-project-columns > section {
+  min-width: 0;
+}
+.setup-project-columns h3 {
+  font-size: 15px !important;
+  color: #78608e;
+}
+.setup-command {
+  border: 1px solid #e5daef;
+  border-radius: 9px;
+  margin: 14px 0;
+  background: #fcfaff;
+  overflow: hidden;
+}
+.setup-command > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid #eee7f5;
+}
+.setup-command strong {
+  font-size: 11px;
+  font-weight: 500;
+  color: #9980aa;
+}
+.setup-command button {
+  font-size: 10px !important;
+  padding: 5px 8px !important;
+  flex-shrink: 0;
+}
+.setup-command pre {
+  padding: 12px 14px;
+  margin: 0;
+  color: #7c5f95;
+  font-size: 13px !important;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.9;
+}
+.setup-evidence {
+  display: inline-flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+.setup-evidence a {
+  font-size: 10px;
+  color: #a68abd;
+  border-bottom: 1px dotted #d6c4e5;
+  overflow-wrap: anywhere;
+}
+.setup-environment-list > article {
+  padding: 12px 0;
+  border-bottom: 1px solid #f0e9f7;
+}
+.setup-environment-list > article > div {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.setup-environment-list code {
+  font-size: 12px;
+  color: #85669c;
+}
+.setup-environment-list p {
+  font-size: 12px;
+  margin: 8px 0;
+}
+.setup-service {
+  padding: 15px;
+  border: 1px solid #e5dbf0;
+  background: #fbf8ff;
+  border-radius: 10px;
+  margin: 12px 0;
+}
+.setup-service strong {
+  font-size: 14px;
+  color: #826499;
+}
+.setup-service small {
+  display: block;
+  margin-top: 5px;
+}
+.setup-service ol {
+  padding-left: 18px;
+  font-size: 12px;
+  color: #9279a5;
+  line-height: 1.9;
+}
+.setup-service > a {
+  display: block;
+  font-size: 12px;
+  margin: 9px 0;
+  color: #8d6caa;
+}
+.setup-manager-choice {
+  padding: 12px;
+  background: #faf6ff;
+  border-radius: 8px;
+}
+.setup-manager-choice p {
+  font-size: 12px;
+  margin-top: 0;
+}
+.setup-ports {
+  border-top: 1px solid #eee5f5;
+  margin-top: 18px;
+}
+.setup-coverage li {
+  color: #9780ab;
+  font-size: 12px;
+  line-height: 1.9;
+}
+@media (max-width: 900px) {
+  .setup-project-columns {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .source-setup-guide .pr-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

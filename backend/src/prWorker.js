@@ -24,6 +24,7 @@ try {
     snapshots.push({
       graph,
       files: input.files,
+      setupMetadata: input.setupMetadata,
       docs,
       markdown: markdown(graph, docs),
     });

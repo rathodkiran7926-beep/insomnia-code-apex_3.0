@@ -7,8 +7,9 @@ import { BackendArchitecture } from './BackendArchitecture';
 import { ComponentDiscussion } from './ComponentDiscussion';
 import { PRMergeSimulator } from './PRMergeSimulator';
 import { ChangeImpactExplorer } from './ChangeImpactExplorer';
+import { SourceSetupGuide } from './SourceSetupGuide';
 import { Modal } from './UI';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useRepositoryAnalysis } from '../state/RepositoryAnalysisContext';
 import '../styles/pr-comparison.css';
 
@@ -97,6 +98,7 @@ const tabs = [
   'Change impact',
 ];
 export function PullRequestChanges({ onDemo }: { onDemo: () => void }) {
+  const [routeParams] = useSearchParams();
   const { loading: repositoryLoading, repositoryUrl } = useRepositoryAnalysis();
   const [url, setUrl] = useState('');
   const [pulls, setPulls] = useState<
@@ -130,6 +132,7 @@ export function PullRequestChanges({ onDemo }: { onDemo: () => void }) {
     [error, setError] = useState('');
   const [tab, setTab] = useState(tabs[0]),
     [path, setPath] = useState('');
+  useEffect(() => { setTab(routeParams.get('tab') === 'setup' ? tabs[4] : tabs[0]); }, [routeParams, result?.id]);
   const [mode, setMode] = useState<'system' | 'request' | 'services'>('system');
   const [discuss, setDiscuss] = useState<{ side: Side; id: string } | null>(null);
   const [version, setVersion] = useState<Side>('after');
@@ -874,133 +877,139 @@ export function PullRequestChanges({ onDemo }: { onDemo: () => void }) {
             )}
             {tab === tabs[4] && (
               <>
-                <p className="pr-warning">
-                  Setup guidance is derived from captured source and manifests. Nothing below has
-                  been installed, migrated, or execution-verified.
-                </p>
-                <div className="pr-two-columns">
-                  <section className="pr-card">
-                    <h2>Environment template changes</h2>
-                    <p>
-                      Names only; requiredness is unknown. An assignment change may appear as both
-                      removal and addition.
-                    </p>
-                    {result.setup.environment.map((e, i) => (
-                      <p key={i}>
-                        <span className="pr-status">{e.change}</span> <code>{e.name}</code>
-                        <small> · {e.path}</small>
-                      </p>
-                    ))}
-                    {!result.setup.environment.length && (
+                <SourceSetupGuide key={result.id} comparisonId={result.id} />
+                <details className="pr-card" style={{ marginTop: 20 }}>
+                  <summary>Raw PR setup changes and captured manifests</summary>
+                  <p className="pr-warning">
+                    Setup guidance is derived from captured source and manifests. Nothing below has
+                    been installed, migrated, or execution-verified.
+                  </p>
+                  <div className="pr-two-columns">
+                    <section className="pr-card">
+                      <h2>Environment template changes</h2>
                       <p>
-                        No template variable names found in the available patches. This does not
-                        establish that configuration is unchanged.
+                        Names only; requiredness is unknown. An assignment change may appear as both
+                        removal and addition.
                       </p>
-                    )}
-                    <h2>Dependencies</h2>
-                    {result.setup.dependencies.map((d, i) => (
-                      <p key={i}>
-                        <strong>{d.name}</strong> {d.before || 'not present'} →{' '}
-                        {d.after || 'removed'}
-                        <small>
-                          {' '}
-                          · {d.path} / {d.section}
-                        </small>
-                      </p>
-                    ))}
-                    {!result.setup.dependencies.length && (
-                      <p>
-                        No dependency changes found in captured package manifests. Lockfiles and
-                        external package resolution are not compared.
-                      </p>
-                    )}
-                    <h2>Potential migrations</h2>
-                    {result.setup.migrations.map((m) => (
-                      <p key={m.path}>
-                        {m.status}:{' '}
-                        <a
-                          href={sourceUrl(m.status === 'removed' ? 'before' : 'after', m.path)}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {m.path}
-                        </a>
-                      </p>
-                    ))}
-                    {!result.setup.migrations.length && (
-                      <p>
-                        No changed paths matched migration/SQL naming rules. Custom migration
-                        systems may be missed.
-                      </p>
-                    )}
-                  </section>
-                  <section className="pr-card">
-                    <h2>Version-specific run recipes</h2>
-                    <div className="pr-version-tabs">
-                      {(['before', 'after'] as const).map((side) => (
-                        <button
-                          key={side}
-                          aria-pressed={version === side}
-                          onClick={() => setVersion(side)}
-                        >
-                          {side}
-                        </button>
-                      ))}
-                    </div>
-                    <p>
-                      Review the exact commit <code>{snapshots[version].commit}</code> in an
-                      isolated checkout. Commands below are declared script names, not verified
-                      startup instructions.
-                    </p>
-                    {result.setup.guides[version].map((m) => (
-                      <article className="pr-manifest" key={m.path}>
-                        <h3>
-                          <a href={sourceUrl(version, m.path)} target="_blank" rel="noreferrer">
-                            {m.path} ↗
-                          </a>
-                        </h3>
-                        <p>
-                          Declared package manager: {m.packageManager || 'not declared'} · engines:{' '}
-                          {JSON.stringify(m.engines)}
+                      {result.setup.environment.map((e, i) => (
+                        <p key={i}>
+                          <span className="pr-status">{e.change}</span> <code>{e.name}</code>
+                          <small> · {e.path}</small>
                         </p>
-                        <ol>
-                          <li>
-                            Use this manifest’s folder and review its README at the selected commit.
-                          </li>
-                          <li>
-                            Install dependencies using the repository’s declared package manager and
-                            lockfile policy. No install command is inferred when it is unknown.
-                          </li>
-                          <li>
-                            Configure the required variable names after reviewing source; values and
-                            defaults are not supplied here.
-                          </li>
-                          <li>Review the declared scripts below before running them.</li>
-                        </ol>
-                        {Object.entries(m.scripts).map(([name, command]) => (
-                          <div key={name}>
-                            <strong>{name}</strong>
-                            <pre>{command}</pre>
-                          </div>
+                      ))}
+                      {!result.setup.environment.length && (
+                        <p>
+                          No template variable names found in the available patches. This does not
+                          establish that configuration is unchanged.
+                        </p>
+                      )}
+                      <h2>Dependencies</h2>
+                      {result.setup.dependencies.map((d, i) => (
+                        <p key={i}>
+                          <strong>{d.name}</strong> {d.before || 'not present'} →{' '}
+                          {d.after || 'removed'}
+                          <small>
+                            {' '}
+                            · {d.path} / {d.section}
+                          </small>
+                        </p>
+                      ))}
+                      {!result.setup.dependencies.length && (
+                        <p>
+                          No dependency changes found in captured package manifests. Lockfiles and
+                          external package resolution are not compared.
+                        </p>
+                      )}
+                      <h2>Potential migrations</h2>
+                      {result.setup.migrations.map((m) => (
+                        <p key={m.path}>
+                          {m.status}:{' '}
+                          <a
+                            href={sourceUrl(m.status === 'removed' ? 'before' : 'after', m.path)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {m.path}
+                          </a>
+                        </p>
+                      ))}
+                      {!result.setup.migrations.length && (
+                        <p>
+                          No changed paths matched migration/SQL naming rules. Custom migration
+                          systems may be missed.
+                        </p>
+                      )}
+                    </section>
+                    <section className="pr-card">
+                      <h2>Version-specific run recipes</h2>
+                      <div className="pr-version-tabs">
+                        {(['before', 'after'] as const).map((side) => (
+                          <button
+                            key={side}
+                            aria-pressed={version === side}
+                            onClick={() => setVersion(side)}
+                          >
+                            {side}
+                          </button>
                         ))}
-                      </article>
-                    ))}
-                    {!result.setup.guides[version].length && (
-                      <p>No usable package manifests captured. Startup commands are unknown.</p>
-                    )}
-                    <h3>Changed scripts</h3>
-                    {result.setup.scripts.map((s, i) => (
-                      <p key={i}>
-                        <strong>
-                          {s.path} · {s.name}
-                        </strong>
-                        <code>
-                          {s.before || 'not present'} → {s.after || 'removed'}
-                        </code>
+                      </div>
+                      <p>
+                        Review the exact commit <code>{snapshots[version].commit}</code> in an
+                        isolated checkout. Commands below are declared script names, not verified
+                        startup instructions.
                       </p>
-                    ))}
-                  </section>
-                </div>
+                      {result.setup.guides[version].map((m) => (
+                        <article className="pr-manifest" key={m.path}>
+                          <h3>
+                            <a href={sourceUrl(version, m.path)} target="_blank" rel="noreferrer">
+                              {m.path} ↗
+                            </a>
+                          </h3>
+                          <p>
+                            Declared package manager: {m.packageManager || 'not declared'} ·
+                            engines: {JSON.stringify(m.engines)}
+                          </p>
+                          <ol>
+                            <li>
+                              Use this manifest’s folder and review its README at the selected
+                              commit.
+                            </li>
+                            <li>
+                              Install dependencies using the repository’s declared package manager
+                              and lockfile policy. No install command is inferred when it is
+                              unknown.
+                            </li>
+                            <li>
+                              Configure the required variable names after reviewing source; values
+                              and defaults are not supplied here.
+                            </li>
+                            <li>Review the declared scripts below before running them.</li>
+                          </ol>
+                          {Object.entries(m.scripts).map(([name, command]) => (
+                            <div key={name}>
+                              <strong>{name}</strong>
+                              <pre>{command}</pre>
+                            </div>
+                          ))}
+                        </article>
+                      ))}
+                      {!result.setup.guides[version].length && (
+                        <p>No usable package manifests captured. Startup commands are unknown.</p>
+                      )}
+                      <h3>Changed scripts</h3>
+                      {result.setup.scripts.map((s, i) => (
+                        <p key={i}>
+                          <strong>
+                            {s.path} · {s.name}
+                          </strong>
+                          <code>
+                            {s.before || 'not present'} → {s.after || 'removed'}
+                          </code>
+                        </p>
+                      ))}
+                    </section>
+                  </div>
+                </details>
               </>
             )}
           </section>

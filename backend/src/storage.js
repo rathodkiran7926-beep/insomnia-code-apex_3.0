@@ -16,7 +16,10 @@ CREATE TABLE IF NOT EXISTS analysis_jobs (id TEXT PRIMARY KEY, status TEXT NOT N
 CREATE TABLE IF NOT EXISTS documentation (snapshot_id TEXT PRIMARY KEY, data TEXT NOT NULL, markdown TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS source_files (snapshot_id TEXT NOT NULL, path TEXT NOT NULL, content TEXT NOT NULL, PRIMARY KEY(snapshot_id,path));
 CREATE TABLE IF NOT EXISTS generated_guides (snapshot_id TEXT NOT NULL, cache_key TEXT NOT NULL, data TEXT NOT NULL, PRIMARY KEY(snapshot_id,cache_key));`);
-export function saveSnapshot(graph, docs, markdown, files = {}) {
+db.exec(
+  "CREATE TABLE IF NOT EXISTS snapshot_setup_metadata (snapshot_id TEXT PRIMARY KEY,data TEXT NOT NULL)",
+);
+export function saveSnapshot(graph, docs, markdown, files = {}, setupMetadata) {
   db.exec("BEGIN IMMEDIATE");
   try {
     db.prepare("INSERT OR IGNORE INTO repositories VALUES (?,?)").run(
@@ -57,6 +60,10 @@ export function saveSnapshot(graph, docs, markdown, files = {}) {
       )
         sourceInsert.run(graph.snapshotId, path, content);
     }
+    if (setupMetadata)
+      db.prepare(
+        "INSERT OR REPLACE INTO snapshot_setup_metadata VALUES (?,?)",
+      ).run(graph.snapshotId, JSON.stringify(setupMetadata));
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");

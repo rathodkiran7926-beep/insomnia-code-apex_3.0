@@ -3,6 +3,7 @@ import { Background, Controls, MarkerType, Panel, Position, ReactFlow } from '@x
 import type { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 import { Crosshair, Code2 } from 'lucide-react';
 import type { RepositorySnapshot } from '../domain/analysisTypes';
+import type { ArchitectureSnapshot } from '../domain/backendArchitecture';
 import { workspaceGraphPositions } from '../domain/workspaceGraph';
 
 export function WorkspaceConnectionMap({
@@ -11,7 +12,7 @@ export function WorkspaceConnectionMap({
   onSelect,
 }: {
   selectedId: string;
-  snapshot: RepositorySnapshot;
+  snapshot: ArchitectureSnapshot & { documentation?: RepositorySnapshot['documentation'] };
   onSelect: (id: string) => void;
 }) {
   const root = useRef<HTMLDivElement>(null);
@@ -39,7 +40,7 @@ export function WorkspaceConnectionMap({
       .filter((component) => visible.has(component.id))
       .map((component) => {
         const ref = refs.get(component.referenceId);
-        const description = snapshot.documentation.ai.explanations.find(
+        const description = snapshot.documentation?.ai.explanations.find(
           (item) => item.componentId === component.id,
         )?.explanation;
         const types = [

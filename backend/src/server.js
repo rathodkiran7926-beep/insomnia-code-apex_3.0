@@ -10,19 +10,22 @@ import { readSource, answerQuestion } from "./workspace.js";
 import { generateGuide } from "./generatedGuides.js";
 import { discussionRoutes } from "./discussionRoutes.js";
 import { prRoutes } from "./prRoutes.js";
+import { collaborationRoutes } from "./collaborationAuth.js";
+import { handoffRoutes } from "./handoffRoutes.js";
 const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: "24kb" }));
 app.use("/api", (req, res, next) => {
   res.set("Cache-Control", "no-store");
   if (
-    req.method === "POST" &&
+    !["GET", "HEAD", "OPTIONS"].includes(req.method) &&
     req.headers.origin &&
     ![
       "http://127.0.0.1:5173",
       "http://localhost:5173",
       `http://127.0.0.1:${process.env.PORT || 3001}`,
       `http://localhost:${process.env.PORT || 3001}`,
+      ...(process.env.APP_ORIGIN ? [process.env.APP_ORIGIN] : []),
     ].includes(req.headers.origin)
   )
     return res.status(403).json({ error: "Origin not allowed" });
@@ -33,6 +36,8 @@ db.prepare(
 ).run();
 app.use("/api/discussions", discussionRoutes);
 app.use("/api/pr", prRoutes);
+app.use("/api/collaboration", collaborationRoutes);
+app.use("/api/handoffs", handoffRoutes);
 let active = 0;
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.post("/api/analyses", (req, res, next) => {
@@ -87,7 +92,13 @@ app.post("/api/analyses", (req, res, next) => {
       if (event.type === "failed") finish("failed", event.message);
       if (event.type === "complete") {
         try {
-          saveSnapshot(event.graph, event.docs, event.markdown, event.files);
+          saveSnapshot(
+            event.graph,
+            event.docs,
+            event.markdown,
+            event.files,
+            event.setupMetadata,
+          );
           finish("complete", "Analysis complete", event.graph.snapshotId);
         } catch {
           finish("failed", "Could not persist analysis");

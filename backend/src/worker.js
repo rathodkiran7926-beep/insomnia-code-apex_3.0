@@ -20,6 +20,7 @@ try {
     graph,
     docs,
     files: input.files,
+    setupMetadata: input.setupMetadata,
     markdown: markdown(graph, docs),
   });
 } catch (error) {

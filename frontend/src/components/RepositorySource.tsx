@@ -17,6 +17,7 @@ import {
   WrapText,
 } from 'lucide-react';
 import { Modal } from './UI';
+import '../styles/repository-source.css';
 
 type StoredSource = {
   file: string;
@@ -51,10 +52,18 @@ export function RepositorySource({
   source,
   commit,
   focusRange,
+  onLineSelect,
+  annotationLines = [],
+  secondaryRange,
+  navigationRange,
 }: {
   source?: StoredSource;
   commit: string;
   focusRange?: { startLine: number; endLine: number };
+  onLineSelect?: (line: number, extend: boolean) => void;
+  annotationLines?: number[];
+  secondaryRange?: { startLine: number; endLine: number };
+  navigationRange?: { startLine: number; endLine: number };
 }) {
   const viewer = useRef<HTMLDivElement>(null);
   const expandedViewer = useRef<HTMLDivElement>(null);
@@ -131,7 +140,10 @@ export function RepositorySource({
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   function showSelection(root: HTMLDivElement | null) {
-    const line = root?.querySelector<HTMLElement>('.source-focused-line');
+    const line =
+      (navigationRange &&
+        root?.querySelector<HTMLElement>(`[data-line="${navigationRange.startLine}"]`)) ||
+      root?.querySelector<HTMLElement>('.source-focused-line');
     const scroll = root?.querySelector<HTMLElement>('.repository-source-scroll');
     if (line && scroll)
       scroll.scrollTop +=
@@ -143,7 +155,15 @@ export function RepositorySource({
         showSelection(expanded ? expandedViewer.current : viewer.current);
     });
     return () => cancelAnimationFrame(frame);
-  }, [source?.file, source?.excerpt, focusRange?.startLine, focusRange?.endLine, expanded]);
+  }, [
+    source?.file,
+    source?.excerpt,
+    focusRange?.startLine,
+    focusRange?.endLine,
+    navigationRange?.startLine,
+    navigationRange?.endLine,
+    expanded,
+  ]);
   const [wrap, setWrap] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
@@ -368,7 +388,7 @@ export function RepositorySource({
         <pre>
           {lines.map((segments, i) => (
             <div
-              className={`repository-source-line ${large && matchLines.has(source.startLine + i) ? 'source-search-match' : ''} ${large && activeMatch === source.startLine + i ? 'source-active-match' : ''} ${large && jumpLine === source.startLine + i ? 'source-jump-line' : ''} ${focusRange && source.startLine + i >= focusRange.startLine && source.startLine + i <= focusRange.endLine ? `source-focused-line${source.startLine + i === focusRange.startLine ? ' source-focus-start' : ''}` : ''}`}
+              className={`repository-source-line ${secondaryRange && source.startLine + i >= secondaryRange.startLine && source.startLine + i <= secondaryRange.endLine ? 'source-review-line' : ''} ${large && matchLines.has(source.startLine + i) ? 'source-search-match' : ''} ${large && activeMatch === source.startLine + i ? 'source-active-match' : ''} ${large && jumpLine === source.startLine + i ? 'source-jump-line' : ''} ${focusRange && source.startLine + i >= focusRange.startLine && source.startLine + i <= focusRange.endLine ? `source-focused-line${source.startLine + i === focusRange.startLine ? ' source-focus-start' : ''}` : ''}`}
               key={i}
               data-line={source.startLine + i}
               aria-label={
@@ -379,9 +399,22 @@ export function RepositorySource({
                   : undefined
               }
             >
-              <span className="repository-source-number" aria-hidden="true">
-                {source.startLine + i}
-              </span>
+              {onLineSelect ? (
+                <button
+                  type="button"
+                  className="repository-source-number source-select-line"
+                  aria-label={`${annotationLines.includes(source.startLine + i) ? 'Annotated line' : 'Select line'} ${source.startLine + i}`}
+                  title="Select line; Shift-click to select a range"
+                  onClick={(e) => onLineSelect(source.startLine + i, e.shiftKey)}
+                >
+                  {annotationLines.includes(source.startLine + i) ? '● ' : ''}
+                  {source.startLine + i}
+                </button>
+              ) : (
+                <span className="repository-source-number" aria-hidden="true">
+                  {source.startLine + i}
+                </span>
+              )}
               <code>
                 {segments.length
                   ? segments.map((segment, j) => (

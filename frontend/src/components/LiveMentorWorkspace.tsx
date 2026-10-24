@@ -29,6 +29,7 @@ import { WorkspaceOptions } from './WorkspaceOptions';
 import { WorkspaceSplitter } from './WorkspaceSplitter';
 import { ChangeImpactExplorer } from './ChangeImpactExplorer';
 import { Modal } from './UI';
+import { CreateHandoffModal } from './CreateHandoffModal';
 import {
   automaticWorkspaceMode,
   componentForCitation,
@@ -113,6 +114,13 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
   const [sourceError, setSourceError] = useState('');
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState(false);
+  const [handoffOpen, setHandoffOpen] = useState(false);
+  const [handoffRange, setHandoffRange] = useState<{ startLine: number; endLine: number } | null>(
+    null,
+  );
+  useEffect(() => {
+    setHandoffRange(null);
+  }, [reference?.id, selectedId]);
   const [question, setQuestion] = useState('');
   const [turns, setTurns] = useState<Turn[]>([]);
   const [asking, setAsking] = useState(false);
@@ -469,6 +477,13 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
                       )}
                       <div className="workspace-source-actions">
                         <button
+                          disabled={!fullSource || !reference || editing}
+                          onClick={() => setHandoffOpen(true)}
+                          title="Share a pinned code question with a teammate"
+                        >
+                          <MessageCircle size={14} /> Create Handoff Snapshot
+                        </button>
+                        <button
                           disabled={!fullSource}
                           aria-pressed={editing}
                           onClick={() => setEditing(!editing)}
@@ -603,7 +618,17 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
                       <RepositorySource
                         source={source}
                         commit={snapshot.commit}
-                        focusRange={reference}
+                        focusRange={handoffRange || reference}
+                        onLineSelect={(line, extend) =>
+                          setHandoffRange((old) =>
+                            extend && old
+                              ? {
+                                  startLine: Math.min(old.startLine, line),
+                                  endLine: Math.max(old.startLine, line),
+                                }
+                              : { startLine: line, endLine: line },
+                          )
+                        }
                       />
                     )}
                   </section>
@@ -752,6 +777,21 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
           </aside>
         )}
       </div>
+      {fullSource && reference && (
+        <CreateHandoffModal
+          open={handoffOpen}
+          onOpenChange={setHandoffOpen}
+          snapshot={snapshot}
+          source={fullSource}
+          referenceId={reference.id}
+          selection={
+            handoffRange || {
+              startLine: reference.startLine,
+              endLine: Math.min(reference.endLine, reference.startLine + 299),
+            }
+          }
+        />
+      )}
       <Modal
         open={impactOpen}
         onOpenChange={setImpactOpen}

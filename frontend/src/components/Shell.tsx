@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import '../styles/workspace-header.css';
 import { usePageCardReveal } from '../animations/gsapHooks';
 import {
@@ -18,7 +18,6 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
-  MessageSquareText,
   Search,
   Settings2,
   Sparkles,
@@ -31,6 +30,7 @@ import { getRoute } from '../domain/model';
 import { useWorkspace } from '../state/WorkspaceContext';
 import { useRepositoryAnalysis } from '../state/RepositoryAnalysisContext';
 import { Badge, Button, IconButton, Modal, ProgressBar } from './UI';
+import { MentorNavigation, IntegrationLinks, workspaceNavigation } from './MentorNavigation';
 
 const navigation = [
   { path: '/workspace', label: 'Mentor workspace', icon: LayoutGrid },
@@ -50,12 +50,18 @@ export function Shell() {
   const go = useNavigate();
   const contentRef = usePageCardReveal(location.pathname);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    try { return localStorage.getItem('codebase-mentor.sidebar-collapsed') === 'true'; }
-    catch { return false; }
+    try {
+      return localStorage.getItem('codebase-mentor.sidebar-collapsed') === 'true';
+    } catch {
+      return false;
+    }
   });
   useEffect(() => {
-    try { localStorage.setItem('codebase-mentor.sidebar-collapsed', String(sidebarCollapsed)); }
-    catch { /* The toggle still works when storage is unavailable. */ }
+    try {
+      localStorage.setItem('codebase-mentor.sidebar-collapsed', String(sidebarCollapsed));
+    } catch {
+      /* The toggle still works when storage is unavailable. */
+    }
   }, [sidebarCollapsed]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -63,7 +69,9 @@ export function Shell() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [updatesOpen, setUpdatesOpen] = useState(false);
-  const [progressNotification, setProgressNotification] = useState<'unseen' | 'pending' | 'dismissed'>(() => {
+  const [progressNotification, setProgressNotification] = useState<
+    'unseen' | 'pending' | 'dismissed'
+  >(() => {
     try {
       const saved = localStorage.getItem('codebase-mentor.daily-progress.v1');
       return saved === 'pending' || saved === 'dismissed' ? saved : 'unseen';
@@ -101,11 +109,19 @@ export function Shell() {
   const current =
     location.pathname === '/demo-workspace'
       ? 'Demo workspace'
-      : (navigation.find((x) => x.path === location.pathname)?.label ?? 'Team knowledge');
+      : location.pathname.startsWith('/handoffs')
+        ? 'Context Handoffs'
+        : workspaceNavigation
+            .flatMap((g) => g.links)
+            .find((x) => x.path === location.pathname + location.search)?.label ||
+          navigation.find((x) => x.path === location.pathname)?.label ||
+          'Team Knowledge';
   const analyzingRepository =
     location.pathname === '/repository' ||
     location.pathname === '/workspace' ||
-    location.pathname === '/changes';
+    location.pathname === '/changes' ||
+    location.pathname.startsWith('/handoffs') ||
+    location.pathname === '/knowledge';
   const learningRoute = getRoute(
     state.personalized ? state.profile : 'beginner',
     state.personalized ? state.goal : 'contribute',
@@ -169,11 +185,21 @@ export function Shell() {
 
   return (
     <div className={`app-shell${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
-      <a className="shell-skip-link" href="#main-content" onClick={(event) => {
-        event.preventDefault();
-        document.getElementById('main-content')?.focus();
-      }}>Skip to main content</a>
-      <aside id="workspace-sidebar" className="sidebar refreshed-sidebar" aria-label="Workspace sidebar">
+      <a
+        className="shell-skip-link"
+        href="#main-content"
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById('main-content')?.focus();
+        }}
+      >
+        Skip to main content
+      </a>
+      <aside
+        id="workspace-sidebar"
+        className="sidebar refreshed-sidebar"
+        aria-label="Workspace sidebar"
+      >
         <NavLink to="/" className="brand" aria-label="Codebase Mentor home">
           <span className="brand-symbol mascot-icon">
             <img src="/codebase_mentor_logo_transparent.svg" alt="" width={36} height={36} />
@@ -184,48 +210,12 @@ export function Shell() {
           <Badge tone="violet">beta</Badge>
         </NavLink>
         <div className="sidebar-navigation">
-          <nav aria-label="Main navigation">
-            {navigation.map(({ path, label, icon: Icon, count }) => (
-              <Fragment key={path}>
-                {path === '/workspace' && <div className="nav-label">Workspace</div>}
-                {path === '/journeys' && <div className="nav-label">Learn & explore</div>}
-                <NavLink
-                  to={path}
-                  aria-label={label}
-                  title={sidebarCollapsed ? label : undefined}
-                  end={path === '/'}
-                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                >
-                  <Icon size={17} strokeWidth={1.7} />
-                  <span>{label}</span>
-                  {count && !analyzingRepository && <span className="nav-count">{count}</span>}
-                </NavLink>
-              </Fragment>
-            ))}
-          </nav>
-          <div className="team-nav">
-            <div className="nav-label">Team knowledge</div>
-            <NavLink
-              to="/knowledge"
-              aria-label="Knowledge & decisions"
-              title={sidebarCollapsed ? 'Knowledge & decisions' : undefined}
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            >
-              <MessageSquareText size={17} strokeWidth={1.7} />
-              <span>Knowledge & decisions</span>
-              {!analyzingRepository && state.decision === 'open' && <span className="small-dot" />}
-            </NavLink>
-          </div>
+          <MentorNavigation collapsed={sidebarCollapsed} onSettings={() => setSettingsOpen(true)} />
         </div>
         <div className="sidebar-bottom">
-          {!analyzingRepository && (
-            <button className="sidebar-setting" aria-label="Preferences" title={sidebarCollapsed ? 'Preferences' : undefined} onClick={() => setSettingsOpen(true)}>
-              <Settings2 size={15} /> <span className="preferences-label">Preferences</span> <span>⌘ ,</span>
-            </button>
-          )}
           <div className="sidebar-footer">
             <span className="status-dot" />{' '}
-            {analyzingRepository ? 'Local repository analysis' : 'All work stays in browser'}{' '}
+            {analyzingRepository ? 'Local backend connected' : 'Learning workspace'}{' '}
             <span>v0.1</span>
           </div>
         </div>
@@ -315,22 +305,40 @@ export function Shell() {
             </div>
           )}
         </header>
-        <main ref={contentRef} id="main-content" tabIndex={-1} key={location.pathname} className="main-content">
+        <main
+          ref={contentRef}
+          id="main-content"
+          tabIndex={-1}
+          key={location.pathname}
+          className="main-content"
+        >
           <Outlet />
         </main>
       </div>
       {progressPopupOpen && progressNotification === 'pending' && (
         <div className="daily-progress-popup" role="status" aria-live="polite">
           <div className="row between">
-            <span className="tiny-label"><Sparkles size={14} /> DAILY PROGRESS</span>
-            <IconButton icon={X} label="Dismiss daily progress notification" onClick={dismissProgressNotification} />
+            <span className="tiny-label">
+              <Sparkles size={14} /> DAILY PROGRESS
+            </span>
+            <IconButton
+              icon={X}
+              label="Dismiss daily progress notification"
+              onClick={dismissProgressNotification}
+            />
           </div>
           <strong>Your first contribution starts here.</strong>
           <ProgressBar value={routeProgress} />
-          <Button variant="ghost" icon={Bell} onClick={() => {
-            setProgressPopupOpen(false);
-            setUpdatesOpen(true);
-          }}>View notification</Button>
+          <Button
+            variant="ghost"
+            icon={Bell}
+            onClick={() => {
+              setProgressPopupOpen(false);
+              setUpdatesOpen(true);
+            }}
+          >
+            View notification
+          </Button>
         </div>
       )}
       {notice && (
@@ -345,28 +353,14 @@ export function Shell() {
       <Modal
         open={mobileOpen}
         onOpenChange={setMobileOpen}
-        title="Relay workspace"
-        description="acme / relay-api · sample repository"
+        title="Codebase Mentor"
+        description="Workspace navigation"
         className="nav-drawer"
       >
-        <nav aria-label="Mobile navigation">
-          {navigation.map(({ path, label, icon: Icon, count }) => (
-            <NavLink
-              key={path}
-              to={path}
-              onClick={() => setMobileOpen(false)}
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            >
-              <Icon size={18} />
-              <span>{label}</span>
-              {count && <span className="nav-count">{count}</span>}
-            </NavLink>
-          ))}
-          <NavLink to="/knowledge" onClick={() => setMobileOpen(false)} className="nav-item">
-            <MessageSquareText size={18} />
-            <span>Knowledge & decisions</span>
-          </NavLink>
-        </nav>
+        <MentorNavigation
+          onSettings={() => setSettingsOpen(true)}
+          onNavigate={() => setMobileOpen(false)}
+        />
         <div className="dialog-body">
           <Button
             icon={Settings2}
@@ -492,6 +486,7 @@ export function Shell() {
         description="Your preferences change explanations and the recommended learning route."
       >
         <div className="dialog-body stack-20">
+          <IntegrationLinks />
           <div className="profile-line">
             <div className="large-avatar">JD</div>
             <div>
@@ -549,17 +544,32 @@ export function Shell() {
       >
         <div className="dialog-body stack-20">
           {progressNotification === 'pending' && (
-            <section className="daily-progress-notification" aria-label="Daily progress notification">
+            <section
+              className="daily-progress-notification"
+              aria-label="Daily progress notification"
+            >
               <div className="row between">
-                <span className="tiny-label"><Sparkles size={14} /> DAILY PROGRESS</span>
-                <IconButton icon={X} label="Remove daily progress notification" onClick={dismissProgressNotification} />
+                <span className="tiny-label">
+                  <Sparkles size={14} /> DAILY PROGRESS
+                </span>
+                <IconButton
+                  icon={X}
+                  label="Remove daily progress notification"
+                  onClick={dismissProgressNotification}
+                />
               </div>
               <strong>Your first contribution starts here.</strong>
               <ProgressBar value={routeProgress} />
-              <Button variant="ghost" icon={ArrowRight} onClick={() => {
-                go('/learn');
-                setUpdatesOpen(false);
-              }}>Continue learning path</Button>
+              <Button
+                variant="ghost"
+                icon={ArrowRight}
+                onClick={() => {
+                  go('/learn');
+                  setUpdatesOpen(false);
+                }}
+              >
+                Continue learning path
+              </Button>
             </section>
           )}
           <Badge tone="violet">Prepared change · PR #402</Badge>
