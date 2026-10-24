@@ -21,30 +21,45 @@ function Test-BackendHealth {
     catch { return $false }
 }
 function Register-CodexMcp([string]$NodeExe) {
-    $CodexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME '.codex' }
-    New-Item -ItemType Directory -Path $CodexHome -Force | Out-Null
-    $ConfigPath = Join-Path $CodexHome 'config.toml'
-    $nodeToml = ('"' + $NodeExe.Replace('\','/').Replace('"','\"') + '"')
-    $envArg = ('"--env-file-if-exists=' + $McpEnv.Replace('\','/').Replace('"','\"') + '"')
-    $entryArg = ('"' + (Join-Path $Mcp 'src/stdio.js').Replace('\','/').Replace('"','\"') + '"')
-    $Block = "[mcp_servers.codebase_mentor]`r`ncommand = $nodeToml`r`nargs = [$envArg, $entryArg]`r`nstartup_timeout_sec = 30`r`ntool_timeout_sec = 360`rnenabled = true`r`n"
-    $Existing = if (Test-Path $ConfigPath) { Get-Content -Raw -Path $ConfigPath } else { '' }
-    $Pattern = '(?ms)^\[mcp_servers\.codebase_mentor\]\r?\n.*?(?=^\[|\z)'
-    if ($Existing -match $Pattern) {
-        $Updated = [regex]::Replace($Existing, $Pattern, [System.Text.RegularExpressions.MatchEvaluator]{ param($m) $Block + "`r`n" }, 1)
-    } else {
-        $Updated = $Existing.TrimEnd()
-        if ($Updated.Length -gt 0) { $Updated += "`r`n`r`n" }
-        $Updated += $Block
-    }
-    if ($Existing -ne $Updated) {
-        if (Test-Path $ConfigPath) {
-            $Backup = "$ConfigPath.codebase-mentor-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
-            Copy-Item $ConfigPath $Backup -Force
-            Write-Host "Existing Codex settings backed up to $Backup"
+    $CodexCommand = Get-Command codex -ErrorAction SilentlyContinue
+    if (-not $CodexCommand) { Fail 'Codex CLI is required. Install it and ensure codex is on PATH, then rerun this installer.' }
+    $CodexConfigRoot = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME '.codex' }
+    $ConfigPath = Join-Path $CodexConfigRoot 'config.toml'
+    if (Test-Path -LiteralPath $ConfigPath) {
+        $Backup = "$ConfigPath.codebase-mentor-backup-$([guid]::NewGuid().ToString('N'))"
+        Copy-Item -LiteralPath $ConfigPath -Destination $Backup
+        Write-Host "Existing Codex settings backed up to $Backup"
+        # Windows PowerShell 5.1's Set-Content -Encoding utf8 added a BOM.
+        # Remove only those three bytes; leave TOML parsing/writing to Codex.
+        $Bytes = [IO.File]::ReadAllBytes($ConfigPath)
+        if ($Bytes.Length -ge 3 -and $Bytes[0] -eq 239 -and $Bytes[1] -eq 187 -and $Bytes[2] -eq 191) {
+            $WithoutBom = New-Object byte[] ($Bytes.Length - 3)
+            [Array]::Copy($Bytes, 3, $WithoutBom, 0, $WithoutBom.Length)
+            [IO.File]::WriteAllBytes($ConfigPath, $WithoutBom)
+            Write-Host 'Removed the UTF-8 BOM from the existing Codex config.'
         }
-        Set-Content -Path $ConfigPath -Value $Updated -Encoding utf8
     }
+    & $CodexCommand mcp add codebase_mentor -- $NodeExe "--env-file-if-exists=$McpEnv" (Join-Path $Mcp 'src/stdio.js')
+    if ($LASTEXITCODE -ne 0) { Fail "Codex MCP registration failed (exit $LASTEXITCODE). Existing settings were backed up if present; check the Codex error above." }
+    $EntryJson = & $CodexCommand mcp get codebase_mentor --json
+    if ($LASTEXITCODE -ne 0) { Fail 'Codex could not read the registered MCP server.' }
+    $Entry = ($EntryJson | Out-String | ConvertFrom-Json)
+    # The CLI has no timeout flags. Add only missing limits to its generated table.
+    $TimeoutLines = @()
+    if ($null -eq $Entry.startup_timeout_sec) { $TimeoutLines += 'startup_timeout_sec = 30' }
+    if ($null -eq $Entry.tool_timeout_sec) { $TimeoutLines += 'tool_timeout_sec = 360' }
+    if ($TimeoutLines.Count) {
+        $Lines = New-Object 'System.Collections.Generic.List[string]'
+        $Lines.AddRange([IO.File]::ReadAllLines($ConfigPath))
+        $HeaderIndex = $Lines.IndexOf('[mcp_servers.codebase_mentor]')
+        if ($HeaderIndex -lt 0) { Fail 'Unexpected Codex config layout; timeout settings were not changed.' }
+        $Lines.InsertRange($HeaderIndex + 1, [string[]]$TimeoutLines)
+        [IO.File]::WriteAllLines($ConfigPath, $Lines, (New-Object Text.UTF8Encoding($false)))
+    }
+    $VerifiedJson = & $CodexCommand mcp get codebase_mentor --json
+    if ($LASTEXITCODE -ne 0) { Fail 'Codex rejected the final MCP configuration; restore the backup above.' }
+    $Verified = ($VerifiedJson | Out-String | ConvertFrom-Json)
+    if ($null -eq $Verified.startup_timeout_sec -or $null -eq $Verified.tool_timeout_sec) { Fail 'Codex MCP timeout settings could not be verified.' }
     Write-Host "Codex MCP registered in $ConfigPath" -ForegroundColor Green
 }
 function Start-LocalBackend([string]$NodeExe) {
