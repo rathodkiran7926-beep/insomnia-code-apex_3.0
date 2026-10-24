@@ -17,6 +17,7 @@ import { journeyRoutes } from "./journeyRoutes.js";
 import { engineeringMemoryRoutes } from "./engineeringMemoryRoutes.js";
 import { practiceRoutes } from "./practiceRoutes.js";
 import { agentContextRouter } from "./agentContextRoutes.js";
+import { impactPreviewRoutes } from "./impactPreviewRoutes.js";
 const app = express();
 app.disable("x-powered-by");
 app.use("/api", componentNamesMiddleware(db));
@@ -197,6 +198,10 @@ function workspaceGraph(id) {
     throw Object.assign(new Error("Snapshot not found"), { status: 404 });
   return JSON.parse(row.graph_json);
 }
+app.use(
+  "/api/snapshots",
+  impactPreviewRoutes({ loadSnapshot: workspaceGraph, readSource }),
+);
 app.get("/api/snapshots/:id/source", async (req, res, next) => {
   try {
     const graph = workspaceGraph(req.params.id);

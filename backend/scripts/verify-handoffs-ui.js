@@ -473,11 +473,21 @@ try {
     `document.querySelector('.related-team-knowledge')?.innerText.includes('Remember the duplicate-account failure')`,
     "Approved memory did not surface for its workspace component",
   );
+  await evaluate("document.querySelector('.impact-toggle input').click()");
+  await wait("document.querySelector('#impact-proposed-code')?.value.includes('createUser')", 'Merged Impact tab did not load pinned source');
+  const beforeImpact=await evaluate("document.querySelector('#impact-proposed-code').value");
+  await fill('#impact-proposed-code',beforeImpact+'\n// proposed review draft');
+  await click('Analyze proposed code');
+  await wait("document.querySelector('.impact-code-analysis')?.innerText.includes('Source facts')", 'Merged impact analysis did not preserve source-only fallback');
+  await evaluate("[...document.querySelectorAll('.workspace-right-panel-tabs button')].find(e=>e.textContent.trim()==='Mentor').click()");
+  await wait("document.querySelector('.workspace-mentor-content .related-team-knowledge')?.innerText.includes('Remember the duplicate-account failure')", 'Impact tab lost existing mentor knowledge');
   await evaluate(
     `location.hash='/journeys/repo-${snapshot.snapshotId}-${component.id}'`,
   );
+  await wait(`document.querySelector('.journey-component-details summary')`, 'Journey details missing');
+  await evaluate(`document.querySelector('.journey-component-details').open=true`);
   await wait(
-    `document.querySelector('.journey-learning-panel .related-team-knowledge')?.innerText.includes('Remember the duplicate-account failure')`,
+    `document.querySelector('.journey-component-details .related-team-knowledge')?.innerText.includes('Remember the duplicate-account failure')`,
     "Approved memory did not surface for its CodeJourney event",
   );
   await evaluate(`location.hash='/handoffs/${sessionId}'`);
