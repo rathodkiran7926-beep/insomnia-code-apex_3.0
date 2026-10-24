@@ -78,9 +78,13 @@ export function questionContext(graph, componentId) {
     component.referenceId,
     ...relationships.map((e) => e.referenceId),
   ]);
-  const references = graph.references.filter(
-    (r) => ids.has(r.id) && r.snapshotId === graph.snapshotId,
-  );
+  const references = graph.references
+    .filter((r) => ids.has(r.id) && r.snapshotId === graph.snapshotId)
+    .sort(
+      (a, b) =>
+        Number(b.id === component.referenceId) -
+        Number(a.id === component.referenceId),
+    );
   const connected = graph.components.filter((c) =>
     relationships.some((e) => e.source === c.id || e.target === c.id),
   );
@@ -156,6 +160,11 @@ export async function answerQuestion(graph, componentId, question) {
       "Error handling and validation were not determined. Inspect the source before changing this behavior.";
   else
     answer = `${c.name} is recorded as a ${c.role.replaceAll("_", " ")}.\n\n${(c.evidence || []).join("\n") || "Inspect the selected source for its implementation."}\n\n${outgoing.length ? `Connected behavior: ${outgoing.slice(0, 12).join("; ")}.` : "No outgoing connections were resolved."}\n\n${/why|reason|design|change|refactor/i.test(question) ? "Static code cannot establish the author’s intent or confirm a proposed change is safe. Check callers and tests before editing." : "These are recorded static facts; runtime behavior has not been verified."}`;
+  const factsLimited = answer.length > 15000;
+  if (factsLimited)
+    answer =
+      answer.slice(0, 14900) +
+      "\n\nAdditional connection details omitted; inspect the source graph for the remaining evidence.";
   let result = {
     answer,
     referenceIds: references.slice(0, 8).map((r) => r.id),
@@ -212,6 +221,8 @@ export async function answerQuestion(graph, componentId, question) {
         "AI response unavailable. Showing recorded source facts for this component.";
     }
   }
+  if (mode === "facts" && factsLimited)
+    notice += " Connection details were limited to keep the response bounded.";
   return {
     ...result,
     mode,

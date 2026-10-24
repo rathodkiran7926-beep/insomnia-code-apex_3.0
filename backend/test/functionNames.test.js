@@ -168,3 +168,20 @@ test("inline Express use callbacks retain middleware context without affecting m
     ),
   );
 });
+
+test("IDE handoff and checkpoint exports retain exact digest-bearing response objects", async () => {
+  const { componentNamesMiddleware } =
+    await import("../src/componentPresentation.js");
+  for (const path of ["/ide/handoffs/preview", "/ide/checkpoints/id"]) {
+    const body = {
+      snapshotId: "missing",
+      name: "anonymous:1",
+      digest: "fixed",
+    };
+    let result;
+    const res = { json: (value) => (result = value) };
+    componentNamesMiddleware(db)({ path }, res, () => {});
+    res.json(body);
+    assert.equal(result, body);
+  }
+});

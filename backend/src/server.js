@@ -1,4 +1,5 @@
 import express from "express";
+import { ideRoutes } from "./ideRoutes.js";
 import { componentNamesMiddleware } from "./componentPresentation.js";
 import { Worker } from "node:worker_threads";
 import { randomUUID } from "node:crypto";
@@ -45,6 +46,7 @@ db.prepare(
 ).run();
 app.use("/api/discussions", discussionRoutes);
 app.use("/api/pr", prRoutes);
+app.use("/api/ide", ideRoutes);
 app.use("/api/collaboration", collaborationRoutes);
 app.use("/api/handoffs", handoffRoutes);
 app.use("/api", journeyRoutes);

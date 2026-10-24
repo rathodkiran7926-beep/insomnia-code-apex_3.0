@@ -1,0 +1,504 @@
+{
+  "name": "codebase-mentor",
+  "displayName": "Codebase Mentor",
+  "description": "A lightweight IDE companion to the shared Codebase Mentor backend.",
+  "version": "0.1.1",
+  "publisher": "codebase-mentor-local",
+  "private": true,
+  "license": "SEE LICENSE IN LICENSE.txt",
+  "engines": {
+    "vscode": "^1.100.0",
+    "node": ">=24"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Backend health is available. Trust is required for Git/editor context and snapshot connections. No source contents are uploaded."
+    },
+    "virtualWorkspaces": {
+      "supported": true
+    }
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codebaseMentor",
+          "title": "Codebase Mentor",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "codebaseMentor": [
+        {
+          "id": "codebaseMentor.focus",
+          "name": "Focus",
+          "type": "webview"
+        },
+        {
+          "id": "codebaseMentor.changes",
+          "name": "Changes",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "codebaseMentor.explainSelection",
+        "title": "Codebase Mentor: Explain Selection"
+      },
+      {
+        "command": "codebaseMentor.openMentor",
+        "title": "Codebase Mentor: Open Mentor"
+      },
+      {
+        "command": "codebaseMentor.askFollowUp",
+        "title": "Codebase Mentor: Ask Follow-up"
+      },
+      {
+        "command": "codebaseMentor.cancelMentor",
+        "title": "Codebase Mentor: Cancel Mentor Request"
+      },
+      {
+        "command": "codebaseMentor.openCitation",
+        "title": "Codebase Mentor: Open Source Citation"
+      },
+      {
+        "command": "codebaseMentor.connectRepository",
+        "title": "Codebase Mentor: Connect Repository"
+      },
+      {
+        "command": "codebaseMentor.refreshRepository",
+        "title": "Codebase Mentor: Refresh Repository Context"
+      },
+      {
+        "command": "codebaseMentor.changeSnapshot",
+        "title": "Codebase Mentor: Change Snapshot"
+      },
+      {
+        "command": "codebaseMentor.disconnectRepository",
+        "title": "Codebase Mentor: Disconnect Repository"
+      },
+      {
+        "command": "codebaseMentor.openWorkspace",
+        "title": "Codebase Mentor: Open Workspace"
+      },
+      {
+        "command": "codebaseMentor.checkConnection",
+        "title": "Codebase Mentor: Check Backend Connection",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "codebaseMentor.openSettings",
+        "title": "Codebase Mentor: Open Settings",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "codebaseMentor.showRelatedCode",
+        "title": "Codebase Mentor: Show Related Code",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "codebaseMentor.openMap",
+        "title": "Codebase Mentor: Open Map",
+        "icon": "$(map)"
+      },
+      {
+        "command": "codebaseMentor.showMentorRelated",
+        "title": "Codebase Mentor: Show Mentor Component in Map",
+        "icon": "$(map)"
+      },
+      {
+        "command": "codebaseMentor.refreshMap",
+        "title": "Codebase Mentor: Refresh Map",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "codebaseMentor.mapBack",
+        "title": "Codebase Mentor: Back to Previous Component",
+        "icon": "$(arrow-left)"
+      },
+      {
+        "command": "codebaseMentor.mapBackToEditor",
+        "title": "Codebase Mentor: Back to Editor Selection",
+        "icon": "$(code)"
+      },
+      {
+        "command": "codebaseMentor.exploreComponent",
+        "title": "Codebase Mentor: Explore Component",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "codebaseMentor.openAtlasSource",
+        "title": "Codebase Mentor: Open Map Source Evidence",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "codebaseMentor.explainAtlasComponent",
+        "title": "Codebase Mentor: Explain with Codebase Mentor",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "codebaseMentor.openRepositoryArchitecture",
+        "title": "Codebase Mentor: Open Complete Repository Architecture",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "codebaseMentor.openFullAtlas",
+        "title": "Codebase Mentor: Open Full Architecture Atlas",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "codebaseMentor.openChanges",
+        "title": "Codebase Mentor: Open PR Changes",
+        "icon": "$(git-pull-request)"
+      },
+      {
+        "command": "codebaseMentor.refreshPrList",
+        "title": "Codebase Mentor: Refresh Pull Request List",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "codebaseMentor.prNextPage",
+        "title": "Codebase Mentor: Next PR Page",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "codebaseMentor.prPreviousPage",
+        "title": "Codebase Mentor: Previous PR Page",
+        "icon": "$(arrow-left)"
+      },
+      {
+        "command": "codebaseMentor.prFilterList",
+        "title": "Codebase Mentor: Filter Pull Requests",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "codebaseMentor.selectPr",
+        "title": "Codebase Mentor: Select Pull Request",
+        "icon": "$(git-pull-request)"
+      },
+      {
+        "command": "codebaseMentor.prEnterUrl",
+        "title": "Codebase Mentor: Enter Pull Request URL",
+        "icon": "$(link)"
+      },
+      {
+        "command": "codebaseMentor.startPrAnalysis",
+        "title": "Codebase Mentor: Start PR Analysis",
+        "icon": "$(play)"
+      },
+      {
+        "command": "codebaseMentor.resumePrJob",
+        "title": "Codebase Mentor: Resume PR Job",
+        "icon": "$(play)"
+      },
+      {
+        "command": "codebaseMentor.cancelPrWaiting",
+        "title": "Codebase Mentor: Stop Local PR Waiting",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "codebaseMentor.refreshPrComparison",
+        "title": "Codebase Mentor: Refresh Stored PR Comparison",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "codebaseMentor.reanalyzePr",
+        "title": "Codebase Mentor: Reanalyze Selected PR",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "codebaseMentor.openPrSource",
+        "title": "Codebase Mentor: Open PR Source Evidence",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "codebaseMentor.prExploreMap",
+        "title": "Codebase Mentor: Explore PR Component in Map",
+        "icon": "$(map)"
+      },
+      {
+        "command": "codebaseMentor.prExplainComponent",
+        "title": "Codebase Mentor: Explain PR Component with Mentor",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "codebaseMentor.openPrDiff",
+        "title": "Codebase Mentor: Open PR File Diff",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "codebaseMentor.saveTaskCheckpoint",
+        "title": "Codebase Mentor: Save Task Checkpoint",
+        "icon": "$(save)"
+      },
+      {
+        "command": "codebaseMentor.refreshCheckpoints",
+        "title": "Codebase Mentor: Refresh Saved Tasks",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "codebaseMentor.resumeTask",
+        "title": "Codebase Mentor: Resume Task",
+        "icon": "$(history)"
+      },
+      {
+        "command": "codebaseMentor.viewCheckpointDetails",
+        "title": "Codebase Mentor: View Checkpoint Details",
+        "icon": "$(book)"
+      },
+      {
+        "command": "codebaseMentor.deleteCheckpoint",
+        "title": "Codebase Mentor: Delete Task Checkpoint",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "codebaseMentor.nextCheckpoints",
+        "title": "Codebase Mentor: Next Saved Tasks",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "codebaseMentor.previousCheckpoints",
+        "title": "Codebase Mentor: Previous Saved Tasks",
+        "icon": "$(arrow-left)"
+      },
+      {
+        "command": "codebaseMentor.askSeniorWithContext",
+        "title": "Codebase Mentor: Ask Senior with Context",
+        "icon": "$(export)"
+      },
+      {
+        "command": "codebaseMentor.askSeniorMentor",
+        "title": "Codebase Mentor: Ask Senior About This",
+        "icon": "$(export)"
+      },
+      {
+        "command": "codebaseMentor.askSeniorMap",
+        "title": "Codebase Mentor: Ask Senior About This Component",
+        "icon": "$(export)"
+      },
+      {
+        "command": "codebaseMentor.askSeniorChange",
+        "title": "Codebase Mentor: Ask Senior About This Change",
+        "icon": "$(export)"
+      },
+      {
+        "command": "codebaseMentor.askSeniorTask",
+        "title": "Codebase Mentor: Ask Senior About This Task",
+        "icon": "$(export)"
+      },
+      {
+        "command": "codebaseMentor.refreshHandoffs",
+        "title": "Codebase Mentor: Refresh Saved Handoffs",
+        "icon": "$(export)"
+      },
+      {
+        "command": "codebaseMentor.openHandoff",
+        "title": "Codebase Mentor: Open Saved Handoff",
+        "icon": "$(export)"
+      },
+      {
+        "command": "codebaseMentor.deleteHandoff",
+        "title": "Codebase Mentor: Delete Saved Handoff",
+        "icon": "$(export)"
+      },
+      {
+        "command": "codebaseMentor.nextHandoffs",
+        "title": "Codebase Mentor: Next Handoffs",
+        "icon": "$(export)"
+      },
+      {
+        "command": "codebaseMentor.previousHandoffs",
+        "title": "Codebase Mentor: Previous Handoffs",
+        "icon": "$(export)"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "codebaseMentor.explainSelection",
+          "when": "editorTextFocus",
+          "group": "navigation@20"
+        },
+        {
+          "command": "codebaseMentor.showRelatedCode",
+          "when": "editorTextFocus",
+          "group": "navigation@21"
+        },
+        {
+          "command": "codebaseMentor.askSeniorWithContext",
+          "when": "editorTextFocus",
+          "group": "navigation@22"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "codebaseMentor.checkConnection",
+          "when": "view == codebaseMentor.focus",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codebaseMentor.openSettings",
+          "when": "view == codebaseMentor.focus",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codebaseMentor.mapBack",
+          "when": "view == codebaseMentor.map",
+          "group": "navigation@0"
+        },
+        {
+          "command": "codebaseMentor.refreshMap",
+          "when": "view == codebaseMentor.map",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codebaseMentor.openMap",
+          "when": "view == codebaseMentor.map",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codebaseMentor.refreshPrList",
+          "when": "view == codebaseMentor.changes",
+          "group": "navigation@0"
+        },
+        {
+          "command": "codebaseMentor.prEnterUrl",
+          "when": "view == codebaseMentor.changes",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codebaseMentor.saveTaskCheckpoint",
+          "when": "view == codebaseMentor.focus",
+          "group": "navigation@3"
+        },
+        {
+          "command": "codebaseMentor.refreshCheckpoints",
+          "when": "view == codebaseMentor.focus",
+          "group": "navigation@4"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "codebaseMentor.exploreComponent",
+          "when": "view == codebaseMentor.map && viewItem == atlasComponent",
+          "group": "navigation@0"
+        },
+        {
+          "command": "codebaseMentor.openAtlasSource",
+          "when": "view == codebaseMentor.map && viewItem == atlasComponent",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codebaseMentor.explainAtlasComponent",
+          "when": "view == codebaseMentor.map && viewItem == atlasComponent",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codebaseMentor.prExploreMap",
+          "when": "view == codebaseMentor.changes && viewItem == prComponent",
+          "group": "navigation@0"
+        },
+        {
+          "command": "codebaseMentor.prExplainComponent",
+          "when": "view == codebaseMentor.changes && viewItem == prComponent",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codebaseMentor.openPrSource",
+          "when": "view == codebaseMentor.changes && viewItem == prComponent",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codebaseMentor.resumeTask",
+          "when": "view == codebaseMentor.focus && viewItem == savedTask",
+          "group": "navigation@0"
+        },
+        {
+          "command": "codebaseMentor.viewCheckpointDetails",
+          "when": "view == codebaseMentor.focus && viewItem == savedTask",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codebaseMentor.deleteCheckpoint",
+          "when": "view == codebaseMentor.focus && viewItem == savedTask",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codebaseMentor.askSeniorMap",
+          "when": "view == codebaseMentor.map && viewItem == atlasComponent",
+          "group": "navigation@4"
+        },
+        {
+          "command": "codebaseMentor.askSeniorChange",
+          "when": "view == codebaseMentor.changes && viewItem == prComponent",
+          "group": "navigation@4"
+        },
+        {
+          "command": "codebaseMentor.askSeniorTask",
+          "when": "view == codebaseMentor.focus && viewItem == savedTask",
+          "group": "navigation@4"
+        },
+        {
+          "command": "codebaseMentor.openHandoff",
+          "when": "view == codebaseMentor.focus && viewItem == savedHandoff",
+          "group": "navigation@4"
+        },
+        {
+          "command": "codebaseMentor.deleteHandoff",
+          "when": "view == codebaseMentor.focus && viewItem == savedHandoff",
+          "group": "navigation@4"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Codebase Mentor",
+      "properties": {
+        "codebaseMentor.apiBaseUrl": {
+          "type": "string",
+          "scope": "machine",
+          "default": "http://127.0.0.1:3001",
+          "description": "Backend root URL. HTTP is limited to loopback; other hosts require HTTPS. The current backend has no production authentication. In remote windows, localhost refers to the extension host."
+        },
+        "codebaseMentor.webBaseUrl": {
+          "type": "string",
+          "scope": "machine",
+          "default": "http://127.0.0.1:5173",
+          "description": "Main web platform root for Open Full Architecture Atlas. Uses its existing workspace route; browser repository state is independent. Loopback HTTP or HTTPS only."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "build": "npm run check && node scripts/build.mjs",
+    "build:dev": "npm run check && node scripts/build.mjs --development",
+    "watch": "node scripts/build.mjs --watch",
+    "test": "node scripts/test.mjs",
+    "test:host": "npm run build && node scripts/test-host.mjs",
+    "vscode:prepublish": "npm run build",
+    "package:vsix": "vsce package --allow-missing-repository",
+    "package:list": "vsce ls",
+    "test:vsix": "npm run build && node scripts/test-host.mjs --installed"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/vscode": "~1.100.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "@azure/msal-node": "7.1.1"
+  }
+}

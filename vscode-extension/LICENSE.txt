@@ -1,0 +1,4 @@
+Copyright (c) 2026 Codebase Mentor contributors. All rights reserved.
+
+No license for redistribution or Marketplace publication is granted by this
+foundation package. Obtain the project owners' permission before redistribution.

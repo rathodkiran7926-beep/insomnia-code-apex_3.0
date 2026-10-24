@@ -124,10 +124,14 @@ export function componentNamePresentation(database) {
 }
 export function componentNamesMiddleware(database) {
   const present = componentNamePresentation(database);
-  return (_req, res, next) => {
+  return (req, res, next) => {
+    // IDE saved exports carry exact context/digest contracts. Preserve canonical archived payloads.
+    const preserve = /^\/ide\/(handoffs|checkpoints)(\/|$)/.test(
+      req.path || "",
+    );
     const json = res.json;
     res.json = function (body) {
-      return json.call(this, present(body));
+      return json.call(this, preserve ? body : present(body));
     };
     next();
   };
