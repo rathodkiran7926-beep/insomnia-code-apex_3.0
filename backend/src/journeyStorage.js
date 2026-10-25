@@ -8,5 +8,6 @@ CREATE TABLE IF NOT EXISTS event_source_links (event_id TEXT PRIMARY KEY, trace_
 CREATE TABLE IF NOT EXISTS playback_checkpoints (user_id TEXT NOT NULL, journey_id TEXT NOT NULL, data TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(user_id,journey_id));
 CREATE TABLE IF NOT EXISTS journey_questions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, trace_id TEXT NOT NULL, event_id TEXT NOT NULL, snapshot_id TEXT NOT NULL, question TEXT NOT NULL, answer TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS runtime_trace_owner ON runtime_traces(user_id,scenario_id,created_at DESC);
+CREATE TABLE IF NOT EXISTS journey_explanation_artifacts (cache_key TEXT PRIMARY KEY, data TEXT NOT NULL, created_at INTEGER NOT NULL);
 `);
 export { db };

@@ -5,6 +5,8 @@ import tar from "tar-stream";
 import { isSetupPath } from "./setupRequirements.js";
 const MAX_RESPONSE = 8 * 1024 * 1024;
 const MAX_ERROR_RESPONSE = 4096;
+// Bump when source selection, archive limits, or extraction semantics change.
+export const EXTRACTION_POLICY_VERSION = "1";
 
 async function readErrorResponse(response) {
   const reader = response.body?.getReader();
@@ -137,7 +139,7 @@ export function parseRepository(value) {
     url: `https://github.com/${match[1]}/${match[2]}`,
   };
 }
-export async function downloadRepository(url, revision, progress) {
+export async function resolveRepository(url, revision) {
   const repo = parseRepository(url);
   const headers = {
     Accept: "application/vnd.github+json",
@@ -150,13 +152,36 @@ export async function downloadRepository(url, revision, progress) {
   const get = async (endpoint) =>
     JSON.parse(await boundedFetch(`${api}${endpoint}`, { headers }));
   const metadata = await get("");
-  if (metadata.private)
+  if (metadata.private !== false)
     throw new Error("Only public repositories are supported");
+  const ref = revision || metadata.default_branch;
+  if (typeof ref !== "string" || !ref) throw new Error("Repository has no resolvable revision");
   const commit = (
     await get(
-      `/commits/${encodeURIComponent(revision || metadata.default_branch)}`,
+      `/commits/${encodeURIComponent(ref)}`,
     )
   ).sha;
+  if (typeof commit !== "string" || !/^[a-f0-9]{40}$/i.test(commit))
+    throw new Error("GitHub returned an invalid immutable commit SHA");
+  return {
+    repository: repo.url, commit: commit.toLowerCase(),
+    branch: revision ? null : metadata.default_branch,
+    revision: ref,
+  };
+}
+export async function downloadRepository(url, revision, progress, resolved) {
+  const repo = parseRepository(url);
+  const pinned = resolved || await resolveRepository(url, revision);
+  if (pinned.repository !== repo.url || !/^[a-f0-9]{40}$/.test(pinned.commit))
+    throw new Error("Invalid pinned repository identity");
+  const { commit } = pinned;
+  const headers = {
+    Accept: "application/vnd.github+json", "User-Agent": "Codebase-Mentor",
+    ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}),
+  };
+  const get = async (endpoint) => JSON.parse(await boundedFetch(
+    `https://api.github.com/repos/${repo.owner}/${repo.name}${endpoint}`, { headers },
+  ));
   progress(15, `Resolved commit ${commit.slice(0, 12)}`);
   const tree = await get(`/git/trees/${commit}?recursive=1`);
   const exclusions = [];
@@ -241,12 +266,11 @@ export async function downloadRepository(url, revision, progress) {
     `Loaded ${Object.keys(files).length} eligible files from commit archive`,
   );
   return {
-    repository: repo.url,
-    commit,
-    branch: revision ? null : metadata.default_branch,
-    revision: revision || metadata.default_branch,
+    ...pinned,
     files,
     exclusions,
+    complete: !tree.truncated && exclusions.every((entry) =>
+      entry.reason === "Excluded dependency, generated output, symlink, or sensitive path"),
     setupMetadata: {
       paths: tree.tree
         .filter(

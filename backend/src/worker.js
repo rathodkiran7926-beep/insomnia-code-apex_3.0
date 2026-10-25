@@ -1,6 +1,6 @@
 import { parentPort, workerData } from "node:worker_threads";
-import { downloadRepository } from "./github.js";
-import { analyze } from "./analyzer.js";
+import { downloadRepository, EXTRACTION_POLICY_VERSION } from "./github.js";
+import { analyze, ANALYZER_VERSION } from "./analyzer.js";
 import { documentGraph, markdown } from "./documentation.js";
 try {
   const progress = (progress, message) =>
@@ -10,6 +10,7 @@ try {
     workerData.url,
     workerData.revision,
     progress,
+    workerData.resolved,
   );
   progress(60, "Parsing sources and resolving compiler symbols");
   const graph = analyze(input);
@@ -22,6 +23,7 @@ try {
     files: input.files,
     setupMetadata: input.setupMetadata,
     markdown: markdown(graph, docs),
+    analysis: { analyzerVersion: ANALYZER_VERSION, extractionPolicy: EXTRACTION_POLICY_VERSION, complete: input.complete },
   });
 } catch (error) {
   parentPort.postMessage({ type: "failed", message: error.message });

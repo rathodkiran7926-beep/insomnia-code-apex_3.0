@@ -1,5 +1,9 @@
-import test, { after } from "node:test";
+import test, { after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import express from "express";
 import ts from "typescript";
 process.env.DATABASE_PATH = ":memory:";
@@ -19,6 +23,11 @@ const { collaborationRoutes } = await import("../src/collaborationAuth.js");
 const { db } = await import("../src/journeyStorage.js");
 const { analyze } = await import("../src/analyzer.js");
 const { saveSnapshot } = await import("../src/storage.js");
+beforeEach(() => {
+  // Each regression starts cold, without touching source/history/progress tables.
+  if (db.prepare("SELECT 1 FROM sqlite_master WHERE name='journey_explanation_artifacts'").get())
+    db.exec("DELETE FROM journey_explanation_artifacts");
+});
 const journey = journeyById("signup"),
   scenario = journey.scenarios[0];
 function contractFixture(scenarioId = "success") {
@@ -896,4 +905,357 @@ test("AI walkthrough rejects fabricated per-step source citations", async () => 
     if (key === undefined) delete process.env.LLM_API_KEY;
     else process.env.LLM_API_KEY = key;
   }
+});
+
+function fakeWalkthroughResponse(context) {
+  return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
+    answer: "The selected component uses the recorded source contract.",
+    sourceRefId: context.sourceRefId,
+    sentences: ["It receives the declared inputs.", "It follows the recorded source conditions.", "It connects to the next source operation."],
+    steps: [
+      { title: "Inputs", explanation: "Inspect the declared inputs in the selected source.", sourceRefId: context.sourceRefId },
+      { title: "Conditions", explanation: "Inspect the recorded conditions before assuming their outcome.", sourceRefId: context.sourceRefId },
+      { title: "Connections", explanation: "Follow the linked source operation without assuming runtime order.", sourceRefId: context.sourceRefId },
+    ],
+  }) } }] }));
+}
+
+test("automatic journey generation already coalesces overlapping steps and isolates levels and observed traces", async () => {
+  const { createExplanationCache } = await import("../src/journeyExplanations.js");
+  const explain = createExplanationCache();
+  const trace = explainedTrace("signup", "success");
+  const firstEvent = trace.events[1], nextEvent = trace.events[2];
+  const original = globalThis.fetch, key = process.env.LLM_API_KEY;
+  process.env.LLM_API_KEY = "mock-key";
+  let calls = 0, release, started;
+  const firstStarted = new Promise((resolve) => { started = resolve; });
+  globalThis.fetch = async (_url, options) => {
+    calls++;
+    const context = JSON.parse(JSON.parse(options.body).messages[1].content);
+    if (calls === 1) await new Promise((resolve) => { release = resolve; started(); });
+    return fakeWalkthroughResponse(context);
+  };
+  try {
+    const first = explain(trace, firstEvent), duplicate = explain(trace, firstEvent);
+    await firstStarted;
+    assert.equal(calls, 1);
+    const next = await explain(trace, nextEvent);
+    assert.equal(next.generated, true);
+    assert.equal(next.eventId, nextEvent.id);
+    assert.equal(next.sourceRefId, nextEvent.sourceRefId);
+    assert.equal(calls, 2, "a different uncached step must generate normally");
+    release();
+    const [a, b] = await Promise.all([first, duplicate]);
+    assert.equal(a.generated, true);
+    assert.deepEqual(a, b);
+    assert.equal(a.eventId, firstEvent.id);
+    assert.equal(a.sentences.length, 3);
+    assert(a.steps.every((step) => a.sourceReferences.some((reference) => reference.sourceRefId === step.sourceRefId)));
+    for (const event of [firstEvent, nextEvent, firstEvent]) await explain(trace, event);
+    assert.equal(calls, 2, "overlapping and repeated visits must add zero provider calls");
+    await explain(trace, firstEvent, "advanced");
+    assert.equal(calls, 3);
+    const observedA = { ...trace, mode: "observed_replay", id: "observed-generation-a" };
+    const observedB = { ...observedA, id: "observed-generation-b" };
+    assert.equal((await explain(observedA, firstEvent)).traceId, observedA.id);
+    assert.equal((await explain(observedB, firstEvent)).traceId, observedB.id);
+    assert.equal(calls, 5, "observed traces must generate independently");
+    assert.equal((await explain(observedA, firstEvent)).traceId, observedA.id);
+    assert.equal(calls, 5);
+  } finally {
+    release?.();
+    globalThis.fetch = original;
+    if (key === undefined) delete process.env.LLM_API_KEY;
+    else process.env.LLM_API_KEY = key;
+  }
+});
+
+test("automatic journey missing-key and provider-error fallbacks retain their short retry window", async () => {
+  const { createExplanationCache } = await import("../src/journeyExplanations.js");
+  const explain = createExplanationCache();
+  const trace = explainedTrace("signup", "success"), event = trace.events[1];
+  const original = globalThis.fetch, key = process.env.LLM_API_KEY, originalNow = Date.now;
+  let time = originalNow(), calls = 0, failing = true;
+  Date.now = () => time;
+  globalThis.fetch = async (_url, options) => {
+    calls++;
+    if (failing) return new Response("Unauthorized", { status: 401 });
+    return fakeWalkthroughResponse(JSON.parse(JSON.parse(options.body).messages[1].content));
+  };
+  try {
+    delete process.env.LLM_API_KEY;
+    const offline = await explain(trace, event);
+    assert.equal(offline.generated, false);
+    assert.equal(offline.sentences.length, 3);
+    assert.match(offline.notice, /unavailable/);
+    assert.equal(calls, 0);
+    process.env.LLM_API_KEY = "mock-key";
+    time += 20001;
+    assert.equal((await explain(trace, event)).generated, false);
+    assert.equal(calls, 1);
+    assert.equal((await explain(trace, event)).generated, false);
+    assert.equal(calls, 1, "the existing short fallback cache prevents immediate repeated failures");
+    failing = false;
+    time += 20001;
+    assert.equal((await explain(trace, event)).generated, true);
+    assert.equal(calls, 2, "generation can recover after the existing retry window");
+    assert.equal((await explain(trace, event)).generated, true);
+    assert.equal(calls, 2);
+  } finally {
+    Date.now = originalNow;
+    globalThis.fetch = original;
+    if (key === undefined) delete process.env.LLM_API_KEY;
+    else process.env.LLM_API_KEY = key;
+  }
+});
+
+function completeExplanation(trace, event) {
+  return {
+    generated: true, expression: "explaining",
+    sentences: ["It receives declared inputs.", "It evaluates source conditions.", "It connects to a source operation."],
+    steps: ["Inputs", "Conditions", "Connections"].map((title) => ({
+      title, explanation: "Inspect this part of the saved implementation.", sourceRefId: event.sourceRefId,
+    })),
+    sourceReferences: [{ sourceRefId: event.sourceRefId, title: event.title, ...event.source }],
+    eventId: event.id, traceId: trace.id, sourceRefId: event.sourceRefId, snapshotId: trace.snapshotId,
+  };
+}
+
+test("successful explanations survive new cache instances and the old memory TTL", async () => {
+  const { createExplanationCache } = await import("../src/journeyExplanations.js");
+  const trace = explainedTrace("signup", "success"), event = trace.events[1];
+  let calls = 0;
+  const generate = async (trace, event) => { calls++; return completeExplanation(trace, event); };
+  const explain = createExplanationCache(generate);
+  const first = await explain(trace, event);
+  assert.equal(calls, 1);
+  assert.deepEqual(await explain(trace, event), first);
+  assert.equal(calls, 1);
+  assert.deepEqual(await createExplanationCache(generate)(trace, event), first);
+  assert.equal(calls, 1, "recreating the cache must add zero generation calls");
+  const originalNow = Date.now;
+  Date.now = () => originalNow() + 3600001;
+  try { assert.deepEqual(await explain(trace, event), first); }
+  finally { Date.now = originalNow; }
+  assert.equal(calls, 1, "successful durable artifacts must survive the old one-hour TTL");
+  const rebound = { ...trace, id: "compatible-explained-trace", events: trace.events.map((item) => ({ ...item, id: `new-${item.id}` })) };
+  const result = await createExplanationCache(generate)(rebound, rebound.events[1]);
+  assert.equal(calls, 1);
+  assert.equal(result.traceId, rebound.id);
+  assert.equal(result.eventId, rebound.events[1].id);
+  assert.equal(result.sourceRefId, event.sourceRefId);
+  assert.deepEqual(result.steps, first.steps);
+});
+
+test("durable cache rejects corrupt or stale citation artifacts and safely regenerates", async () => {
+  const { createExplanationCache } = await import("../src/journeyExplanations.js");
+  const trace = explainedTrace("signup", "success"), event = trace.events[1];
+  let calls = 0;
+  const generate = async (trace, event) => { calls++; return completeExplanation(trace, event); };
+  for (const defect of ["step", "reference", "coordinates", "incomplete", "json", "identity"]) {
+    db.exec("DELETE FROM journey_explanation_artifacts");
+    await createExplanationCache(generate)(trace, event);
+    const row = db.prepare("SELECT * FROM journey_explanation_artifacts").get();
+    const stored = JSON.parse(row.data);
+    if (defect === "step") stored.value.steps[0].sourceRefId = "unrelated-step";
+    if (defect === "reference") stored.value.sourceReferences[0].sourceRefId = "unrelated-reference";
+    if (defect === "coordinates") stored.value.sourceReferences[0].startLine++;
+    if (defect === "incomplete") stored.value.sentences.pop();
+    if (defect === "identity") stored.key = "another-cache-identity";
+    db.prepare("UPDATE journey_explanation_artifacts SET data=? WHERE cache_key=?")
+      .run(defect === "json" ? "invalid JSON" : JSON.stringify(stored), row.cache_key);
+    const before = calls;
+    const result = await createExplanationCache(generate)(trace, event);
+    assert.equal(calls, before + 1, defect);
+    assert.equal(result.generated, true);
+    assert(result.steps.every((step) => step.sourceRefId === event.sourceRefId));
+    await createExplanationCache(generate)(trace, event);
+    assert.equal(calls, before + 1, `${defect} regeneration must leave a valid artifact`);
+  }
+});
+
+test("incomplete successes, fallback replies and failures never persist", async () => {
+  const { createExplanationCache } = await import("../src/journeyExplanations.js");
+  const trace = explainedTrace("signup", "success"), event = trace.events[1];
+  for (const defect of ["sentences", "steps", "sourceReferences", "citation", "credential", "fallback", "failure"]) {
+    let calls = 0;
+    const generate = async () => {
+      calls++;
+      if (defect === "failure") throw new Error("provider failed");
+      const result = completeExplanation(trace, event);
+      if (["sentences", "steps", "sourceReferences"].includes(defect)) delete result[defect];
+      if (defect === "citation") result.steps[0].sourceRefId = "fabricated";
+      if (defect === "credential") result.sentences[0] = "sk-abcdefghijklmnopqrstuvwxyz123456";
+      if (defect === "fallback") result.generated = false;
+      return result;
+    };
+    for (let i = 0; i < 2; i++) {
+      if (defect === "failure") await assert.rejects(createExplanationCache(generate)(trace, event), /provider failed/);
+      else await createExplanationCache(generate)(trace, event);
+    }
+    assert.equal(calls, 2, `${defect} must not be reused by a fresh cache instance`);
+    assert.equal(db.prepare("SELECT count(*) AS n FROM journey_explanation_artifacts").get().n, 0);
+  }
+});
+
+test("persisted observed artifacts remain trace-scoped and authorization precedes cache access", async () => {
+  const { createExplanationCache } = await import("../src/journeyExplanations.js");
+  const a = saveObservedRun(journey, scenario, contractFixture(), owner.data.user.id);
+  const b = saveObservedRun(journey, scenario, contractFixture(), owner.data.user.id);
+  let calls = 0;
+  const generate = async (trace, event) => { calls++; return completeExplanation(trace, event); };
+  await createExplanationCache(generate)(a, a.events[0], "advanced");
+  await createExplanationCache(generate)(b, b.events[0], "advanced");
+  assert.equal(calls, 2);
+  await createExplanationCache(generate)(a, a.events[0], "advanced");
+  assert.equal(calls, 2);
+  const path = `/traces/${a.id}/events/${encodeURIComponent(a.events[0].id)}/explanation?level=advanced`;
+  const prepare = db.prepare;
+  let reads = 0;
+  db.prepare = function (sql, ...args) {
+    if (/SELECT.*journey_explanation_artifacts/i.test(sql)) reads++;
+    return prepare.call(this, sql, ...args);
+  };
+  try {
+    assert.equal((await api(path)).status, 401);
+    assert.equal((await api(path, undefined, other.cookie)).status, 404);
+    assert.equal(reads, 0, "denied callers must never reach artifact reads");
+    const response = await api(path, undefined, owner.cookie);
+    assert.equal(response.status, 200);
+    assert.equal(response.data.generated, true);
+    assert.equal(response.data.traceId, a.id);
+    assert(reads > 0);
+  } finally { db.prepare = prepare; }
+});
+
+test("successful explanations survive a real backend-process restart", () => {
+  const directory = mkdtempSync(join(tmpdir(), "journey-artifact-"));
+  const database = join(directory, "artifacts.sqlite");
+  const script = `
+    const { explainedTrace } = await import('./src/journeyService.js');
+    const { createExplanationCache } = await import('./src/journeyExplanations.js');
+    const { db } = await import('./src/journeyStorage.js');
+    const trace = explainedTrace('signup', 'success');
+    let calls = 0;
+    const result = await createExplanationCache(async (trace, event) => {
+      calls++;
+      return (${completeExplanation.toString()})(trace, event);
+    })(trace, trace.events[1]);
+    console.log(JSON.stringify({calls,result}));
+    db.close();
+  `;
+  try {
+    const run = () => {
+      const child = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
+        cwd: new URL("..", import.meta.url), env: { ...process.env, DATABASE_PATH: database },
+        encoding: "utf8", timeout: 15000,
+      });
+      assert.equal(child.status, 0, child.stderr);
+      return JSON.parse(child.stdout);
+    };
+    const cold = run(), warm = run();
+    assert.equal(cold.calls, 1);
+    assert.equal(warm.calls, 0);
+    assert.deepEqual(warm.result, cold.result);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("durable identities miss changed source, component, level, evidence and path context", async () => {
+  const { createExplanationCache } = await import("../src/journeyExplanations.js");
+  const trace = explainedTrace("signup", "success"), event = trace.events[1];
+  let calls = 0;
+  const generate = async (trace, event) => { calls++; return completeExplanation(trace, event); };
+  await createExplanationCache(generate)(trace, event);
+  const variants = [
+    [{ ...trace, sourceHash: "changed-source" }, event, "beginner"],
+    [trace, trace.events[2], "beginner"],
+    [trace, event, "advanced"],
+    [{ ...trace, events: trace.events.map((item, i) => i === 2 ? { ...item, key: "different-next" } : item) }, event, "beginner"],
+    [{ ...trace, events: trace.events.map((item, i) => i === 0 ? { ...item, title: "Different previous context" } : item) }, event, "beginner"],
+  ];
+  for (const args of variants) {
+    const before = calls;
+    await createExplanationCache(generate)(...args);
+    assert.equal(calls, before + 1);
+  }
+  const row = db.prepare("SELECT data FROM runtime_recipe_sources WHERE snapshot_id=?").get(trace.snapshotId);
+  const changed = JSON.parse(row.data);
+  changed.source += "\n// changed captured source";
+  db.prepare("UPDATE runtime_recipe_sources SET data=? WHERE snapshot_id=?").run(JSON.stringify(changed), trace.snapshotId);
+  try {
+    const before = calls;
+    await createExplanationCache(generate)(trace, event);
+    assert.equal(calls, before + 1, "captured evidence changes must not hit even if metadata hash was not updated");
+  } finally { db.prepare("UPDATE runtime_recipe_sources SET data=? WHERE snapshot_id=?").run(row.data, trace.snapshotId); }
+});
+
+test("persistent route walkthroughs preserve separate handler citations when anchors rebind", async () => {
+  const { createExplanationCache } = await import("../src/journeyExplanations.js");
+  const { repositoryJourneys } = await import("../src/repositoryJourneys.js");
+  const { savedJourney } = await import("../src/journeyService.js");
+  const { walkthroughEvidence } = await import("../src/journeyWalkthrough.js");
+  const files = {
+    "routes.ts": "import express from 'express'; import { handler } from './handler'; const app=express(); app.get('/value', handler);",
+    "handler.ts": "export function handler(req,res) { return res.json({value:1}); }",
+  };
+  const graph = analyze({ repository: "https://github.com/test/durable-walkthrough", commit: "9".repeat(40), files });
+  saveSnapshot(graph, {}, "", files);
+  const route = repositoryJourneys(graph.snapshotId).find((item) => item.events[0].kind === "http_request");
+  assert(route);
+  const trace = explainedTrace(route.id, route.scenarios[0].id), event = trace.events[0];
+  const evidence = walkthroughEvidence(savedJourney(trace.snapshotId, trace.journeyId), event);
+  assert(evidence.length > 1);
+  let calls = 0;
+  const generate = async (trace, event) => {
+    calls++;
+    const result = completeExplanation(trace, event);
+    result.sourceReferences = evidence.map((item) => ({ sourceRefId: item.sourceRefId, title: item.title, ...item.source }));
+    result.steps[1].sourceRefId = evidence[1].sourceRefId;
+    return result;
+  };
+  const first = await createExplanationCache(generate)(trace, event);
+  const rebound = { ...trace, id: "another-compatible-route", events: trace.events.map((item) => ({ ...item, id: `new-${item.id}` })) };
+  const second = await createExplanationCache(generate)(rebound, rebound.events[0]);
+  assert.equal(calls, 1);
+  assert.equal(second.traceId, rebound.id);
+  assert.equal(second.eventId, rebound.events[0].id);
+  assert.deepEqual(second.steps, first.steps);
+  assert.equal(second.steps[1].sourceRefId, evidence[1].sourceRefId);
+  assert.notEqual(second.steps[1].sourceRefId, event.sourceRefId);
+});
+
+test("bounded artifact retention never deletes trace history, source or progress", async () => {
+  const { createExplanationCache } = await import("../src/journeyExplanations.js");
+  const tracesBefore = db.prepare("SELECT count(*) AS n FROM runtime_traces").get().n;
+  const sourcesBefore = db.prepare("SELECT count(*) AS n FROM runtime_recipe_sources").get().n;
+  const progressBefore = db.prepare("SELECT count(*) AS n FROM playback_checkpoints").get().n;
+  let calls = 0, last;
+  const generate = async (trace, event) => { calls++; return completeExplanation(trace, event); };
+  const explain = createExplanationCache(generate);
+  for (let i = 0; i < 201; i++) {
+    last = saveObservedRun(journey, scenario, contractFixture(), owner.data.user.id);
+    await explain(last, last.events[0]);
+  }
+  assert.equal(calls, 201);
+  assert.equal(db.prepare("SELECT count(*) AS n FROM journey_explanation_artifacts").get().n, 200);
+  assert.equal(db.prepare("SELECT count(*) AS n FROM runtime_traces").get().n, tracesBefore + 201);
+  assert.equal(db.prepare("SELECT count(*) AS n FROM runtime_recipe_sources").get().n, sourcesBefore);
+  assert.equal(db.prepare("SELECT count(*) AS n FROM playback_checkpoints").get().n, progressBefore);
+  await createExplanationCache(generate)(last, last.events[0]);
+  assert.equal(calls, 201);
+});
+
+test("optional artifact write failure does not lose the generated response or poison future retries", async () => {
+  const { createExplanationCache } = await import("../src/journeyExplanations.js");
+  const trace = explainedTrace("signup", "success"), event = trace.events[1];
+  let calls = 0;
+  const generate = async (trace, event) => { calls++; return completeExplanation(trace, event); };
+  db.exec("CREATE TEMP TRIGGER fail_explanation_write BEFORE INSERT ON journey_explanation_artifacts BEGIN SELECT RAISE(ABORT,'simulated cache write failure'); END;");
+  try {
+    assert.equal((await createExplanationCache(generate)(trace, event)).generated, true);
+    assert.equal(db.prepare("SELECT count(*) AS n FROM journey_explanation_artifacts").get().n, 0);
+  } finally { db.exec("DROP TRIGGER fail_explanation_write"); }
+  assert.equal((await createExplanationCache(generate)(trace, event)).generated, true);
+  await createExplanationCache(generate)(trace, event);
+  assert.equal(calls, 2);
 });

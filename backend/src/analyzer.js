@@ -2,6 +2,8 @@ import ts from "typescript";
 import { functionLabel } from "./functionNames.js";
 import path from "node:path";
 import { createHash } from "node:crypto";
+// Snapshot IDs stay stable; compatibility is tracked separately from identity.
+export const ANALYZER_VERSION = "1";
 
 export function analyze(input) {
   const { files, commit, repository } = input;
