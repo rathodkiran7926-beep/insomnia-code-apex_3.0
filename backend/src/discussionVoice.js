@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { boundedFetch } from "./github.js";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
@@ -14,39 +13,112 @@ const missing = () =>
 let cache = null,
   pending = null;
 function key() {
-  if (!process.env.ELEVENLABS_API_KEY) throw missing();
-  return process.env.ELEVENLABS_API_KEY;
+  const credential = process.env.ELEVENLABS_API_KEY?.trim();
+  if (!credential) throw missing();
+  return credential;
 }
-async function provider(path, options = {}) {
+function voiceError(status, code, path, signal, networkCode) {
+  const permission = path.includes("/text-to-speech/")
+    ? "Text to Speech"
+    : path.includes("/speech-to-text")
+      ? "Speech to Text"
+      : "Voices Read";
+  const reason =
+    code === "missing_permissions"
+      ? `ElevenLabs key lacks ${permission} permission (HTTP ${status}). Enable ${permission} for this API key in ElevenLabs, or replace ELEVENLABS_API_KEY in backend/.env with a key that has this permission, then restart the backend.`
+      : status === 401
+        ? "ElevenLabs rejected the API key (HTTP 401). Check ELEVENLABS_API_KEY in backend/.env and restart the backend."
+        : status === 403
+          ? "ElevenLabs denied voice access (HTTP 403). Check the API key permissions and account access."
+          : status === 429 || code === "quota_exceeded"
+            ? `ElevenLabs rate or account limit reached (HTTP ${status}). Check account usage before retrying.`
+            : networkCode === "EACCES" || networkCode === "EPERM"
+              ? `Network access to api.elevenlabs.io was blocked (${networkCode}). Restart the backend from a normal terminal outside the restricted environment and check firewall or proxy settings.`
+              : status
+                ? `ElevenLabs returned HTTP ${status}. Check voice access, model availability, and account usage.`
+                : "Cannot reach ElevenLabs. Check network access and retry.";
+  return Object.assign(
+    new Error(
+      signal?.aborted
+        ? "Voice request cancelled."
+        : reason + " Your text answer remains available.",
+    ),
+    {
+      status: signal?.aborted ? 499 : 502,
+      voiceErrorCode: code || "voice_unavailable",
+    },
+  );
+}
+async function providerResponse(path, options = {}) {
+  const credential = key();
+  const signal = options.signal
+    ? AbortSignal.any([options.signal, AbortSignal.timeout(45000)])
+    : AbortSignal.timeout(45000);
+  let response;
   try {
-    return await boundedFetch(api + path, {
+    response = await fetch(api + path, {
       ...options,
-      headers: { ...options.headers, "xi-api-key": key() },
+      signal,
+      redirect: "error",
+      headers: { ...options.headers, "xi-api-key": credential },
     });
   } catch (error) {
-    if (error.status) throw error;
-    const remoteStatus = error.remoteStatus;
-    const denied = error.code === "EACCES" || error.code === "EPERM";
-    const reason = denied
-      ? `Network access to api.elevenlabs.io was blocked (${error.code}). Restart the backend from a normal terminal outside the restricted environment. If it still fails, check firewall or proxy settings.`
-      : remoteStatus === 401
-        ? "ElevenLabs rejected the API key (HTTP 401). Check ELEVENLABS_API_KEY in backend/.env and restart the backend."
-        : remoteStatus === 403
-          ? "ElevenLabs denied access (HTTP 403). Check the API key's voice, speech-to-text, or text-to-speech permissions."
-          : remoteStatus === 429
-            ? "ElevenLabs rate or account limit reached (HTTP 429). Check account usage and retry later."
-            : remoteStatus
-              ? `ElevenLabs returned HTTP ${remoteStatus}. Check voice access, model availability, and account usage.`
-              : "Cannot reach ElevenLabs. Check network access and retry.";
-    throw Object.assign(
-      new Error(
-        options.signal?.aborted
-          ? "Voice request cancelled."
-          : `${reason} Text discussion remains available.`,
-      ),
-      { status: options.signal?.aborted ? 499 : 502 },
+    throw voiceError(
+      null,
+      null,
+      path,
+      options.signal,
+      error.cause?.code || error.code,
     );
   }
+  if (!response.ok) {
+    // Only inspect bounded error JSON. Never return provider messages, keys,
+    // account details, or request text to the client.
+    const reader = response.body?.getReader();
+    let size = 0;
+    const chunks = [];
+    try {
+      while (reader && size < 4096) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = value.subarray(0, 4096 - size);
+        size += chunk.length;
+        chunks.push(Buffer.from(chunk));
+      }
+    } catch {
+    } finally {
+      await reader?.cancel().catch(() => {});
+      reader?.releaseLock();
+    }
+    let code;
+    try {
+      const value = JSON.parse(Buffer.concat(chunks).toString("utf8")).detail
+        ?.status;
+      if (
+        ["missing_permissions", "invalid_api_key", "quota_exceeded"].includes(
+          value,
+        )
+      )
+        code = value;
+    } catch {}
+    throw voiceError(response.status, code, path, options.signal);
+  }
+  return response;
+}
+async function provider(path, options = {}) {
+  const response = await providerResponse(path, options);
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of response.body) {
+    size += chunk.length;
+    if (size > (options.limit || 3000000))
+      throw Object.assign(new Error("Voice response exceeds size limit."), {
+        status: 502,
+      });
+    chunks.push(chunk);
+  }
+  const data = Buffer.concat(chunks);
+  return options.binary ? data : data.toString("utf8");
 }
 export async function availableVoices() {
   const credential = key();
@@ -139,27 +211,25 @@ export async function streamSpeech(voiceId, text, res, signal) {
       { status: 400 },
     );
   const combined = AbortSignal.any([signal, AbortSignal.timeout(45000)]);
-  const response = await fetch(
-    `${api}/v1/text-to-speech/${encodeURIComponent(voiceId)}/stream?output_format=mp3_44100_128`,
+  const response = await providerResponse(
+    `/v1/text-to-speech/${encodeURIComponent(voiceId)}/stream?output_format=mp3_44100_128`,
     {
       method: "POST",
       signal: combined,
-      headers: { "xi-api-key": key(), "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         text: text.slice(0, 1200),
         model_id: process.env.ELEVENLABS_TTS_MODEL || "eleven_flash_v2_5",
       }),
     },
   );
-  if (!response.ok || !response.body) {
-    await response.body?.cancel();
+  if (!response.body)
     throw Object.assign(
       new Error(
-        `Voice service unavailable (HTTP ${response.status}). Your text answer remains available.`,
+        "ElevenLabs returned no audio. Your text answer remains available.",
       ),
       { status: 502 },
     );
-  }
   res.type("audio/mpeg");
   res.set("Cache-Control", "no-store");
   res.set("X-Accel-Buffering", "no");

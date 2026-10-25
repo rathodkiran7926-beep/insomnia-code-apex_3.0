@@ -45,8 +45,8 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 10px 16px 18px;
+  gap: 8px;
+  padding: 8px 14px 12px;
 }
 .discussion-call-dock.is-active {
   position: sticky;
@@ -54,8 +54,7 @@
   z-index: 4;
   background: #fcfaff;
   border-bottom: 1px solid #e9e1fa;
-  max-height: 65dvh;
-  overflow: auto;
+  overflow: visible;
 }
 /* The tab wrapper must not intercept sticky positioning while its outer
    mentor pane is the scrolling container. */
@@ -84,21 +83,30 @@
 }
 .component-discussion .discussion-microphone.is-call-active {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
-  text-align: center;
-  padding: 28px 20px;
+  text-align: left;
+  gap: 10px;
+  padding: 14px;
+  margin: 12px;
 }
 .component-discussion .is-call-active .discussion-mic-icon {
-  width: 108px;
-  height: 108px;
+  width: 56px;
+  height: 56px;
   border: 1px solid #ded5fc;
 }
-.is-call-active > div {
-  width: 100%;
+.component-discussion .discussion-microphone.is-call-active > div {
+  /* The normal row uses a 160px flex basis. In the old column layout that
+     became an empty vertical block between the message and call controls. */
+  flex: 1 1 150px;
+  width: auto;
+  min-width: 0;
 }
-.is-call-active .discussion-record-button {
+.component-discussion .is-call-active .discussion-record-button {
   background: #5741bd;
+  width: auto;
+  flex: 0 1 auto;
 }
 @media (max-width: 600px) {
   .discussion-microphone .discussion-record-button {
@@ -155,9 +163,6 @@
   padding: 6px 10px;
 }
 .mentor-voice-dialog .discussion-microphone {
-  position: sticky;
-  top: 0;
-  z-index: 2;
   padding: 20px;
   box-shadow: 0 4px 14px #70509a10;
 }

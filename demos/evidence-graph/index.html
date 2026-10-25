@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>From code to connections | Codebase Mentor</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script defer src="graph-data.js"></script>
+    <script defer src="app.js"></script>
+  </head>
+  <body>
+    <header class="brand-bar">
+      <a class="brand" href="index.html"
+        ><img
+          src="../../frontend/public/codebase_mentor_logo_transparent.svg"
+          alt=""
+        /><span>Codebase <b>Mentor</b></span></a
+      >
+      <span class="badge">Interactive teaching example</span>
+    </header>
+    <main>
+      <section class="intro">
+        <span class="eyebrow">BEHIND THE CONNECTIONS</span>
+        <h1>From code to evidence.</h1>
+        <p>
+          A graph is a map of relationships found in source code. Follow a small
+          signup example to see how the map is built, one connection at a time.
+        </p>
+        <div class="notice">
+          <span aria-hidden="true">i</span>
+          <p>
+            <strong>Illustrative source, real analyzer.</strong> This fixture is
+            analysed by Codebase Mentor's TypeScript parser. Nothing here runs a
+            signup request or records runtime values.
+          </p>
+        </div>
+      </section>
+      <section class="builder" aria-label="Evidence graph construction">
+        <nav id="steps" class="steps" aria-label="Construction steps"></nav>
+        <div class="step-heading">
+          <div>
+            <span id="step-number" class="eyebrow"></span>
+            <h2 id="step-title"></h2>
+            <p id="step-description"></p>
+          </div>
+          <div class="playback">
+            <button
+              id="restart"
+              class="icon-button"
+              aria-label="Restart simulation"
+              title="Restart"
+            >
+              &#8634;</button
+            ><button id="back">Back</button
+            ><button id="play" class="primary">Play build</button
+            ><button id="next">
+              Next step <span aria-hidden="true">&rarr;</span>
+            </button>
+          </div>
+        </div>
+        <div class="workspace">
+          <section class="graph-card" aria-label="Source relationship graph">
+            <div class="panel-header">
+              <h3>The evidence graph</h3>
+              <span id="graph-count" class="subtle" aria-live="polite"></span>
+            </div>
+            <div
+              class="graph-scroll"
+              tabindex="0"
+              aria-label="Graph canvas. Scroll sideways on smaller screens."
+            >
+              <div class="canvas">
+                <div id="snapshot-intro">
+                  <span class="snapshot-symbol" aria-hidden="true">{ }</span>
+                  <h3>Start with saved source</h3>
+                  <p>
+                    Three files. One pinned example version.<br />The parser
+                    reads code; it does not execute it.
+                  </p>
+                  <div class="file-pills">
+                    <span>app.ts</span><span>handlers.ts</span
+                    ><span>users.ts</span>
+                  </div>
+                </div>
+                <svg
+                  id="edges"
+                  viewBox="0 0 800 380"
+                  aria-label="Directed source relationships"
+                >
+                  <defs>
+                    <marker
+                      id="arrow"
+                      viewBox="0 0 10 10"
+                      refX="9"
+                      refY="5"
+                      markerWidth="7"
+                      markerHeight="7"
+                      orient="auto-start-reverse"
+                    >
+                      <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />
+                    </marker>
+                  </defs>
+                </svg>
+                <div id="nodes"></div>
+              </div>
+            </div>
+            <div class="legend">
+              <span><i class="module-dot"></i> File / module</span
+              ><span><i></i> Code component</span
+              ><span>Arrow = source-supported relationship</span>
+            </div>
+            <div class="connections">
+              <h3>Inspect a connection</h3>
+              <div id="relationship-list"></div>
+              <p id="connection-hint" class="subtle">
+                Connections appear as you move through the build.
+              </p>
+            </div>
+          </section>
+          <aside class="evidence-card" aria-label="Selected source evidence">
+            <div class="panel-header">
+              <h3>Why this connection exists</h3>
+              <span class="badge">Source evidence</span>
+            </div>
+            <div class="evidence-content">
+              <span id="selection-kind" class="eyebrow"></span>
+              <h2 id="selection-name"></h2>
+              <p id="selection-reason"></p>
+              <div id="evidence-chain"></div>
+            </div>
+            <div class="source-toolbar">
+              <label for="source-file" class="sr-only"
+                >Example source file</label
+              ><select id="source-file"></select
+              ><span id="line-reference" class="subtle"></span>
+            </div>
+            <div
+              id="source"
+              class="source"
+              aria-label="Example source with line numbers"
+            ></div>
+            <p class="source-note">
+              Lavender lines are the exact source range attached to the
+              selection.
+            </p>
+          </aside>
+        </div>
+        <details class="boundaries">
+          <summary>
+            What the analyzer could not resolve
+            <span id="unresolved-count"></span>
+          </summary>
+          <p>
+            Missing evidence stays visible. External or dynamic calls do not
+            become invented connections.
+          </p>
+          <div id="unresolved"></div>
+        </details>
+      </section>
+      <section class="explainers" aria-label="How evidence is stored">
+        <article>
+          <span class="number">01</span>
+          <h3>A snapshot pins the version</h3>
+          <p>
+            The snapshot identifies the analysed repository version. This
+            example uses a teaching repository and commit; its graph is a local
+            file, not a database record.
+          </p>
+          <code id="snapshot-id"></code>
+        </article>
+        <article>
+          <span class="number">02</span>
+          <h3>Components become nodes</h3>
+          <p>
+            The parser finds files, the Express application, route
+            registrations, and function declarations. Component IDs connect the
+            diagram to their source references.
+          </p>
+          <code>component ID &rarr; source reference</code>
+        </article>
+        <article>
+          <span class="number">03</span>
+          <h3>Evidence supports each arrow</h3>
+          <p>
+            The analyzer resolves imports and call targets. Each relationship
+            stores its source and target IDs, relationship type, and the
+            reference to the code that supports it.
+          </p>
+          <code>relationship &rarr; reference &rarr; file + lines</code>
+        </article>
+      </section>
+      <footer>
+        <strong>A source map, not an execution trace.</strong>
+        <p>
+          These connections do not prove request order, branch outcomes,
+          database writes, or a successful response. AI does not create the
+          nodes or arrows in this example.
+        </p>
+        <a href="README.md">How to run and regenerate this example &rarr;</a>
+      </footer>
+    </main>
+  </body>
+</html>

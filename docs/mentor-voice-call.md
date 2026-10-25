@@ -25,6 +25,24 @@ No new voice-provider subscription or credentials are assumed. Browser speech
 synthesis is never used for this component discussion. Voice settings list
 voices actually available on the configured account.
 
+### HTTP 401 when speaking
+
+A successful voice list does not establish permission to generate speech.
+ElevenLabs can return `401 missing_permissions` for a valid restricted key.
+The app now distinguishes this from an invalid API key and names the permission
+needed for the failed operation.
+
+1. Open the API key settings in your ElevenLabs account.
+2. Enable **Text to Speech** and **Speech to Text** for the configured key;
+   retain **Voices Read** so the voice picker works.
+3. If using a replacement key, update `ELEVENLABS_API_KEY` in `backend/.env`.
+   Do not put the key in frontend code.
+4. Restart the backend with `cd backend` then `npm.cmd run dev`. Reload the app
+   and try the voice preview before starting a conversation.
+
+The app cannot grant permissions in your ElevenLabs account. Repeated retries
+or switching voices do not fix a key permission restriction.
+
 ## How latency is reduced
 
 After sustained speech, one second of silence submits the question. Listening

@@ -31,6 +31,17 @@ Tests: `npm.cmd test` in each folder; `npm.cmd run build` in `frontend`. With Ch
 
 ## Limits
 
+Discussion replies now request a JSON schema containing the required answer,
+claim, and memory fields. The provider schema omits string/array length limits
+that some local servers cannot compile into a grammar; the backend still enforces
+all original limits and validates citation IDs against the selected snapshot.
+`LLM_JSON_MODE=json_object` selects legacy JSON-object formatting, and `0` omits
+the format parameter. Both retain backend validation. A single fenced JSON reply
+is accepted; truncated replies are regenerated. One repair attempt receives the
+rejected shape and validation details. Invalid citations are never replaced, and
+invalid answers are never persisted. No environment change is required for the
+configured server tested with this fix.
+
 Recordings are capped at 60 seconds and 5 MB, kept in memory and not saved locally. Provider retention follows its account policy. Server validation checks format, client duration metadata, and returned transcription word timestamps; it is not a full media demuxer. Provider requests time out, audio responses and context are bounded, and discussion routes are rate-limited. At most three text reasoning jobs run concurrently. Voice lists are cached for five minutes and capped at 300 returned voices.
 
 Missing voice credentials keep text mode usable. Missing Gemini configuration prevents reasoning with a clear error. No production mock answers are supplied. Source IDs are validated against the bound snapshot, but that does not verify semantic correctness. Tests are source evidence, not executed results. Draft code edits are not analyzed evidence. The existing app is a local, public-repository tool with no multi-user authentication; production hosting needs repository/session authorization before exposing discussion data.

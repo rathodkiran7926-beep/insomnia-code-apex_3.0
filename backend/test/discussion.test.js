@@ -507,3 +507,107 @@ test("two invalid model replies stop without persisting any messages", async () 
     },
   );
 });
+
+test("discussion uses a grammar-compatible schema while retaining strict local limits and evidence validation", async () => {
+  const view = startDiscussion(graph, component.id);
+  await fakeAI(
+    async (_url, options) => {
+      const body = JSON.parse(options.body);
+      const format = body.response_format;
+      assert.equal(format.type, "json_schema");
+      assert.equal(format.json_schema.strict, true);
+      const schema = format.json_schema.schema;
+      assert(schema.required.includes("claims"));
+      assert(schema.required.includes("memory"));
+      assert.equal(schema.additionalProperties, false);
+      assert(!schema.$schema);
+      assert.equal(schema.properties.spokenText.maxLength, undefined);
+      const allowed = JSON.parse(body.messages[1].content).allowedEvidenceIds;
+      assert.deepEqual(
+        schema.properties.claims.items.properties.evidenceIds.items.enum,
+        allowed,
+      );
+      assert.throws(() =>
+        validateReply(
+          { ...reply(), spokenText: "x".repeat(1201) },
+          graph.references,
+        ),
+      );
+      assert.throws(() =>
+        validateReply(
+          {
+            ...reply(),
+            claims: [{ text: "Unsupported", evidenceIds: ["invented"] }],
+          },
+          graph.references,
+        ),
+      );
+      return jsonResponse(reply());
+    },
+    async () => {
+      const result = await discussionTurn(view.id, "Explain this code.");
+      assert(result.answer.citations.length > 0);
+    },
+  );
+});
+
+test("a reply missing citations is repaired using the rejected shape, never saved as an answer", async () => {
+  const view = startDiscussion(graph, component.id);
+  let attempts = 0;
+  const partial = {
+    spokenText: "Incomplete output",
+    displayText: "Missing evidence",
+  };
+  await fakeAI(
+    async (_url, options) => {
+      attempts++;
+      if (attempts === 1) return jsonResponse(partial);
+      const repair = JSON.parse(
+        JSON.parse(options.body).messages.at(-1).content,
+      );
+      assert.deepEqual(JSON.parse(repair.rejectedReply), partial);
+      assert(repair.validationIssues.some((issue) => issue.path === "claims"));
+      assert(repair.allowedEvidenceIds.includes(component.referenceId));
+      assert.equal(sessionView(discussion(view.id)).messages.length, 0);
+      return jsonResponse(reply());
+    },
+    async () => {
+      const result = await discussionTurn(view.id, "Explain this code.");
+      assert.equal(attempts, 2);
+      assert(result.answer.citations.length > 0);
+      assert.equal(sessionView(discussion(view.id)).messages.length, 2);
+    },
+  );
+});
+
+test("single fenced JSON is accepted but truncated valid-looking JSON must be regenerated", async () => {
+  for (const truncated of [false, true]) {
+    const view = startDiscussion(graph, component.id);
+    let attempts = 0;
+    await fakeAI(
+      async (_url, options) => {
+        attempts++;
+        if (attempts > 1) {
+          const repair = JSON.parse(
+            JSON.parse(options.body).messages.at(-1).content,
+          );
+          assert.equal(repair.validationIssues[0].code, "truncated_reply");
+        }
+        return Response.json({
+          choices: [
+            {
+              finish_reason: truncated && attempts === 1 ? "length" : "stop",
+              message: {
+                content: "```json\n" + JSON.stringify(reply()) + "\n```",
+              },
+            },
+          ],
+        });
+      },
+      async () => {
+        await discussionTurn(view.id, "Explain this code.");
+        assert.equal(attempts, truncated ? 2 : 1);
+      },
+    );
+  }
+});

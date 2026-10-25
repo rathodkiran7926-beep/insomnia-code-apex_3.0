@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Writable } from "node:stream";
-import { streamSpeech } from "../src/discussionVoice.js";
+import {
+  streamSpeech,
+  createSpeech,
+  transcribe,
+  availableVoices,
+} from "../src/discussionVoice.js";
 
 test("provider speech streams bytes, validates voice IDs, and propagates cancellation", async () => {
   const original = globalThis.fetch;
@@ -82,6 +87,79 @@ test("provider speech streams bytes, validates voice IDs, and propagates cancell
       ),
       /HTTP 429/,
     );
+  } finally {
+    globalThis.fetch = original;
+    if (originalKey === undefined) delete process.env.ELEVENLABS_API_KEY;
+    else process.env.ELEVENLABS_API_KEY = originalKey;
+  }
+});
+
+test("missing voice permissions are distinguished from invalid credentials without leaking provider data", async () => {
+  const original = globalThis.fetch;
+  const originalKey = process.env.ELEVENLABS_API_KEY;
+  process.env.ELEVENLABS_API_KEY = "  permission-test-key  ";
+  let code = "missing_permissions";
+  let requests = 0;
+  globalThis.fetch = async (url, options) => {
+    assert.equal(options.headers["xi-api-key"], "permission-test-key");
+    if (String(url).includes("/v2/voices"))
+      return Response.json({
+        voices: [{ voice_id: "permitted-voice", name: "Voice" }],
+        has_more: false,
+      });
+    requests++;
+    return Response.json(
+      {
+        detail: {
+          status: code,
+          message: "private provider and account details",
+        },
+      },
+      { status: 401 },
+    );
+  };
+  const permission = (name) => (error) => {
+    assert.match(error.message, new RegExp(`lacks ${name} permission`));
+    assert.match(error.message, /restart the backend/);
+    assert.doesNotMatch(
+      error.message,
+      /private provider|permission-test-key|rejected the API key/,
+    );
+    return true;
+  };
+  try {
+    await assert.rejects(
+      streamSpeech(
+        "permitted-voice",
+        "Hello",
+        {},
+        new AbortController().signal,
+      ),
+      permission("Text to Speech"),
+    );
+    await assert.rejects(
+      createSpeech("permitted-voice", "Hello"),
+      permission("Text to Speech"),
+    );
+    const wav = Buffer.alloc(44);
+    wav.write("RIFF", 0);
+    wav.write("WAVE", 8);
+    await assert.rejects(
+      transcribe(wav, "audio/wav", 1),
+      permission("Speech to Text"),
+    );
+    code = "invalid_api_key";
+    await assert.rejects(
+      createSpeech("permitted-voice", "Hello"),
+      /rejected the API key/,
+    );
+    assert.equal(requests, 4, "Authentication failures are never retried");
+    process.env.ELEVENLABS_API_KEY = "   ";
+    await assert.rejects(
+      availableVoices(),
+      /Voice requires ELEVENLABS_API_KEY/,
+    );
+    assert.equal(requests, 4);
   } finally {
     globalThis.fetch = original;
     if (originalKey === undefined) delete process.env.ELEVENLABS_API_KEY;

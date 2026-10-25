@@ -258,6 +258,7 @@ try {
   await waitFor("document.querySelector('.discussion-state.listening')");
   assert(await evaluate("!!document.querySelector('.discussion-platform-icon')"));
   assert(await evaluate("(()=>{const r=document.querySelector('.discussion-call-dock.is-active').getBoundingClientRect();return r.top>=0 && r.bottom<=innerHeight})()"), "Active call controls remain in view");
+  assert(await evaluate("document.querySelector('.discussion-microphone.is-call-active').getBoundingClientRect().height<260"), "Side-panel call card stays compact");
   const callImage = await send("Page.captureScreenshot", { format: "png" });
   writeFileSync(root + "/data/ui-mentor-active-call.png", Buffer.from(callImage.data, "base64"));
 
@@ -265,6 +266,16 @@ try {
   await waitFor("document.querySelector('.mentor-voice-dialog')");
   assert(await evaluate("document.querySelector('.mentor-voice-dialog').getBoundingClientRect().width>700"));
   assert(await evaluate("!!document.querySelector('.mentor-voice-dialog .discussion-state.listening')"));
+  assert(await evaluate("document.querySelector('.mentor-voice-dialog .discussion-microphone').getBoundingClientRect().height<200"), "Desktop dialog call card stays compact");
+  let compactShot = await send("Page.captureScreenshot", { format: "png" });
+  writeFileSync(root + "/data/ui-compact-voice-desktop.png", Buffer.from(compactShot.data, "base64"));
+  await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  assert(await evaluate("document.querySelector('.mentor-voice-dialog .discussion-microphone').getBoundingClientRect().height<260"), "Mobile call card stays compact");
+  assert(await evaluate("(()=>{const dock=document.querySelector('.discussion-call-dock');return dock.scrollHeight<=dock.clientHeight+1})()"), "Call card has no nested scrollbar");
+  compactShot = await send("Page.captureScreenshot", { format: "png" });
+  writeFileSync(root + "/data/ui-compact-voice-mobile.png", Buffer.from(compactShot.data, "base64"));
+  await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
+
   assert.equal(await evaluate("sessionStorage.getItem('mentor-last-discussion')"), liveSessionId);
   await evaluate("document.querySelector('.mentor-voice-dialog [aria-label=\"Close dialog\"]').click()");
   await waitFor("!document.querySelector('.mentor-voice-dialog')");
