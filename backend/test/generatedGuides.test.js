@@ -95,6 +95,9 @@ test("AI provider guides are generated once, citation-checked, and cached per co
     calls++;
     const request = JSON.parse(options.body);
     assert.match(request.messages[0].content, /router explain registration/);
+    assert.match(request.messages[0].content, /exactly 5 concise sections/);
+    assert.match(request.messages[0].content, /200-250 words total/);
+    assert.doesNotMatch(request.messages[0].content, /5-8 detailed sections|several clear paragraphs/);
     const context = JSON.parse(
       request.messages[1].content,
     ).untrustedSourceEvidence;
@@ -250,7 +253,13 @@ test("overlapping scope visits already share generation and retain each scope's 
   let started;
   const bothStarted = new Promise((resolve) => { started = resolve; });
   globalThis.fetch = async (_url, options) => {
-    const context = JSON.parse(JSON.parse(options.body).messages[1].content).untrustedSourceEvidence;
+    const request = JSON.parse(options.body);
+    const context = JSON.parse(request.messages[1].content).untrustedSourceEvidence;
+    if (!context.component) {
+      assert.match(request.messages[0].content, /Write 5-8 detailed sections/);
+      assert.match(request.messages[0].content, /several clear paragraphs/);
+      assert.doesNotMatch(request.messages[0].content, /200-250 words/);
+    }
     calls.push(context.scope);
     if (calls.length <= 2) await new Promise((resolve) => {
       releases.set(context.scope, resolve);

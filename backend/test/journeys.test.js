@@ -270,6 +270,18 @@ test("captured contract fixture traces have owner-only access and stored event/s
     400,
   );
 });
+test("guests can ask about explained learning paths without a team account", async () => {
+  const trace = explainedTrace("signup", "success"), event = trace.events[1];
+  const count = db.prepare("SELECT COUNT(*) AS count FROM journey_questions").get().count;
+  const body = { eventId: event.id, snapshotId: trace.snapshotId, question: "What does this component do?", level: "beginner" };
+  const response = await api(`/traces/${encodeURIComponent(trace.id)}/questions`, body);
+  assert.equal(response.status, 200);
+  assert.equal(response.data.sourceRefId, event.sourceRefId);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM journey_questions").get().count, count);
+  assert.equal((await api(`/traces/${encodeURIComponent(trace.id)}/questions`, { ...body, eventId: "wrong" })).status, 404);
+  assert.equal((await api("/traces/private-runtime-trace/questions", body)).status, 401);
+});
+
 test("questions stay pinned to their event and save trace/event/snapshot IDs without unrelated runtime values", async () => {
   const trace = explainedTrace("signup", "success"),
     event = trace.events[1];

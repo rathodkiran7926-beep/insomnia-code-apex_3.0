@@ -1,5 +1,6 @@
 ﻿import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CornerDownLeft, Volume2, X, ArrowUpRight } from 'lucide-react';
+import { Fragment } from 'react';
 import { Button } from './UI';
 import { HandoffAccountGate } from './HandoffAccount';
 import { handoffApi } from '../services/handoffApi';
@@ -51,6 +52,7 @@ export function JourneyQuestion({
     panel = useRef<HTMLElement>(null);
   const request = useRef<AbortController | null>(null);
   const brief = useJourneyExplanation(trace, event, level, open);
+  const QuestionAccess = trace.mode === 'explained_path' ? Fragment : HandoffAccountGate;
   async function askQuestion(prompt: string) {
     if (locked.current || !prompt.trim()) return;
     locked.current = true;
@@ -226,14 +228,6 @@ export function JourneyQuestion({
             )}
           </dl>
         </section>
-        <a
-          className="journey-view-source"
-          href={`/api/journey-snapshots/${trace.snapshotId}/source?referenceId=${encodeURIComponent(event.sourceRefId)}`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          View source <ArrowUpRight size={17} />
-        </a>
         <details className="journey-component-details">
           <summary>About this component</summary>
           {children}
@@ -314,7 +308,7 @@ export function JourneyQuestion({
         )}
       </div>
       <div className="journey-chat-composer">
-        <HandoffAccountGate>
+        <QuestionAccess>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -337,7 +331,7 @@ export function JourneyQuestion({
               {busy ? 'Reading the evidence...' : 'Ask mentor'}
             </Button>
           </form>
-        </HandoffAccountGate>
+        </QuestionAccess>
       </div>
     </section>
   );

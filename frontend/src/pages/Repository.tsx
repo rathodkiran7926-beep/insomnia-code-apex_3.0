@@ -133,7 +133,7 @@ export default function Repository() {
       setQuery('');
       setRole('all');
       setTab('architecture');
-      setActiveJob(result.id);
+      setActiveJob(result.id, revision);
     } catch (e) {
       setError((e as Error).message);
     } finally {

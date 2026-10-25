@@ -247,6 +247,7 @@ test("read-only route validates parameters and returns only its loaded snapshot"
     );
 
     let sentComparison;
+    let providerReference = "r0";
     process.env.LLM_API_KEY = "test-key";
     process.env.LLM_BASE_URL = "http://llm.test/v1";
     globalThis.fetch = async (_url, options) => {
@@ -261,7 +262,7 @@ test("read-only route validates parameters and returns only its loaded snapshot"
                   behaviorChanges: ["The function now returns false."],
                   dependencyImpacts: ["Callers may observe the changed result."],
                   reviewChecks: ["Check callers that rely on a truthy result."],
-                  referenceIds: ["r0"],
+                  referenceIds: [providerReference],
                 }),
               },
             },
@@ -288,6 +289,58 @@ test("read-only route validates parameters and returns only its loaded snapshot"
     assert.equal(submitted.beforeCode, "function target() {\n  return true;");
     assert.equal(submitted.proposedCode, "function target() {\n  return false;\n}");
     assert.deepEqual(aiAnalysis.analysis.referenceIds, ["r0"]);
+
+    const question = "What happens if the caller receives an empty result?";
+    for (const proposedCode of [submitted.beforeCode, ""]) {
+      const scenarioResponse = await originalFetch(
+        `${base}/${snapshotId}/components/c0/impact-analysis`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ proposedCode, question }),
+        },
+      );
+      assert.equal(scenarioResponse.status, 200);
+      assert.equal((await scenarioResponse.json()).analysis.mode, "ai");
+      const scenario = JSON.parse(sentComparison.messages[1].content);
+      assert.equal(scenario.question, question);
+      assert.equal(scenario.proposedCode, scenario.beforeCode);
+      assert.match(sentComparison.messages[0].content, /hypothetical/i);
+      assert.match(sentComparison.messages[0].content, /unchanged/i);
+    }
+    for (const question of ["x".repeat(2001), { injected: true }]) {
+      const invalidQuestion = await originalFetch(
+        `${base}/${snapshotId}/components/c0/impact-analysis`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ proposedCode: submitted.beforeCode, question }),
+        },
+      );
+      assert.equal(invalidQuestion.status, 400);
+    }
+
+    providerReference = "foreign-reference";
+    const staleCitationResponse = await originalFetch(
+      `${base}/${snapshotId}/components/c0/impact-analysis`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ proposedCode: submitted.beforeCode, question }),
+      },
+    );
+    assert.equal(staleCitationResponse.status, 502);
+    delete process.env.LLM_API_KEY;
+    const offlineScenarioResponse = await originalFetch(
+      `${base}/${snapshotId}/components/c0/impact-analysis`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ proposedCode: submitted.beforeCode, question }),
+      },
+    );
+    assert.equal(offlineScenarioResponse.status, 200);
+    assert.equal((await offlineScenarioResponse.json()).analysis.mode, "source-facts");
 
     const invalidAnalysis = await originalFetch(
       `${base}/${snapshotId}/components/c0/impact-analysis`,

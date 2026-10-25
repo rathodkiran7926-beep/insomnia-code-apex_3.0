@@ -17,6 +17,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useRepositoryAnalysis } from '../state/RepositoryAnalysisContext';
+import { displayedSnapshotRevision } from '../domain/analysisRevisionLabel';
 import '../styles/mentor-navigation.css';
 export const workspaceNavigation = [
   { label: '', links: [{ path: '/workspace', label: 'Workspace', icon: LayoutGrid }] },
@@ -62,7 +63,7 @@ export function MentorNavigation({
   onSettings: () => void;
   onNavigate?: () => void;
 }) {
-  const { snapshot, repositoryUrl } = useRepositoryAnalysis();
+  const { snapshot, repositoryUrl, requestedRevisionLabel } = useRepositoryAnalysis();
   const location = useLocation();
   const [closed, setClosed] = useState<string[]>([]);
   const repo = (snapshot?.repository || repositoryUrl).replace('https://github.com/', '');
@@ -83,7 +84,7 @@ export function MentorNavigation({
         </strong>
         <span>
           {snapshot
-            ? `${snapshot.branch || snapshot.revision || 'Pinned commit'} / ${snapshot.commit.slice(0, 8)}`
+            ? `${displayedSnapshotRevision(snapshot, requestedRevisionLabel)} / ${snapshot.commit.slice(0, 8)}`
             : 'Open Architecture to choose your code'}
         </span>
       </div>

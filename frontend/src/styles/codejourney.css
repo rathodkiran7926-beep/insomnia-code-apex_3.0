@@ -1834,18 +1834,19 @@ button.journey-brand-mentor:focus-visible {
   outline-offset: 3px;
 }
 .journey-chat-event {
-  padding: 18px;
+  padding: 10px 12px;
   background: linear-gradient(120deg, #fcfaff, #f8f5ff);
   border-color: #e1d6fc;
   border-radius: 14px;
 }
 .journey-chat-event h2 {
-  margin-top: 14px;
-  font-size: 22px;
+  margin: 5px 0 0;
+  font-size: 16px;
   line-height: 1.3;
 }
 .journey-chat-event .journey-event-source {
-  margin-top: 12px;
+  margin-top: 5px;
+  line-height: 1.4;
 }
 .journey-auto-explanation {
   padding-top: 22px;

@@ -2,18 +2,23 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AnalysisJob, RepositorySnapshot } from '../domain/analysisTypes';
 import { analysisApi } from '../services/analysisApi';
+import { ANALYSIS_REVISION_LABEL_KEY, labelForActiveJob, revisionLabelForRequest } from '../domain/analysisRevisionLabel';
 const Context = createContext<{
   snapshot: RepositorySnapshot | null;
   job: AnalysisJob | null;
   loading: boolean;
   error: string;
-  setActiveJob: (id: string) => void;
+  setActiveJob: (id: string, revision?: string) => void;
+  requestedRevisionLabel: string | null;
   repositoryUrl: string;
   setRepositoryUrl: (url: string) => void;
 } | null>(null);
 export function RepositoryAnalysisProvider({ children }: { children: ReactNode }) {
   const [id, setId] = useState(() => localStorage.getItem('mentor-analysis-job') || '');
   const [snapshot, setSnapshot] = useState<RepositorySnapshot | null>(null);
+  const [requestedRevisionLabel, setRequestedRevisionLabel] = useState(() =>
+    labelForActiveJob(id, localStorage.getItem(ANALYSIS_REVISION_LABEL_KEY)),
+  );
   const [job, setJob] = useState<AnalysisJob | null>(null);
   const [loading, setLoading] = useState(Boolean(id));
   const [error, setError] = useState('');
@@ -74,7 +79,10 @@ export function RepositoryAnalysisProvider({ children }: { children: ReactNode }
       clearTimeout(timer);
     };
   }, [id]);
-  function setActiveJob(next: string) {
+  function setActiveJob(next: string, revision = '') {
+    const label = revisionLabelForRequest(revision);
+    localStorage.setItem(ANALYSIS_REVISION_LABEL_KEY, JSON.stringify({ jobId: next, label }));
+    setRequestedRevisionLabel(label);
     localStorage.setItem('mentor-analysis-job', next);
     setSnapshot(null);
     setError('');
@@ -84,7 +92,7 @@ export function RepositoryAnalysisProvider({ children }: { children: ReactNode }
   }
   return (
     <Context.Provider
-      value={{ snapshot, job, loading, error, setActiveJob, repositoryUrl, setRepositoryUrl }}
+      value={{ snapshot, job, loading, error, setActiveJob, requestedRevisionLabel, repositoryUrl, setRepositoryUrl }}
     >
       {children}
     </Context.Provider>

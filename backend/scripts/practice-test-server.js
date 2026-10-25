@@ -6,13 +6,14 @@ process.env.LLM_BASE_URL = 'https://practice-model.invalid/v1';
 process.env.LLM_API_KEY = 'isolated-practice-test-key';
 process.env.LLM_MODEL = 'isolated-practice-model';
 const { analyze } = await import('../src/analyzer.js');
+const { documentGraph } = await import('../src/documentation.js');
 const { db, saveSnapshot } = await import('../src/storage.js');
 const files = {
   'src/users.ts': 'export function normalizeEmail(email: string) { return email.trim(); }\nexport function createUser(email: string) { return normalizeEmail(email); }',
   'src/routes.ts': "import express from 'express'; import {createUser} from './users'; const app=express(); app.post('/users', register); function register(req,res) { return res.json(createUser(req.body.email)); }",
 };
 const graph = analyze({ repository: 'https://github.com/test/practice-checkout', commit: 'd'.repeat(40), files });
-saveSnapshot(graph, { snapshotId: graph.snapshotId }, '', files);
+saveSnapshot(graph, await documentGraph(graph, { generateAI: false }), '', files);
 db.prepare('INSERT INTO analysis_jobs VALUES (?,?,?,?,?,?)').run('practice-ui-job', 'complete', 100, 'Ready', graph.snapshotId, new Date().toISOString());
 const original = globalThis.fetch;
 globalThis.fetch = async (url, options) => {
