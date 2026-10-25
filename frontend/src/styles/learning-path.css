@@ -19,10 +19,10 @@
 .learning-sections {
   display: flex;
   gap: 8px;
-  margin-bottom: 22px;
+  margin-bottom: 10px;
 }
 .learning-sections button {
-  padding: 11px 22px;
+  padding: 7px 16px;
   border: 1px solid #e5dff4;
   border-radius: 12px;
   background: white;
