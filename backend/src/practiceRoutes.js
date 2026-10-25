@@ -18,9 +18,9 @@ practiceRoutes.post("/tasks", async (req, res, next) => {
   }
 });
 
-practiceRoutes.post("/attempts", (req, res, next) => {
+practiceRoutes.post("/attempts", async (req, res, next) => {
   try {
-    res.status(201).json(createPracticeAttempt(req.body));
+    res.status(201).json(await createPracticeAttempt(req.body));
   } catch (error) {
     next(error);
   }

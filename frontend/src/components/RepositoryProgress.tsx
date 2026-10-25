@@ -26,6 +26,7 @@ type Attempt = {
   snapshotId: string;
   difficulty: string;
   status: string;
+  reviewStatus: string | null;
   createdAt: string;
 };
 type Quiz = {
@@ -56,6 +57,8 @@ type Report = {
     syntaxPassed: number;
     syntaxFailed: number;
     tasksAttempted: number;
+    tasksCompleted: number;
+    reviewsPassed: number;
     quizSessions: number;
     quizAnswered: number;
     quizCorrect: number;
@@ -291,7 +294,7 @@ export function RepositoryProgress({ onSample }: { onSample: () => void }) {
           id: a.id,
           time: a.createdAt,
           title: a.title || a.taskId,
-          detail: `${a.difficulty} · syntax ${a.status}`,
+          detail: `${a.difficulty} · ${a.reviewStatus ? `AI review ${a.reviewStatus}` : `syntax ${a.status} (not AI reviewed)`}`,
           kind: 'Practice attempt',
         })),
         ...(report?.quizzes || []).map((q) => ({
@@ -452,7 +455,7 @@ export function RepositoryProgress({ onSample }: { onSample: () => void }) {
                     FlaskConical,
                     'Practice attempts',
                     report.summary.attempts,
-                    `${report.summary.tasksAttempted} tasks attempted · ${report.summary.syntaxPassed} syntax passed · ${report.summary.syntaxFailed} failed`,
+                    `${report.summary.tasksAttempted} tasks attempted; ${report.summary.tasksCompleted} completed; ${report.summary.reviewsPassed} AI reviews passed`,
                   ],
                   [
                     Target,
@@ -579,15 +582,15 @@ export function RepositoryProgress({ onSample }: { onSample: () => void }) {
                     </h2>
                     <p>
                       Saved attempts for this browser's existing practice learner ID. Checks verify
-                      syntax; they do not execute tests.
+                      syntax and use AI review for new submissions. Completed tasks passed AI review; runtime tests are not executed.
                     </p>
                     {report.attempts
                       .filter((a) => matches(a.title || a.taskId))
                       .map((a) => (
                         <article className="rp-record" key={a.id}>
                           <strong>{a.title || a.taskId}</strong>
-                          <span className={`rp-pill ${a.status === 'passed' ? 'good' : ''}`}>
-                            Syntax {a.status}
+                          <span className={`rp-pill ${a.reviewStatus === 'passed' ? 'good' : ''}`}>
+                            {a.reviewStatus ? `AI review ${a.reviewStatus}` : `Syntax ${a.status}; not AI reviewed`}
                           </span>
                           <small>
                             {a.difficulty} · {date(a.createdAt)} · snapshot {a.snapshotId}
