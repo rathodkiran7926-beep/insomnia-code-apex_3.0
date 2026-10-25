@@ -131,9 +131,78 @@ export function validateAnswer(value, context) {
     throw new Error("Invalid mentor citation");
   return result;
 }
+
+function completeFactualAnswer(graph, context, question) {
+  const normalized = question.trim().toLowerCase().replace(/\s+/g, " ").replace(/\?$/, "");
+  const connections = /^(?:which|what) direct (callers|dependencies) are resolved by static analysis$/.exec(normalized);
+  const signature = /^what (?:are the declared (inputs|parameters|inputs and output type)|is the declared (output|return) type) of this (?:function|component)$/.exec(normalized);
+  if (!connections && !signature) return null;
+  const { component, relationships, references, connected, selectedSource } = context;
+  if (selectedSource.truncated || relationships.length > 100 || references.length > 20 || connected.length > 100)
+    return null;
+  const referenceById = new Map(references.map((reference) => [reference.id, reference]));
+  const ids = new Set([component.referenceId]);
+  let answer;
+  if (connections) {
+    const callers = connections[1] === "callers";
+    const edges = relationships.filter((edge) => callers
+      ? edge.target === component.id && edge.type === "calls"
+      : edge.source === component.id);
+    const names = new Map(connected.map((node) => [node.id, node.name]));
+    if (edges.some((edge) => edge.certainty !== "static" || !edge.type || !names.get(callers ? edge.source : edge.target)))
+      return null;
+    for (const edge of edges) {
+      ids.add(edge.referenceId);
+      const node = connected.find((item) => item.id === (callers ? edge.source : edge.target));
+      const declaration = graph.references.find((reference) => reference.id === node.referenceId && reference.snapshotId === graph.snapshotId);
+      if (!declaration) return null;
+      ids.add(declaration.id);
+      referenceById.set(declaration.id, declaration);
+    }
+    const facts = edges.map((edge) => callers ? names.get(edge.source)
+      : `${edge.type.replaceAll("_", " ")} → ${names.get(edge.target)}`);
+    answer = `Statically resolved direct ${connections[1]}: ${facts.join("; ") || "none resolved by static analysis"}.\n\nOnly recorded static connections are listed; unresolved or dynamic connections may still exist. Runtime behavior has not been verified.`;
+  } else {
+    if (!["function", "handler", "service"].includes(component.role)) return null;
+    const inputs = Boolean(signature[1]);
+    const output = Boolean(signature[2]) || signature[1] === "inputs and output type";
+    if (inputs && (!Array.isArray(component.inputs) || component.inputs.some((input) => typeof input !== "string" || !input.trim())))
+      return null;
+    if (output && (typeof component.output !== "string" || !component.output.trim() || component.output === "Not statically determined"))
+      return null;
+    answer = [
+      inputs ? `Inputs: ${component.inputs.join(", ") || "none declared"}.` : null,
+      output ? `Output: ${component.output}.` : null,
+    ].filter(Boolean).join("\n");
+  }
+  if (ids.size > 8 || answer.length > 4000) return null;
+  for (const id of ids) {
+    const reference = referenceById.get(id);
+    if (!reference || !reference.excerpt ||
+      !Number.isInteger(reference.startOffset) || !Number.isInteger(reference.endOffset) ||
+      reference.startOffset < 0 || reference.endOffset <= reference.startOffset)
+      return null;
+    const source = db.prepare("SELECT content FROM source_files WHERE snapshot_id=? AND path=?")
+      .get(graph.snapshotId, reference.file)?.content;
+    // Excerpts are capped by the analyzer. Require an exact, complete captured
+    // span and matching coordinates; legacy/missing/truncated evidence uses AI.
+    if (source === undefined || reference.endOffset > source.length ||
+      source.slice(reference.startOffset, reference.endOffset) !== reference.excerpt ||
+      source.slice(0, reference.startOffset).split(/\r\n|\r|\n/).length !== reference.startLine ||
+      source.slice(0, reference.endOffset).split(/\r\n|\r|\n/).length !== reference.endLine)
+      return null;
+  }
+  const factReferences = [...referenceById.values()];
+  return {
+    result: validateAnswer({ answer, referenceIds: [...ids] }, { ...context, references: factReferences }),
+    references: factReferences,
+  };
+}
+
 export async function answerQuestion(graph, componentId, question) {
   const context = questionContext(graph, componentId);
-  const { component: c, relationships, references, connected } = context;
+  const { component: c, relationships, connected } = context;
+  let { references } = context;
   const names = new Map(connected.map((n) => [n.id, n.name]));
   const outgoing = relationships
     .filter((e) => e.source === c.id)
@@ -172,7 +241,12 @@ export async function answerQuestion(graph, componentId, question) {
   let mode = "facts";
   let notice = "Source facts only. Configure LLM_API_KEY for tailored answers.";
   if (llmConfig().apiKey) {
-    try {
+    const factual = completeFactualAnswer(graph, context, question);
+    if (factual) {
+      result = factual.result;
+      references = factual.references;
+      notice = "Source facts from complete saved evidence for this precise question. Static analysis does not establish runtime behavior.";
+    } else try {
       const raw = await boundedFetch(llmConfig().endpoint, {
         method: "POST",
         limit: 48000,

@@ -6,8 +6,9 @@ import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import { z } from "zod";
-import { db, saveSnapshot } from "./storage.js";
-import { parseRepository } from "./github.js";
+import { db, saveSnapshot, reusableSnapshot } from "./storage.js";
+import { parseRepository, resolveRepository, EXTRACTION_POLICY_VERSION } from "./github.js";
+import { ANALYZER_VERSION } from "./analyzer.js";
 import { readSource, answerQuestion } from "./workspace.js";
 import { generateGuide } from "./generatedGuides.js";
 import { discussionRoutes } from "./discussionRoutes.js";
@@ -55,9 +56,19 @@ app.use("/api/practice", practiceRoutes);
 app.use("/api/snapshots", agentContextRouter);
 app.use("/api/contributions", contributionRoutes);
 let active = 0;
+const analysesInFlight = new Map();
+const analysisVersions = { analyzerVersion: ANALYZER_VERSION, extractionPolicy: EXTRACTION_POLICY_VERSION };
+function analysisJob(status = "running", message = "Queued for worker", snapshot = null) {
+  const id = randomUUID();
+  db.prepare("INSERT INTO analysis_jobs VALUES (?,?,?,?,?,?)").run(
+    id, status, status === "complete" ? 100 : 0, message, snapshot, new Date().toISOString(),
+  );
+  return id;
+}
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
-app.post("/api/analyses", (req, res, next) => {
+app.post("/api/analyses", async (req, res, next) => {
   try {
+    const startedAt = Date.now();
     const body = z
       .object({
         url: z.string().max(300),
@@ -66,39 +77,52 @@ app.post("/api/analyses", (req, res, next) => {
       .strict()
       .parse(req.body);
     parseRepository(body.url);
+    let resolved;
+    try {
+      // Always verify public access and the current remote SHA, including hits.
+      resolved = await resolveRepository(body.url, body.revision);
+    } catch (error) {
+      return res.status(202).json({ id: analysisJob("failed", error.message) });
+    }
+    const identity = JSON.stringify([resolved.repository, resolved.commit, analysisVersions]);
+    const pending = analysesInFlight.get(identity);
+    if (pending) return res.status(202).json({ id: pending });
+    const cached = reusableSnapshot(resolved.repository, resolved.commit, analysisVersions);
+    if (cached) return res.status(202).json({ id: analysisJob("complete", "Analysis complete", cached.snapshotId) });
     if (active >= 2)
       return res.status(429).json({
         error: "Two analyses are already running. Retry when one finishes.",
       });
-    const id = randomUUID();
-    db.prepare("INSERT INTO analysis_jobs VALUES (?,?,?,?,?,?)").run(
-      id,
-      "running",
-      0,
-      "Queued for worker",
-      null,
-      new Date().toISOString(),
-    );
-    // One dedicated thread per bounded job keeps parsing away from HTTP requests.
-    const worker = new Worker(new URL("./worker.js", import.meta.url), {
-      workerData: body,
-      resourceLimits: { maxOldGenerationSizeMb: 384 },
-    });
+    const id = analysisJob();
+    analysesInFlight.set(identity, id);
     active++;
+    let worker;
+    let timeout;
     let finished = false;
     const finish = (status, message, snapshot = null) => {
       if (finished) return;
       finished = true;
       clearTimeout(timeout);
       active--;
+      if (analysesInFlight.get(identity) === id) analysesInFlight.delete(identity);
       db.prepare(
         "UPDATE analysis_jobs SET status=?, progress=?, message=?, snapshot_id=? WHERE id=?",
       ).run(status, status === "complete" ? 100 : 0, message, snapshot, id);
+      if (status === "failed" && worker) void worker.terminate().catch(() => {});
     };
-    const timeout = setTimeout(() => {
+    try {
+      // Only the verified immutable resolution crosses into the worker.
+      worker = new Worker(new URL("./worker.js", import.meta.url), {
+        workerData: { ...body, resolved },
+        resourceLimits: { maxOldGenerationSizeMb: 384 },
+      });
+    } catch (error) {
+      finish("failed", error.message);
+      throw error;
+    }
+    timeout = setTimeout(() => {
       finish("failed", "Analysis exceeded the five minute limit");
-      void worker.terminate();
-    }, 300000);
+    }, Math.max(1, 300000 - (Date.now() - startedAt)));
     worker.on("message", (event) => {
       if (finished) return;
       if (event.type === "progress")
@@ -108,16 +132,21 @@ app.post("/api/analyses", (req, res, next) => {
       if (event.type === "failed") finish("failed", event.message);
       if (event.type === "complete") {
         try {
+          if (event.graph.repository !== resolved.repository || event.graph.commit !== resolved.commit ||
+            event.analysis?.analyzerVersion !== analysisVersions.analyzerVersion ||
+            event.analysis?.extractionPolicy !== analysisVersions.extractionPolicy)
+            throw new Error("Worker returned incompatible analysis evidence");
           saveSnapshot(
             event.graph,
             event.docs,
             event.markdown,
             event.files,
             event.setupMetadata,
+            event.analysis,
           );
           finish("complete", "Analysis complete", event.graph.snapshotId);
-        } catch {
-          finish("failed", "Could not persist analysis");
+        } catch (error) {
+          finish("failed", error.code === "SNAPSHOT_EVIDENCE_CONFLICT" ? error.message : "Could not persist analysis");
         }
       }
     });
@@ -281,7 +310,7 @@ app.use((error, _req, res, _next) =>
             : error.message,
     }),
 );
-const server = app.listen(Number(process.env.PORT || 3001), "127.0.0.1", () =>
+export const server = app.listen(Number(process.env.PORT || 3001), "127.0.0.1", () =>
   console.log(
     `Codebase Mentor API: http://127.0.0.1:${process.env.PORT || 3001}`,
   ),

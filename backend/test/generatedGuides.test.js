@@ -5,6 +5,7 @@ const { db, saveSnapshot } = await import("../src/storage.js");
 const { analyze } = await import("../src/analyzer.js");
 const { generateGuide, guideContext, validateGuide } =
   await import("../src/generatedGuides.js");
+const { generationUsage } = await import("../src/generationAccounting.js");
 const files = {
   "backend/package.json": JSON.stringify({
     scripts: { dev: "node app.js" },
@@ -233,6 +234,203 @@ test("documentation allows longer generation without changing ordinary fetch tim
   } finally {
     AbortSignal.timeout = originalTimeout;
     globalThis.fetch = originalFetch;
+    if (key === undefined) delete process.env.LLM_API_KEY;
+    else process.env.LLM_API_KEY = key;
+  }
+});
+
+test("overlapping scope visits already share generation and retain each scope's citations", async () => {
+  const snapshot = analyze({ repository: graph.repository, commit: "d".repeat(40), files });
+  saveSnapshot(snapshot, {}, "", files);
+  const original = globalThis.fetch;
+  const key = process.env.LLM_API_KEY;
+  process.env.LLM_API_KEY = "mock-key";
+  const releases = new Map();
+  const calls = [];
+  let started;
+  const bothStarted = new Promise((resolve) => { started = resolve; });
+  globalThis.fetch = async (_url, options) => {
+    const context = JSON.parse(JSON.parse(options.body).messages[1].content).untrustedSourceEvidence;
+    calls.push(context.scope);
+    if (calls.length <= 2) await new Promise((resolve) => {
+      releases.set(context.scope, resolve);
+      if (releases.size === 2) started();
+    });
+    return new Response(JSON.stringify({ choices: [{ message: {
+      content: JSON.stringify(value(context.sourceReferences[0].id)),
+    } }] }));
+  };
+  try {
+    const all = generateGuide(snapshot, { scope: "all" });
+    const front = generateGuide(snapshot, { scope: "frontend" });
+    const allAgain = generateGuide(snapshot, { scope: "all" });
+    await bothStarted;
+    assert.deepEqual(calls, ["all", "frontend"]);
+    releases.get("frontend")();
+    const frontGuide = await front;
+    assert.equal(frontGuide.scope, "frontend");
+    assert(frontGuide.citations.every((ref) => ref.file.startsWith("frontend/")));
+    assert.equal((await generateGuide(snapshot, { scope: "frontend" })).cached, true);
+    releases.get("all")();
+    const [a, b] = await Promise.all([all, allAgain]);
+    assert.deepEqual(a, b);
+    assert.equal(a.scope, "all");
+    const back = await generateGuide(snapshot, { scope: "backend" });
+    assert(back.citations.every((ref) => ref.file.startsWith("backend/")));
+    for (const scope of ["all", "frontend", "backend", "all"])
+      assert.equal((await generateGuide(snapshot, { scope })).cached, true);
+    assert.equal(calls.length, 3, "three cold scopes generate once each; overlapping/repeated visits add zero calls");
+    const changed = analyze({ repository: graph.repository, commit: "e".repeat(40), files });
+    saveSnapshot(changed, {}, "", files);
+    const changedGuide = await generateGuide(changed, { scope: "all" });
+    assert.equal(calls.length, 4, "a different snapshot must generate its own guide");
+    assert(changedGuide.citations.every((ref) => ref.snapshotId === changed.snapshotId && ref.url.includes(changed.commit)));
+    const selected = snapshot.components.find((node) => node.role === "router");
+    assert.equal((await generateGuide(snapshot, { componentId: selected.id })).componentId, selected.id);
+    assert.equal(calls.length, 5, "a new component must generate separately from its project scope");
+  } finally {
+    for (const release of releases.values()) release();
+    globalThis.fetch = original;
+    if (key === undefined) delete process.env.LLM_API_KEY;
+    else process.env.LLM_API_KEY = key;
+  }
+});
+
+test("guide errors and missing keys leave the same uncached selection retryable", async () => {
+  const snapshot = analyze({ repository: graph.repository, commit: "f".repeat(40), files });
+  saveSnapshot(snapshot, {}, "", files);
+  const original = globalThis.fetch;
+  const key = process.env.LLM_API_KEY;
+  let calls = 0;
+  globalThis.fetch = async (_url, options) => {
+    calls++;
+    if (calls === 1) return new Response("Unauthorized", { status: 401 });
+    const context = JSON.parse(JSON.parse(options.body).messages[1].content).untrustedSourceEvidence;
+    return new Response(JSON.stringify({ choices: [{ message: {
+      content: JSON.stringify(value(context.sourceReferences[0].id)),
+    } }] }));
+  };
+  try {
+    delete process.env.LLM_API_KEY;
+    await assert.rejects(generateGuide(snapshot, { scope: "all" }), (error) => error.status === 503);
+    assert.equal(calls, 0);
+    process.env.LLM_API_KEY = "mock-key";
+    await assert.rejects(generateGuide(snapshot, { scope: "all" }), (error) => error.status === 502);
+    assert.equal(calls, 1);
+    assert.equal((await generateGuide(snapshot, { scope: "all" })).scope, "all");
+    assert.equal(calls, 2);
+    assert.equal((await generateGuide(snapshot, { scope: "all" })).cached, true);
+    assert.equal(calls, 2, "successful Retry must be reused without another provider call");
+  } finally {
+    globalThis.fetch = original;
+    if (key === undefined) delete process.env.LLM_API_KEY;
+    else process.env.LLM_API_KEY = key;
+  }
+});
+
+test("guide accounting preserves existing cache keys, coalescing and model-independent artifacts", async () => {
+  const snapshot = analyze({ repository: graph.repository, commit: "1".repeat(40), files });
+  saveSnapshot(snapshot, {}, "", files);
+  const original = globalThis.fetch, key = process.env.LLM_API_KEY, model = process.env.LLM_MODEL;
+  process.env.LLM_API_KEY = "mock-key";
+  const sequence = generationUsage().at(-1)?.sequence || 0;
+  let calls = 0;
+  globalThis.fetch = async (_url, options) => {
+    calls++;
+    const context = JSON.parse(JSON.parse(options.body).messages[1].content).untrustedSourceEvidence;
+    return new Response(JSON.stringify({ choices: [{ message: {
+      content: JSON.stringify(value(context.sourceReferences[0].id)),
+    } }] }));
+  };
+  try {
+    const [a, b] = await Promise.all([generateGuide(snapshot, { scope: "all" }), generateGuide(snapshot, { scope: "all" })]);
+    assert.deepEqual(a, b);
+    assert.equal(calls, 1);
+    process.env.LLM_MODEL = "changed-model-must-not-invalidate-cache";
+    const cached = await generateGuide(snapshot, { scope: "all" });
+    assert.equal(cached.cached, true);
+    assert.deepEqual(cached.sections, a.sections);
+    assert.equal(calls, 1);
+    const other = analyze({ repository: graph.repository, commit: "2".repeat(40), files });
+    saveSnapshot(other, {}, "", files);
+    assert.equal((await generateGuide(other, { scope: "all" })).snapshotId, other.snapshotId);
+    assert.equal(calls, 2);
+    const records = generationUsage().filter((row) => row.sequence > sequence && row.feature === "generated_guides");
+    assert.equal(records.filter((row) => row.kind === "attempt").length, 2);
+    assert(records.filter((row) => row.kind === "attempt").every((row) => row.tokens.total === "unknown"));
+    assert.equal(records.filter((row) => row.kind === "cache" && row.status === "hit").length, 1);
+    assert.equal(records.filter((row) => row.kind === "cache" && row.status === "coalesced").length, 1);
+    assert(!JSON.stringify(records).includes(snapshot.snapshotId));
+    assert(!JSON.stringify(records).includes("mock-key"));
+  } finally {
+    globalThis.fetch = original;
+    if (key === undefined) delete process.env.LLM_API_KEY;
+    else process.env.LLM_API_KEY = key;
+    if (model === undefined) delete process.env.LLM_MODEL;
+    else process.env.LLM_MODEL = model;
+  }
+});
+
+test("guide accounting measures each existing retry and rejects malformed output as before", async () => {
+  const snapshot = analyze({ repository: graph.repository, commit: "3".repeat(40), files });
+  saveSnapshot(snapshot, {}, "", files);
+  const original = globalThis.fetch, key = process.env.LLM_API_KEY;
+  process.env.LLM_API_KEY = "mock-key";
+  const sequence = generationUsage().at(-1)?.sequence || 0;
+  let calls = 0, malformed = false;
+  globalThis.fetch = async (_url, options) => {
+    calls++;
+    if (calls === 1) return new Response("private provider failure details", { status: 503 });
+    const context = JSON.parse(JSON.parse(options.body).messages[1].content).untrustedSourceEvidence;
+    return new Response(JSON.stringify({ choices: [{ message: {
+      content: malformed ? "malformed JSON" : JSON.stringify(value(context.sourceReferences[0].id)),
+    } }], usage: { prompt_tokens: 23, completion_tokens: 4, total_tokens: 27 } }));
+  };
+  try {
+    await generateGuide(snapshot, { scope: "all" });
+    assert.equal(calls, 2);
+    malformed = true;
+    await assert.rejects(generateGuide(snapshot, { scope: "backend" }), (error) => error.status === 502);
+    malformed = false;
+    await generateGuide(snapshot, { scope: "backend" });
+    await generateGuide(snapshot, { scope: "backend" });
+    assert.equal(calls, 4);
+    const records = generationUsage().filter((row) => row.sequence > sequence && row.feature === "generated_guides");
+    const attempts = records.filter((row) => row.kind === "attempt");
+    assert.equal(attempts.length, 4);
+    assert.equal(attempts.filter((row) => row.status === "error").length, 1);
+    assert.deepEqual(attempts[1].tokens, { input: 23, output: 4, total: 27 });
+    assert.equal(records.filter((row) => row.kind === "generation_error" && row.errorCategory === "invalid_output").length, 1);
+    assert(!JSON.stringify(records).includes("private provider failure details"));
+  } finally {
+    globalThis.fetch = original;
+    if (key === undefined) delete process.env.LLM_API_KEY;
+    else process.env.LLM_API_KEY = key;
+  }
+});
+
+test("guide accounting distinguishes persistence failures without caching partial artifacts", async () => {
+  const snapshot = analyze({ repository: graph.repository, commit: "4".repeat(40), files });
+  saveSnapshot(snapshot, {}, "", files);
+  const original = globalThis.fetch, key = process.env.LLM_API_KEY;
+  process.env.LLM_API_KEY = "mock-key";
+  const sequence = generationUsage().at(-1)?.sequence || 0;
+  globalThis.fetch = async (_url, options) => {
+    const context = JSON.parse(JSON.parse(options.body).messages[1].content).untrustedSourceEvidence;
+    return new Response(JSON.stringify({ choices: [{ message: {
+      content: JSON.stringify(value(context.sourceReferences[0].id)),
+    } }] }));
+  };
+  db.exec("CREATE TEMP TRIGGER fail_guide_accounting BEFORE INSERT ON generated_guides BEGIN SELECT RAISE(ABORT,'private storage details'); END;");
+  try {
+    await assert.rejects(generateGuide(snapshot, { scope: "all" }), (error) => error.status === 502);
+    const records = generationUsage().filter((row) => row.sequence > sequence && row.feature === "generated_guides");
+    assert.equal(records.filter((row) => row.kind === "generation_error" && row.errorCategory === "storage").length, 1);
+    assert(!JSON.stringify(records).includes("private storage details"));
+    assert.equal(db.prepare("SELECT count(*) AS n FROM generated_guides WHERE snapshot_id=?").get(snapshot.snapshotId).n, 0);
+  } finally {
+    db.exec("DROP TRIGGER fail_guide_accounting");
+    globalThis.fetch = original;
     if (key === undefined) delete process.env.LLM_API_KEY;
     else process.env.LLM_API_KEY = key;
   }

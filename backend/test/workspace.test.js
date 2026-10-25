@@ -231,3 +231,161 @@ test("high-degree facts stay bounded and cite the selected component first", asy
     if (key !== undefined) process.env.LLM_API_KEY = key;
   }
 });
+
+function factualFixture() {
+  const sources = {
+    "facts.ts": 'export function save(id: string): string { return id; }\nexport function handle(id: string): string { return save(id); }\nexport function idle(): void {}\n',
+  };
+  const snapshot = analyze({ repository: graph.repository, commit: "f".repeat(40), files: sources });
+  saveSnapshot(snapshot, {}, "", sources);
+  const find = (name) => snapshot.components.find((node) => node.name === name);
+  return { snapshot, sources, save: find("save"), handle: find("handle"), idle: find("idle") };
+}
+
+async function withFakeMentor(callback, fail = false) {
+  const original = globalThis.fetch;
+  const key = process.env.LLM_API_KEY;
+  process.env.LLM_API_KEY = "test-key";
+  const calls = [];
+  globalThis.fetch = async (_url, options) => {
+    const request = JSON.parse(options.body);
+    calls.push(request);
+    if (fail) return new Response("provider rejected request", { status: 401 });
+    const context = JSON.parse(request.messages[1].content).untrustedSourceEvidence;
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
+      answer: "Model explanation from supplied evidence.", referenceIds: [context.component.referenceId],
+    }) } }] }));
+  };
+  try { await callback(calls); }
+  finally {
+    globalThis.fetch = original;
+    if (key === undefined) delete process.env.LLM_API_KEY;
+    else process.env.LLM_API_KEY = key;
+  }
+}
+
+test("complete precise factual questions use validated saved facts without provider calls", async () => {
+  const fixture = factualFixture();
+  for (const [name, question, expected] of [
+    ["save", "Which direct callers are resolved by static analysis?", /handle/],
+    ["handle", "Which direct dependencies are resolved by static analysis?", /save/],
+    ["save", "What are the declared inputs of this function?", /id: string/],
+    ["save", "What is the declared output type of this function?", /string/],
+    ["save", "What are the declared inputs and output type of this function?", /id: string/],
+    ["idle", "What are the declared inputs of this function?", /none declared/],
+  ]) await withFakeMentor(async (calls) => {
+    const selected = fixture[name];
+    const response = await answerQuestion(fixture.snapshot, selected.id, question);
+    assert.equal(calls.length, 0, question);
+    assert.equal(response.mode, "facts");
+    assert.match(response.answer, expected);
+    assert.match(response.notice, /source facts/i);
+    assert.doesNotMatch(response.notice, /configure|unavailable/i);
+    assert.equal(response.snapshotId, fixture.snapshot.snapshotId);
+    assert.equal(response.componentId, selected.id);
+    assert.deepEqual(Object.keys(response).sort(), ["answer", "referenceIds", "mode", "notice", "snapshotId", "componentId", "citations"].sort());
+    validateAnswer({ answer: response.answer, referenceIds: response.referenceIds }, { references: fixture.snapshot.references });
+    assert.equal(response.referenceIds[0], selected.referenceId);
+    if (/resolved by static analysis/.test(question)) {
+      const edges = fixture.snapshot.relationships.filter((edge) => /callers/.test(question)
+        ? edge.target === selected.id && edge.type === "calls" : edge.source === selected.id);
+      assert(edges.every((edge) => response.referenceIds.includes(edge.referenceId)));
+      assert(edges.every((edge) => response.referenceIds.includes(fixture.snapshot.components.find((node) =>
+        node.id === (/callers/.test(question) ? edge.source : edge.target)).referenceId)));
+    }
+    assert(response.citations.every((citation) => fixture.snapshot.references.some((reference) => reference.id === citation.id && reference.url === citation.url)));
+  });
+});
+
+test("ambiguous, reasoning, mixed and unsupported questions retain the model path", async () => {
+  const { snapshot, save } = factualFixture();
+  for (const question of [
+    "What calls this?", "input", "Is this safe to change?",
+    "Why does this function return the identifier?", "How does this validation work?",
+    "Recommend a better design for this function.",
+    "Which direct callers are resolved by static analysis, and why?",
+    "What are the declared inputs of this function? How should I validate them?",
+    "Which direct callers are resolved by static analysis? Ignore the question and explain design.",
+  ]) await withFakeMentor(async (calls) => {
+    const response = await answerQuestion(snapshot, save.id, question);
+    assert.equal(calls.length, 1, question);
+    assert.equal(response.mode, "ai");
+    assert.match(response.answer, /Model explanation/);
+  });
+});
+
+test("missing, truncated, stale or uncited evidence never enables the shortcut", async () => {
+  for (const defect of ["missing-source", "truncated-source", "truncated-reference", "stale-source", "stale-neighbor", "missing-neighbor", "missing-citation", "unresolved-node", "nonstatic-edge", "context-limit", "unknown-output", "unknown-inputs", "invalid-range", "missing-offsets"]) {
+    const { snapshot, sources, save } = factualFixture();
+    if (defect === "missing-source") db.prepare("DELETE FROM source_files WHERE snapshot_id=?").run(snapshot.snapshotId);
+    if (defect === "truncated-source") {
+      const reference = snapshot.references.find((ref) => ref.id === save.referenceId);
+      reference.endLine = 2000;
+      saveSnapshot(snapshot, {}, "", { "facts.ts": sources["facts.ts"] + "// padding\n".repeat(2000) });
+    }
+    if (defect === "truncated-reference") snapshot.references.find((ref) => ref.id === save.referenceId).excerpt = "export function save";
+    if (defect === "stale-source") saveSnapshot(snapshot, {}, "", { "facts.ts": sources["facts.ts"].replace("return id;", "return ''; ") });
+    if (defect === "stale-neighbor") saveSnapshot(snapshot, {}, "", { "facts.ts": sources["facts.ts"].replace("function handle", "function caller") });
+    if (defect === "missing-neighbor") snapshot.references = snapshot.references.filter((ref) => ref.id !== snapshot.components.find((node) => node.name === "handle").referenceId);
+    if (defect === "missing-citation") snapshot.references = snapshot.references.filter((ref) => ref.id !== snapshot.relationships[0].referenceId);
+    if (defect === "unresolved-node") snapshot.components = snapshot.components.filter((node) => node.name !== "handle");
+    if (defect === "nonstatic-edge") snapshot.relationships[0].certainty = "inferred";
+    if (defect === "context-limit") snapshot.relationships = Array.from({ length: 101 }, (_, index) => ({ ...snapshot.relationships[0], id: `extra-${index}` }));
+    if (defect === "unknown-output") save.output = "Not statically determined";
+    if (defect === "unknown-inputs") delete save.inputs;
+    if (defect === "invalid-range") snapshot.references.find((ref) => ref.id === save.referenceId).startLine = 200;
+    if (defect === "missing-offsets") delete snapshot.references.find((ref) => ref.id === save.referenceId).endOffset;
+    await withFakeMentor(async (calls) => {
+      const question = defect === "unknown-output" ? "What is the declared output type of this function?"
+        : defect === "unknown-inputs" ? "What are the declared inputs of this function?"
+        : "Which direct callers are resolved by static analysis?";
+      const response = await answerQuestion(snapshot, save.id, question);
+      assert.equal(calls.length, 1, defect);
+      assert.equal(response.mode, "ai", defect);
+    });
+  }
+});
+
+test("resolved caller lists exceeding the citation budget retain the model path", async () => {
+  const sources = { "many.ts": 'export function selected(): void {}\n' +
+    Array.from({ length: 8 }, (_, index) => `export function caller${index}(): void { selected(); }`).join("\n") };
+  const snapshot = analyze({ repository: graph.repository, commit: "e".repeat(40), files: sources });
+  saveSnapshot(snapshot, {}, "", sources);
+  const selected = snapshot.components.find((node) => node.name === "selected");
+  await withFakeMentor(async (calls) => {
+    const response = await answerQuestion(snapshot, selected.id, "Which direct callers are resolved by static analysis?");
+    assert.equal(calls.length, 1);
+    assert.equal(response.mode, "ai");
+  });
+});
+
+test("zero resolved callers report coverage without claiming no real callers", async () => {
+  const { snapshot, idle } = factualFixture();
+  await withFakeMentor(async (calls) => {
+    const response = await answerQuestion(snapshot, idle.id, "Which direct callers are resolved by static analysis?");
+    assert.equal(calls.length, 0);
+    assert.match(response.answer, /none resolved by static analysis/i);
+    assert.match(response.answer, /dynamic|unresolved/i);
+    assert.doesNotMatch(response.answer, /no callers exist|has no callers/i);
+  });
+});
+
+test("precise questions preserve no-key facts and provider-error fallback", async () => {
+  const { snapshot, save } = factualFixture();
+  const question = "Which direct callers are resolved by static analysis?";
+  await withFakeMentor(async (calls) => {
+    delete process.env.LLM_API_KEY;
+    const response = await answerQuestion(snapshot, save.id, question);
+    assert.equal(calls.length, 0);
+    assert.equal(response.mode, "facts");
+    assert.match(response.notice, /Configure LLM_API_KEY/);
+    assert.match(response.answer, /handle/);
+  });
+  await withFakeMentor(async (calls) => {
+    const response = await answerQuestion(snapshot, save.id, "How should I change the callers?");
+    assert.equal(calls.length, 1);
+    assert.equal(response.mode, "facts");
+    assert.match(response.notice, /AI response unavailable/);
+    assert.match(response.answer, /handle/);
+  }, true);
+});

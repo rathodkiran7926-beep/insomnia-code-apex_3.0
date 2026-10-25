@@ -4,11 +4,12 @@ import { db } from "./storage.js";
 import { boundedFetch } from "./github.js";
 import { questionContext, readSource } from "./workspace.js";
 import { setTimeout as delay } from "node:timers/promises";
+import { generationAccounting } from "./generationAccounting.js";
 
-async function requestAI(url, options) {
+async function requestAI(url, options, workKey) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      return await boundedFetch(url, options);
+      return await generationAccounting.attempt("generated_guides", workKey, () => boundedFetch(url, options));
     } catch (error) {
       if (
         attempt === 0 &&
@@ -237,28 +238,37 @@ export async function generateGuide(graph, body) {
   )
     throw Object.assign(new Error("Component not found"), { status: 404 });
   const key = `v1:${request.componentId ? "component:" + request.componentId : "project:" + request.scope}`;
+  const taskKey = graph.snapshotId + ":" + key;
   const cached = db
     .prepare(
       "SELECT data FROM generated_guides WHERE snapshot_id=? AND cache_key=?",
     )
     .get(graph.snapshotId, key);
+  generationAccounting.cache("generated_guides", taskKey, cached ? "hit" : "miss");
   if (cached) return { ...JSON.parse(cached.data), cached: true };
-  const taskKey = graph.snapshotId + ":" + key;
-  if (inProgress.has(taskKey)) return inProgress.get(taskKey);
-  if (!llmConfig().apiKey)
+  if (inProgress.has(taskKey)) {
+    generationAccounting.cache("generated_guides", taskKey, "coalesced");
+    return inProgress.get(taskKey);
+  }
+  if (!llmConfig().apiKey) {
+    generationAccounting.error("generated_guides", taskKey, { status: 503 });
     throw Object.assign(
       new Error(
         "AI provider documentation requires LLM_API_KEY in backend/.env. Source facts remain available.",
       ),
       { status: 503 },
     );
-  if (active >= 2)
+  }
+  if (active >= 2) {
+    generationAccounting.error("generated_guides", taskKey, { status: 429 });
     throw Object.assign(
       new Error("Two documentation requests are running. Retry shortly."),
       { status: 429 },
     );
+  }
   const task = (async () => {
     active++;
+    let failureCategory = "evidence";
     try {
       const context = await guideContext(graph, request);
       if (!context.references.length)
@@ -271,6 +281,7 @@ export async function generateGuide(graph, body) {
         type: "string",
         enum: context.references.map((r) => r.id),
       };
+      failureCategory = undefined;
       const raw = await requestAI(llmConfig().endpoint, {
         method: "POST",
         limit: 100000,
@@ -307,7 +318,8 @@ export async function generateGuide(graph, body) {
             },
           ],
         }),
-      });
+      }, taskKey);
+      failureCategory = "invalid_output";
       const checked = validateGuide(
         JSON.parse(JSON.parse(raw).choices?.[0]?.message?.content || "{}"),
         context.references,
@@ -326,6 +338,7 @@ export async function generateGuide(graph, body) {
           .filter((r) => used.has(r.id))
           .map(({ excerpt, ...r }) => r),
       };
+      failureCategory = "storage";
       db.prepare("INSERT OR REPLACE INTO generated_guides VALUES (?,?,?)").run(
         graph.snapshotId,
         key,
@@ -333,6 +346,7 @@ export async function generateGuide(graph, body) {
       );
       return result;
     } catch (error) {
+      generationAccounting.error("generated_guides", taskKey, error, failureCategory);
       if (error.status) throw error;
       throw Object.assign(
         new Error(
