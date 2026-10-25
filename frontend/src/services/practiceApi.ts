@@ -112,7 +112,7 @@ export function submitPracticeAttempt(input: {
       errors: string[];
       checks: string[];
       message: string;
-      scope: 'syntax-only';
+      scope: 'ai-review';
       runtimeTestsExecuted: false;
     };
   }>('/api/practice/attempts', input);

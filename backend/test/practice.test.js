@@ -110,7 +110,11 @@ async function withGeneratedResponse(content, callback, usage) {
   const requests = [];
   globalThis.fetch = async (url, options) => {
     if (String(url).includes("/chat/completions")) {
-      requests.push(JSON.parse(options.body));
+      const payload = JSON.parse(options.body);
+      if (payload.messages[0].content.includes('reviewing a learner')) {
+        return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ issues: [] }) } }] }));
+      }
+      requests.push(payload);
       return new Response(
         JSON.stringify({
           choices: [{ message: { content: JSON.stringify(content) } }],
@@ -306,7 +310,7 @@ test("tasks can cite supplied relationship evidence and reuse the validated bank
   });
 });
 
-test("LLM-generated attempts retain bounded syntax-only outcomes and history", async () => {
+test("AI-reviewed attempts retain outcomes and history", async () => {
   await withGeneratedResponse(generatedTasks(), async () => {
     const tasks = await api("/tasks", requestContext);
     const task = tasks.body.tasks[0];
@@ -320,8 +324,8 @@ test("LLM-generated attempts retain bounded syntax-only outcomes and history", a
     assert.equal(passed.status, 201);
     assert.equal(passed.body.verification.status, "passed");
     assert.equal(passed.body.verification.runtimeTestsExecuted, false);
-    assert.equal(passed.body.verification.scope, "syntax-only");
-    assert.match(passed.body.verification.message, /syntax check passed/i);
+    assert.equal(passed.body.verification.scope, "ai-review");
+    assert.match(passed.body.verification.message, /success/i);
     const failed = await api("/attempts", {
       learnerId,
       taskId: task.id,
@@ -701,4 +705,35 @@ test("practice accounting records provider retries and malformed output without 
     assert(records.filter((row) => row.kind === "attempt").every((row) => row.tokens.total === "unknown"));
     assert(!JSON.stringify(records).includes("private provider failure details"));
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test("AI review returns only major issues, persists results, and rejects invalid reviews", async () => {
+  const tasks = await withGeneratedResponse(generatedTasks(), () => api("/tasks", requestContext));
+  const task = tasks.body.tasks[0];
+  for (const issues of [[], [{ severity: "major", feedback: "Reject blank email before lookup to meet the acceptance criteria." }], [{ severity: "minor", feedback: "Rename the variable." }]]) {
+    globalThis.fetch = async (url, options) => {
+      if (!String(url).includes("/chat/completions")) return originalFetch(url, options);
+      const payload = JSON.parse(options.body);
+      const evidence = JSON.parse(payload.messages[1].content);
+      assert.deepEqual(evidence.criteria, task.criteria);
+      assert.equal(evidence.code, task.startingCode + "\n// review test");
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ issues }) } }] }));
+    };
+    try {
+      const result = await api("/attempts", { learnerId, taskId: task.id, code: task.startingCode + "\n// review test" });
+      assert.equal(result.status, 201);
+      assert.equal(result.body.verification.status, issues.some(i => i.severity === "major") ? "failed" : "passed");
+      assert.equal(result.body.verification.errors.length, issues.filter(i => i.severity === "major").length);
+      const row = db.prepare("SELECT review_status FROM practice_attempts WHERE id=?").get(result.body.id);
+      assert.equal(row.review_status, result.body.verification.status);
+    } finally { globalThis.fetch = originalFetch; }
+  }
+  await withGeneratedResponse({ invalid: true }, async () => {
+    // This helper supplies a valid review for legacy tests; override the provider here.
+    globalThis.fetch = async (url, options) => String(url).includes("/chat/completions")
+      ? new Response(JSON.stringify({ choices: [{ message: { content: '{"invalid":true}' } }] }))
+      : originalFetch(url, options);
+    const result = await api("/attempts", { learnerId, taskId: task.id, code: task.startingCode + "\n// invalid review" });
+    assert.equal(result.status, 502);
+  });
 });

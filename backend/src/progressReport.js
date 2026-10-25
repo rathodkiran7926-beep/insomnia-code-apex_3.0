@@ -33,6 +33,8 @@ export function repositoryProgress(input) {
       `SELECT count(*) AS attempts,
     coalesce(sum(syntax_status='passed'),0) AS syntaxPassed,
     coalesce(sum(syntax_status='failed'),0) AS syntaxFailed,
+    count(DISTINCT CASE WHEN review_status='passed' THEN task_id END) AS tasksCompleted,
+    coalesce(sum(review_status='passed'),0) AS reviewsPassed,
     count(DISTINCT task_id) AS tasksAttempted
     FROM practice_attempts WHERE learner_id=? AND snapshot_id IN (${scope})`,
     )
@@ -49,7 +51,7 @@ export function repositoryProgress(input) {
   const attempts = db
     .prepare(
       `SELECT a.id,a.snapshot_id AS snapshotId,a.task_id AS taskId,
-    a.difficulty,a.syntax_status AS status,a.created_at AS createdAt,
+    a.difficulty,a.syntax_status AS status,a.review_status AS reviewStatus,a.created_at AS createdAt,
     json_extract(t.data,'$.title') AS title
     FROM practice_attempts a LEFT JOIN practice_tasks t ON t.task_id=a.task_id
     WHERE a.learner_id=? AND a.snapshot_id IN (${scope})

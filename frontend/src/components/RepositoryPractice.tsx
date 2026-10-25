@@ -7,7 +7,7 @@ import {
   ExternalLink,
   LoaderCircle,
   RotateCcw,
-  Save,
+  Send,
 } from 'lucide-react';
 import { Badge, Button, PanelHeading, TiltCard } from './UI';
 import { useRepositoryAnalysis } from '../state/RepositoryAnalysisContext';
@@ -126,7 +126,7 @@ export function RepositoryPractice({ difficulty }: { difficulty: PracticeDifficu
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  async function saveDraft() {
+  async function submitAnswer() {
     if (!selected || !snapshot || saving) return;
     const version = operation.current;
     setSaving(true);
@@ -147,7 +147,7 @@ export function RepositoryPractice({ difficulty }: { difficulty: PracticeDifficu
       setHistory(pastAttempts.attempts);
     } catch (reason) {
       if (operation.current !== version) return;
-      setError(reason instanceof Error ? reason.message : 'Could not save this attempt.');
+      setError(reason instanceof Error ? reason.message : 'Could not review this answer. Please submit again.');
     } finally {
       if (operation.current === version) setSaving(false);
     }
@@ -230,6 +230,7 @@ export function RepositoryPractice({ difficulty }: { difficulty: PracticeDifficu
                   setCode(event.target.value);
                   setResult(null);
                 }}
+                disabled={saving}
                 spellCheck={false}
                 rows={12}
               />
@@ -239,19 +240,20 @@ export function RepositoryPractice({ difficulty }: { difficulty: PracticeDifficu
               <textarea
                 id="repository-practice-reflection"
                 value={reflection}
-                onChange={(event) => setReflection(event.target.value)}
+                onChange={(event) => { setReflection(event.target.value); setResult(null); }}
+                disabled={saving}
                 rows={3}
                 placeholder="What behavior are you changing, and why does it belong here?"
               />
             </label>
-            <p className="muted">{selected.verification.message}</p>
+            <p className="muted">AI will review your answer and suggest fixes only for major issues.</p>
             <Button
               variant="primary"
-              icon={Save}
+              icon={Send}
               disabled={saving || code === selected.startingCode}
-              onClick={() => void saveDraft()}
+              onClick={() => void submitAnswer()}
             >
-              {saving ? 'Checking syntax and saving…' : 'Check syntax and save'}
+              {saving ? 'Reviewing...' : 'Submit'}
             </Button>
             {result && (
               <Button variant="ghost" icon={Download} onClick={downloadDraft}>

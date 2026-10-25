@@ -39,7 +39,7 @@ db.prepare("INSERT INTO practice_tasks VALUES (?,?,?,?,?)").run(
   JSON.stringify({ title: "Change actualHandler" }),
 );
 function attempt(id, owner, snapshot, status) {
-  db.prepare("INSERT INTO practice_attempts VALUES (?,?,?,?,?,?,?,?,?,?)").run(
+  db.prepare("INSERT INTO practice_attempts (id,learner_id,snapshot_id,task_id,difficulty,code,reflection,syntax_status,syntax_errors,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)").run(
     id,
     owner,
     snapshot,
@@ -171,4 +171,16 @@ test("commit history is pinned to the selected snapshot and paginated without cl
   } finally {
     globalThis.fetch = original;
   }
+});
+
+
+test("progress counts unique AI-approved tasks and keeps legacy syntax results separate", () => {
+  const before = repositoryProgress({ snapshotId: first, learnerId: learner });
+  assert.equal(before.summary.tasksCompleted, 0);
+  db.prepare("UPDATE practice_attempts SET review_status='passed',review_errors='[]' WHERE id IN ('attempt-0','attempt-1')").run();
+  db.prepare("UPDATE practice_attempts SET review_status='failed',review_errors='[]' WHERE id='attempt-2'").run();
+  const after = repositoryProgress({ snapshotId: first, learnerId: learner });
+  assert.equal(after.summary.tasksCompleted, 1);
+  assert.equal(after.summary.reviewsPassed, 2);
+  assert.equal(repositoryProgress({ snapshotId: foreign, learnerId: learner }).summary.tasksCompleted, 0);
 });
