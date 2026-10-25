@@ -27,8 +27,15 @@ import { getJourneySteps } from '../domain/model';
 import { useWorkspace } from '../state/WorkspaceContext';
 import { RelearningCard } from '../components/RelearningCard';
 import { buildProgressReportSnapshot } from '../domain/progressSelectors';
+import { RepositoryProgress } from '../components/RepositoryProgress';
 
 export default function Progress() {
+  const [sample, setSample] = useState(false);
+  if (!sample) return <RepositoryProgress onSample={() => setSample(true)} />;
+  return <><Button onClick={() => setSample(false)}>Back to repository progress</Button><SampleProgress /></>;
+}
+
+function SampleProgress() {
   const { state, learningEvents, startJourney, reset, notify } = useWorkspace();
   const go = useNavigate();
   const [resetOpen, setResetOpen] = useState(false);

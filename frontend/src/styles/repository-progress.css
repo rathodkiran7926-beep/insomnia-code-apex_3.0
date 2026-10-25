@@ -1,0 +1,373 @@
+.repository-progress-page {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+  padding-bottom: 24px;
+}
+.repository-progress-page .page-heading {
+  width: 100%;
+  margin: 0;
+  padding: 24px;
+}
+.repository-progress-page .heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rp-scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  border: 1px solid #e3ddf8;
+  border-radius: 16px;
+  background: white;
+}
+.rp-scope strong {
+  font-size: 14px;
+  color: #524368;
+  overflow-wrap: anywhere;
+}
+.rp-scope span {
+  display: block;
+  color: #8d819d;
+  font-size: 11px;
+  line-height: 1.7;
+  margin-top: 5px;
+}
+.rp-scope button,
+.rp-toolbar button,
+.rp-error button {
+  border: 1px solid #ded4fa;
+  background: #faf8ff;
+  color: #7058c4;
+  padding: 9px 12px;
+  border-radius: 9px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+}
+.rp-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.rp-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 20px;
+  min-width: 0;
+}
+.rp-stat svg {
+  color: #7c65ca;
+  padding: 6px;
+  box-sizing: content-box;
+  background: #f1ecff;
+  border-radius: 8px;
+}
+.rp-stat > span {
+  font-size: 12px;
+  color: #877c98;
+}
+.rp-stat strong {
+  font-size: 23px;
+  color: #54416f;
+  letter-spacing: -0.5px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.rp-stat small {
+  font-size: 10px;
+  color: #968ba4;
+  line-height: 1.8;
+}
+.rp-toolbar {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.rp-toolbar nav {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.rp-toolbar button[aria-pressed='true'] {
+  color: #6144d1;
+  background: #eee8ff;
+  border-color: #bba9ff;
+}
+.rp-toolbar input {
+  min-width: 180px;
+  max-width: 100%;
+  border: 1px solid #e4def2;
+  background: white;
+  border-radius: 10px;
+  padding: 12px;
+  font: inherit;
+  font-size: 12px;
+  color: #655477;
+}
+.rp-section {
+  padding: 22px;
+  min-width: 0;
+  overflow: hidden;
+}
+.rp-section h2 {
+  font-size: 16px;
+  color: #55436c;
+  margin: 0 0 8px;
+  line-height: 1.6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.rp-section h2 > span {
+  font-size: 10px;
+  padding: 4px 9px;
+  border: 1px solid #e3d9fa;
+  background: #f5f1ff;
+  color: #8b74bc;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.rp-section > p {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #94859f;
+  margin: 4px 0 18px;
+}
+.rp-table {
+  overflow-x: auto;
+}
+.rp-table table {
+  width: 100%;
+  min-width: 680px;
+  text-align: left;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.rp-table th {
+  padding: 12px;
+  font-weight: 500;
+  color: #9b8aac;
+  background: #faf8ff;
+  border-bottom: 1px solid #e8e1f4;
+}
+.rp-table td {
+  padding: 15px 12px;
+  border-bottom: 1px solid #f0eaf8;
+  color: #7c6a8d;
+  line-height: 1.7;
+  vertical-align: top;
+}
+.rp-table a,
+.rp-record a,
+.rp-empty a {
+  color: #7558c5;
+  text-decoration: none;
+}
+.rp-table a:hover,
+.rp-record a:hover,
+.rp-empty a:hover {
+  text-decoration: underline;
+}
+.rp-table small {
+  display: block;
+  color: #ad9fba;
+  font-size: 9px;
+  margin-top: 5px;
+}
+.rp-pill {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: #8e75ae;
+  background: #f4effc;
+  font-size: 10px;
+  line-height: 1.6;
+}
+.rp-pill.good {
+  background: #e9f6f0;
+  color: #639a86;
+}
+.rp-two-column {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.rp-record {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  border-top: 1px solid #eee7f7;
+  padding: 14px 0;
+  font-size: 12px;
+  color: #7a678d;
+}
+.rp-record > strong,
+.rp-record > a {
+  flex: 1 1 180px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+.rp-record > small,
+.rp-record > p {
+  flex-basis: 100%;
+  color: #a08fab;
+  font-size: 10px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.rp-record progress {
+  width: 100%;
+  height: 5px;
+  accent-color: #7860e0;
+}
+.rp-empty {
+  padding: 26px 16px;
+  text-align: center;
+  color: #a08eaf;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.rp-empty h2 {
+  font-size: 18px;
+  color: #655076;
+}
+.rp-empty svg {
+  color: #ad99cd;
+}
+.rp-error {
+  padding: 14px 18px;
+  border-radius: 12px;
+  border: 1px solid #efd6bd;
+  background: #fff9f1;
+  font-size: 12px;
+  color: #a47c57;
+  line-height: 1.8;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+}
+.rp-load-more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.rp-load-more small,
+.rp-footnote {
+  color: #a18eaf;
+  font-size: 10px;
+  line-height: 1.8;
+}
+.rp-snapshot {
+  padding: 12px 0;
+  border-top: 1px solid #eee7f7;
+}
+.rp-snapshot code {
+  color: #8b73a5;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.rp-snapshot small {
+  display: block;
+  font-size: 10px;
+  color: #a291b0;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+.rp-section summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: #806991;
+  margin-bottom: 14px;
+}
+@media (max-width: 1100px) {
+  .rp-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 650px) {
+  .rp-two-column {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rp-stat {
+    padding: 14px;
+  }
+  .rp-stat strong {
+    font-size: 20px;
+  }
+  .rp-stats {
+    gap: 10px;
+  }
+  .rp-section {
+    padding: 16px;
+  }
+  .rp-toolbar input {
+    width: 100%;
+  }
+  .rp-scope {
+    padding: 16px;
+  }
+  .rp-section h2 {
+    flex-wrap: wrap;
+  }
+}
+@media print {
+  body:has(.repository-progress-page) .sidebar,
+  body:has(.repository-progress-page) .topbar,
+  body:has(.repository-progress-page) .shell-skip-link,
+  body:has(.repository-progress-page) .skip-link,
+  body:has(.repository-progress-page) .daily-progress-popup,
+  body:has(.repository-progress-page) .toast,
+  body:has(.repository-progress-page) .heading-actions {
+    display: none !important;
+  }
+  body:has(.repository-progress-page) .app-shell,
+  body:has(.repository-progress-page) .main-shell,
+  body:has(.repository-progress-page) .main-content {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+  .repository-progress-page {
+    color: black;
+    gap: 12px;
+  }
+  .repository-progress-page button,
+  .rp-toolbar,
+  .rp-scope button,
+  .repository-progress-page .page-heading-actions {
+    display: none !important;
+  }
+  .rp-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .rp-two-column {
+    grid-template-columns: 1fr;
+  }
+  .rp-section,
+  .rp-stat {
+    box-shadow: none;
+    break-inside: avoid;
+  }
+  .rp-table {
+    overflow: visible;
+  }
+  .rp-table table {
+    min-width: 0;
+  }
+}

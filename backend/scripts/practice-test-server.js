@@ -17,7 +17,13 @@ saveSnapshot(graph, await documentGraph(graph, { generateAI: false }), '', files
 db.prepare('INSERT INTO analysis_jobs VALUES (?,?,?,?,?,?)').run('practice-ui-job', 'complete', 100, 'Ready', graph.snapshotId, new Date().toISOString());
 const original = globalThis.fetch;
 globalThis.fetch = async (url, options) => {
-  if (!String(url).includes('/chat/completions')) return original(url, options);
+  const target = String(url);
+  if (target.startsWith('https://api.github.com/repos/test/practice-checkout')) {
+    if (target.includes('/commits?')) return Response.json([{sha:'d'.repeat(40),commit:{message:'Add account input validation',author:{name:'Fixture developer',date:'2026-10-25T10:00:00Z'}},author:{login:'fixture-dev'}}]);
+    if (target.includes('/pulls?')) return Response.json([{number:17,title:'Validate account input',state:'closed',merged_at:'2026-10-25T10:00:00Z',updated_at:'2026-10-25T10:00:00Z',user:{login:'fixture-dev'},head:{ref:'validation'},base:{ref:'main'}}]);
+    return Response.json({private:false});
+  }
+  if (!target.includes('/chat/completions')) return original(url, options);
   assert.equal(String(url), 'https://practice-model.invalid/v1/chat/completions');
   const body = JSON.parse(options.body);
   assert.equal(body.model, 'isolated-practice-model');
@@ -34,3 +40,5 @@ globalThis.fetch = async (url, options) => {
   return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ tasks }) } }] }), { headers: { 'Content-Type': 'application/json' } });
 };
 await import('../src/server.js');
+
+db.prepare('INSERT INTO pr_comparisons VALUES (?,?,?,?)').run('progress-pr-fixture',graph.snapshotId,graph.snapshotId,JSON.stringify({id:'progress-pr-fixture',createdAt:'2026-10-25T10:00:00Z',pr:{number:17,title:'Validate account input',files:[{path:'src/users.ts'}]}}));

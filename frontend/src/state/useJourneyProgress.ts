@@ -8,8 +8,11 @@ export function useJourneyProgress() {
   const [progress, setProgress] = useState<Record<string, JourneyCheckpoint>>({});
   const [ready, setReady] = useState(false),
     [error, setError] = useState('');
+  const [revision, setRevision] = useState(0);
   useEffect(() => {
     let cancelled = false;
+    setReady(false);
+    setError('');
     if (!account) {
       setProgress(readGuestProgress());
       setReady(true);
@@ -28,7 +31,7 @@ export function useJourneyProgress() {
     return () => {
       cancelled = true;
     };
-  }, [account?.user.id]);
+  }, [account?.user.id, revision]);
   async function save(value: JourneyCheckpoint) {
     let stored: JourneyCheckpoint;
     if (account) {
@@ -47,5 +50,5 @@ export function useJourneyProgress() {
     } else stored = saveGuestProgress(value);
     setProgress((old) => ({ ...old, [value.journeyId]: stored }));
   }
-  return { progress, ready, error, save };
+  return { progress, ready, error, save, refresh: () => setRevision((value) => value + 1) };
 }

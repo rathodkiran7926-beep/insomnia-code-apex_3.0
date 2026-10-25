@@ -188,6 +188,40 @@ try {
   writeFileSync(root+'/data/practice-mobile.png',Buffer.from(mobile.data,'base64'));
   const latest = await (await fetch(origin+'/api/snapshots/latest?repository='+encodeURIComponent('https://github.com/test/practice-checkout'))).json();
   assert(latest.snapshotId && latest.commit==='d'.repeat(40), 'Merged latest snapshot endpoint failed');
+
+  const catalog = await (await fetch(origin+'/api/codejourneys?snapshotId='+latest.snapshotId)).json();
+  const journey = catalog.journeys[0];
+  await evaluate(`localStorage.setItem('mentor-codejourney-progress-v1',JSON.stringify({[${JSON.stringify(journey.id)}]:{journeyId:${JSON.stringify(journey.id)},snapshotId:${JSON.stringify(latest.snapshotId)},scenarioId:${JSON.stringify(journey.scenarios[0].id)},traceId:'saved-trace',eventId:${JSON.stringify(journey.events[0].id)},level:'intermediate',visited:[${JSON.stringify(journey.events[0].id)}],predictions:{},completed:false,completedScenarios:[],updatedAt:'2026-10-25T10:00:00Z'}}));location.hash='/progress';`);
+  await wait("document.querySelectorAll('.rp-stat').length===8", 'Real progress summary did not load');
+  const metric = async title => evaluate(`[...document.querySelectorAll('.rp-stat')].find(s=>s.querySelector('span').textContent===${JSON.stringify(title)})?.querySelector('strong').textContent`);
+  assert.equal(await metric('Practice attempts'),'2','Progress must include both saved syntax outcomes');
+  assert.equal(await metric('Journey records'),'1','Real guest journey was not tracked');
+  assert.equal(await metric('Saved PR comparisons'),'1','Saved repository PR missing');
+  assert.match(await metric('Quiz answers (learner)'),/\/ 5$/,'General learning quiz answers must be included');
+  assert(await evaluate("document.querySelector('.rp-table').textContent.includes('In progress')"));
+  await wait("document.body.innerText.includes('Add account input validation')", 'Commit history missing');
+  await wait("document.body.innerText.includes('fixture-dev') && document.body.innerText.includes('Merged')", 'PR history missing');
+  await evaluate("window.__progressExport=null;window.__originalCreateURL=URL.createObjectURL;URL.createObjectURL=blob=>{window.__progressExport=blob;return window.__originalCreateURL(blob)}");
+  await click('Export report');
+  const exported = await evaluate("window.__progressExport.text().then(JSON.parse)");
+  assert.equal(exported.summary.attempts,2);assert.equal(exported.journeyProgress.length,1);assert.equal(exported.github.commits.length,1);
+  await evaluate("URL.createObjectURL=window.__originalCreateURL");
+  await click('Prepared sample activity');
+  await wait("document.querySelector('.progress-skill-row')", 'Prepared sample progress must remain available');
+  await click('Back to repository progress');
+  await wait("document.querySelectorAll('.rp-stat').length===8", 'Repository report did not reopen');
+  assert(await evaluate("document.documentElement.scrollWidth<=innerWidth+2"),'Mobile progress page overflows');
+  assert(await evaluate("getComputedStyle(document.querySelector('.repository-progress-page .heading-actions')).display!=='none'"),'Report actions must remain available on mobile');
+  await send('Emulation.setEmulatedMedia',{media:'print'});
+  assert(await evaluate("getComputedStyle(document.querySelector('.sidebar')).display==='none'"),'Print must hide navigation');
+  await send('Emulation.setEmulatedMedia',{media:''});
+  await pause(1400);
+  const progressMobile = await send('Page.captureScreenshot',{format:'png'});
+  writeFileSync(root+'/data/ui-repository-progress-mobile.png',Buffer.from(progressMobile.data,'base64'));
+  await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
+  await pause(1000);
+  const progressDesktop=await send('Page.captureScreenshot',{format:'png'});
+  writeFileSync(root+'/data/ui-repository-progress-desktop.png',Buffer.from(progressDesktop.data,'base64'));
   await evaluate(`location.hash='/agent-context'`);
   await wait(`document.querySelector('.context-controls textarea')`, 'Merged Agent Context page missing');
   await wait("document.querySelector('#vscode-snapshot-id')", 'Actual VS Code snapshot ID missing');
@@ -230,7 +264,7 @@ try {
   await clickGraphNode('normalizeEmail', true);
   await wait("document.querySelector('.mentor-selection-summary h1')?.textContent==='normalizeEmail'", 'Normal keyboard graph navigation must also work after repeated toggles');
   assert.equal(errors.length,0,errors.join('\n'));
-  console.log('Browser checks passed: guided sample, repository task generation through shared provider config, pinned citations, syntax-only saved attempts/history, quiz grading/completion, difficulty persistence, mobile layout, latest snapshot lookup, Agent Context Bridge retrieval/MCP export, preserved context demo, and What-If exit/re-entry with mouse and keyboard graph navigation. Isolated provider responses; no analyzed code executed.');
+  console.log('Browser checks passed: guided sample, repository task generation through shared provider config, pinned citations, syntax-only saved attempts/history, quiz grading/completion, difficulty persistence, mobile layout, real progress totals/history, general quiz scores, automatic GitHub commits/PRs, report export/print, preserved sample progress, latest snapshot lookup, Agent Context Bridge retrieval/MCP export, preserved context demo, and What-If exit/re-entry with mouse and keyboard graph navigation. Isolated provider responses; no analyzed code executed.');
 } catch (error) {
   if (evaluate)
     console.error(

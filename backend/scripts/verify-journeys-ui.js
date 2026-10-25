@@ -457,11 +457,14 @@ try {
     ),
     second,
   );
+  // Explained repository questions now support guests; register only if a gate is present.
+  if (await evaluate(`[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='New here? Create an account')`)) {
   await click("New here? Create an account");
   await fill("input[name=name]", "Repository learner");
   await fill("input[name=email]", `journey-${run}@test.example`);
   await fill("input[name=password]", "local browser password 123");
   await click("Create account & workspace");
+  }
   await wait(
     `document.querySelector('textarea[aria-label="Question about playback event"]')`,
     "Question gate failed",
@@ -711,6 +714,8 @@ try {
   await wait("document.querySelector('.journey-canvas').innerText.includes('GET /health handler')", 'Playback node kept anonymous callback label');
   assert(!await evaluate("document.querySelector('.journey-canvas').innerText.includes('anonymous:')"),'Playback shows anonymous placeholder');
   await evaluate("location.hash='/progress'");
+  await wait("document.querySelector('.repository-progress-page')", 'Repository progress page failed to render');
+  await evaluate("[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Prepared sample activity').click()");
   await wait("document.querySelector('.progress-report-page') && document.querySelectorAll('.progress-skill-row').length===5", 'Merged progress report or skill map failed to render');
   assert(await evaluate("document.querySelector('.mentor-navigation a[href=\"#/progress\"]').textContent.trim()==='My Progress'"), 'Existing My Progress navigation label was lost');
   assert(await evaluate("document.documentElement.scrollWidth<=innerWidth+2"), 'Merged progress report overflows mobile width');

@@ -1,4 +1,5 @@
 import express from "express";
+import { progressRoutes } from "./progressRoutes.js";
 import { ideRoutes } from "./ideRoutes.js";
 import { componentNamesMiddleware } from "./componentPresentation.js";
 import { Worker } from "node:worker_threads";
@@ -53,6 +54,7 @@ app.use("/api/handoffs", handoffRoutes);
 app.use("/api", journeyRoutes);
 app.use("/api/memory", engineeringMemoryRoutes);
 app.use("/api/practice", practiceRoutes);
+app.use("/api/progress", progressRoutes);
 app.use("/api/snapshots", agentContextRouter);
 app.use("/api/contributions", contributionRoutes);
 let active = 0;
