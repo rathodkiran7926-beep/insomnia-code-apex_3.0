@@ -285,6 +285,27 @@ test("task API asks the LLM for specific repo work and validates snapshot citati
   });
 });
 
+test("tasks can cite supplied relationship evidence and reuse the validated bank", async () => {
+  const { snapshot, files } = rangeFixture();
+  const component = snapshot.components[0];
+  const reference = { ...snapshot.references.find((ref) => ref.id === component.referenceId), id: "relationship-only-ref" };
+  snapshot.references.push(reference);
+  snapshot.relationships = [{ id: "test-call-edge", source: component.id, target: snapshot.components[1].id, type: "calls", referenceId: reference.id }];
+  saveSnapshot(snapshot, {}, "", files);
+  const generated = generatedTasks(snapshot);
+  generated.tasks[0].referenceIds.push(reference.id);
+  const request = { ...requestContext, snapshotId: snapshot.snapshotId };
+  await withGeneratedResponse(generated, async (requests) => {
+    const result = await api("/tasks", request);
+    assert.equal(result.status, 200);
+    assert(result.body.tasks[0].citations.some((ref) => ref.referenceId === reference.id && ref.excerpt === reference.excerpt));
+    assert.deepEqual((await api("/tasks", request)).body, result.body);
+    assert.equal(requests.length, 1);
+    const evidence = JSON.parse(requests[0].messages[1].content);
+    assert(evidence.references.some((ref) => ref.referenceId === reference.id && ref.excerpt === reference.excerpt));
+  });
+});
+
 test("LLM-generated attempts retain bounded syntax-only outcomes and history", async () => {
   await withGeneratedResponse(generatedTasks(), async () => {
     const tasks = await api("/tasks", requestContext);
