@@ -129,7 +129,7 @@ try {
   if (!ready) throw new Error('Real backend did not become healthy.');
   // Electron's inherited Node mode must be removed for desktop testing.
   delete process.env.ELECTRON_RUN_AS_NODE;
-  for (const scenario of ['empty', 'single', 'restart', 'multi', 'multi-handoff', 'public', 'offline', 'checkpoint-save', 'checkpoint-resume', 'checkpoint-delete', 'handoff-save', 'handoff-reopen', 'handoff-delete', 'handoff-disabled', ...(process.env.MENTOR_TEST_LIVE_PR === '1' ? ['pr'] : [])].filter(name => !process.env.MENTOR_TEST_SCENARIOS || process.env.MENTOR_TEST_SCENARIOS.split(',').includes(name))) {
+  for (const scenario of ['empty', 'move-to-ide', 'single', 'restart', 'multi', 'multi-handoff', 'public', 'offline', 'checkpoint-save', 'checkpoint-resume', 'checkpoint-delete', 'handoff-save', 'handoff-reopen', 'handoff-delete', 'handoff-disabled', ...(process.env.MENTOR_TEST_LIVE_PR === '1' ? ['pr'] : [])].filter(name => !process.env.MENTOR_TEST_SCENARIOS || process.env.MENTOR_TEST_SCENARIOS.split(',').includes(name))) {
     if (['handoff-reopen','handoff-delete','handoff-disabled'].includes(scenario)) { await stopBackend(); await startBackend(scenario !== 'handoff-disabled'); console.log(`MENTOR_HANDOFF_BACKEND_RESTART: ${scenario}`); }
     if (scenario === 'multi') execFileSync('git', ['-c', `core.hooksPath=${emptyHooks}`, '-C', fixtureFolders[0], 'checkout', 'main'], { windowsHide: true });
     if (scenario === 'checkpoint-save') execFileSync('git', ['-c', `core.hooksPath=${emptyHooks}`, '-C', publicFolder, 'checkout', '-b', 'checkpoint-initial', publicRevision], { windowsHide: true });
@@ -178,7 +178,7 @@ try {
         console.log(`${installedVsix ? 'MENTOR_INSTALLED_VSIX_PASS' : 'MENTOR_DEVELOPMENT_HOST_PASS'}: ${scenario}`);
       } finally { clearTimeout(timeout); if (child.exitCode === null) child.kill(); testWindows.delete(child); }
     })();
-    if (['single', 'multi', 'multi-handoff', 'public', 'pr', 'offline'].includes(scenario) || scenario.startsWith('checkpoint-') || scenario.startsWith('handoff-')) await Promise.all([tests, driveWorkbench(debugPort, stepFile, snapshots, path.join(profile, 'focus.png'), async action => { if (action === 'stop') await stopBackend(); else if (action === 'start') await startBackend(); else throw new Error('Unknown test backend action'); })]);
+    if (['move-to-ide', 'single', 'multi', 'multi-handoff', 'public', 'pr', 'offline'].includes(scenario) || scenario.startsWith('checkpoint-') || scenario.startsWith('handoff-')) await Promise.all([tests, driveWorkbench(debugPort, stepFile, snapshots, path.join(profile, 'focus.png'), async action => { if (action === 'stop') await stopBackend(); else if (action === 'start') await startBackend(); else throw new Error('Unknown test backend action'); })]);
     else await tests;
   }
 } finally {

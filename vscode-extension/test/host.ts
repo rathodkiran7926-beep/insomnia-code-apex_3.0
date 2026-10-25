@@ -40,7 +40,7 @@ export async function run(): Promise<void> {
     const rows = focus.getChildren();
     assert.ok(rows.some(item => item.label === 'Disconnected'));
     assert.ok(rows.some(item => typeof item.label === 'string' && item.label.startsWith(vscode.workspace.workspaceFolders ? 'Workspace:' : 'No workspace open')));
-    assert.ok(rows.some(item => item.command?.command === 'codebaseMentor.checkConnection'));
+    assert.ok(rows.flatMap(item => [item, ...focus.getChildren(item)]).some(item => item.command?.command === 'codebaseMentor.checkConnection'));
     for (const status of ['connecting', 'connected', 'server-error', 'invalid-configuration'] as const) {
       state.status = status;
       assert.ok(focus.getChildren().length > 0);
@@ -509,6 +509,26 @@ export async function run(): Promise<void> {
       active.selection = new vscode.Selection(0, 0, 0, 5);
       assert.equal(mentor.getEditorContext()?.file, 'src/index.ts');
       assert.equal(mentor.getEditorContext()?.binding?.snapshotId, snapshots[0]!.snapshotId);
+      if (scenario === 'single' || scenario === 'move-to-ide') {
+        const binding = mentor.getRepositoryContext(folders[0]!.uri.toString())!.binding!;
+        const uri = 'vscode://codebase-mentor-local.codebase-mentor/open-source?' + new URLSearchParams({ repository: binding.repositoryIdentity, commit: binding.indexedCommit, file: 'src/index.ts', line: '3' });
+        await vscode.commands.executeCommand('codebaseMentor.moveToIde', uri);
+        assert.equal(vscode.window.activeTextEditor?.document.uri.toString(), document.uri.toString());
+        assert.equal(vscode.window.activeTextEditor?.selection.start.line, 2);
+        assert.equal(vscode.window.activeTextEditor?.selection.start.character, 0);
+        assert.equal(vscode.window.activeTextEditor?.selection.end.line, 2);
+        assert.ok(vscode.window.activeTextEditor?.visibleRanges.some(range => range.start.line <= 2 && range.end.line >= 2));
+        assert.equal(vscode.window.tabGroups.activeTabGroup.activeTab?.isPreview, false);
+        await assert.rejects(vscode.commands.executeCommand('codebaseMentor.moveToIde', uri.replace('line=3', 'line=99999')));
+        assert.equal(vscode.window.activeTextEditor?.selection.start.line, 2);
+        console.log('MENTOR_MOVE_TO_IDE_HOST_PASS: source URI validated, real workspace editor opened at absolute line 3');
+        if (scenario === 'move-to-ide') {
+          await step({ step: 'done', expectedText: 'Codebase Mentor' });
+          await waitFor(async () => { try { await readFile(`${process.env.MENTOR_UI_STEP}.complete`); return true; } catch { return false; } });
+          return;
+        }
+        active = vscode.window.activeTextEditor!; active.selection = new vscode.Selection(0, 0, 0, 5);
+      }
       if (scenario === 'single') {
         await vscode.commands.executeCommand('codebaseMentor.explainSelection');
         const first = mentor.getMentorState().result;

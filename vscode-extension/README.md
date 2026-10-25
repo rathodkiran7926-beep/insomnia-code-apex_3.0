@@ -12,10 +12,10 @@ Requires desktop VS Code1.100+ with a Node24+ shared backend and Git on its PATH
 The extension uses the built-in VS Code Git API; it never runs repository scripts.
 The verified release environment is Windows VS Code1.143.1 and Node24.15.0.
 
-1. Install `codebase-mentor-0.1.1.vsix` using **Extensions: Install from VSIX?**, or:
+1. Install `codebase-mentor-0.1.4.vsix` using **Extensions: Install from VSIX?**, or:
 
    ```powershell
-   code --install-extension .\codebase-mentor-0.1.1.vsix --force
+   code --install-extension .\codebase-mentor-0.1.4.vsix --force
    ```
 
 2. Start the existing backend from this project's `backend/` directory:
@@ -112,6 +112,33 @@ there; that browser route does not restore the IDE's selected component.
 
 ## Local checkpoints and handoffs
 
+## Authenticated sessions and team handoffs
+
+Handoffs connect automatically to a trusted local backend with `CODEBASE_MENTOR_IDE_DEMO=1`. No email or password is requested. All automatic connections use the shared Junior Developer identity in the IDE Local Demo workspace. Web sign-in remains unchanged.
+Session cookies use VS Code SecretStorage and are scoped to the configured backend.
+
+After connecting, **Save Session** stores a personal checkpoint in the existing backend.
+Saved Tasks retains Resume, Details, Share/Ask Senior and Delete. **Share Context**
+prepares a question, completed work and next action, lets you choose a senior, and
+requires **Generate Handoff Link** confirmation. Copy Link and Browser open the
+existing authenticated web Context Handoffs page. Saved Handoffs shows authored and
+assigned sessions, live status and feedback; Open retrieves senior comments.
+
+No web login defaults were changed. A backend-only opt-in local demo seed is
+available; see the repository's docs/vscode-team-handoffs.md for setup and accounts.
+The demo password is not embedded in this extension. Source attachments use the
+saved repository snapshot, not unsaved buffers. Workspace members require existing
+authorization; a link alone grants no access. F17 is not part of this change.
+
+The team flow was checked with backend integration and extension action/transport
+tests. An installed VS Code host check for this change remains a manual step.
+
+### Legacy local preparation (advanced)
+
+The following flags apply only to the retained anonymous local APIs, not to signed-in
+sessions. **Prepare Local Handoff (Advanced)** opens the original preview/Markdown
+workflow. Existing Open Handoff and export commands remain available.
+
 Both features are **disabled by default**. Deliberately enable each one in the
 backend environment and restart the same server:
 
@@ -197,3 +224,7 @@ Git history or normal VS Code profile. Optional `MENTOR_TEST_LIVE_PR=1` exercise
 live public PR analysis; normal tests label controlled PR fixtures clearly.
 Source maps, dependencies, source trees, tests, profiles, logs and environment
 files are excluded from the VSIX. See `docs/phase-8-release.md` for final evidence.
+
+## Move to IDE from the web source viewer
+
+Hover over any source line number for 500 ms, then select **Move to IDE**. The extension opens the exact line in a regular editor tab after checking the connected repository, saved commit and complete local file contents. A changed revision or file produces an error instead of applying old line numbers. Connect the matching snapshot first and allow the browser to open VS Code. See `docs/move-to-ide.md` in the repository for details and verification commands.

@@ -22,6 +22,11 @@ export function migrateCheckpoints(db) {
     source_reference_ids_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
     request_id TEXT NOT NULL UNIQUE, request_json TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS task_checkpoints_repository_created ON task_checkpoints(repository_identity,created_at DESC,id DESC);`);
+  checkpointOwnershipMigration(db);
+}
+export function checkpointOwnershipMigration(db) {
+  if (!db.prepare('PRAGMA table_info(task_checkpoints)').all().some(c => c.name === 'user_id')) db.exec('ALTER TABLE task_checkpoints ADD COLUMN user_id TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS task_checkpoints_user_repository ON task_checkpoints(user_id,repository_identity)');
 }
 export function snapshot(db, snapshotId) {
   const s = db.prepare("SELECT id,repository_id,commit_sha,json_extract(graph_json,'$.report.limitations') AS limitations FROM snapshots WHERE id=?").get(snapshotId);
@@ -32,12 +37,12 @@ export function snapshot(db, snapshotId) {
 function record(row) {
   return { id: row.id, schemaVersion: row.schema_version, repositoryIdentity: row.repository_identity, snapshotId: row.snapshot_id, indexedCommit: row.indexed_commit, taskTitle: row.task_title, notes: JSON.parse(row.notes_json), localContext: JSON.parse(row.local_context_json), sourceReferenceIds: JSON.parse(row.source_reference_ids_json), createdAt: row.created_at, updatedAt: row.updated_at };
 }
-function read(db, checkpointId) {
-  const row = db.prepare('SELECT * FROM task_checkpoints WHERE id=?').get(checkpointId);
+function read(db, checkpointId, userId = null) {
+  const row = db.prepare('SELECT * FROM task_checkpoints WHERE id=? AND user_id IS ?').get(checkpointId, userId);
   if (!row) fail(404, 'Checkpoint not found'); return record(row);
 }
-function scoped(db, checkpointId, snapshotId) {
-  const current = snapshot(db, snapshotId), saved = read(db, checkpointId);
+function scoped(db, checkpointId, snapshotId, userId = null) {
+  const current = snapshot(db, snapshotId), saved = read(db, checkpointId, userId);
   if (saved.repositoryIdentity !== current.repositoryIdentity) fail(409, 'Checkpoint belongs to a different repository');
   return { saved, current };
 }
@@ -80,29 +85,29 @@ function detail(db, checkpoint) {
 function transaction(db, work) {
   db.exec('BEGIN IMMEDIATE'); try { const result = work(); db.exec('COMMIT'); return result; } catch (e) { db.exec('ROLLBACK'); throw e; }
 }
-export function createCheckpoint(db, input) {
+export function createCheckpoint(db, input, userId = null) {
   const p = createRequest.parse(input);
   if (Buffer.byteLength(JSON.stringify(input)) > 24 * 1024) fail(413, 'Checkpoint exceeds request limit');
   return transaction(db, () => {
     // Construct a stable serialization independent of incoming JSON key order.
     const request = JSON.stringify(p), existing = db.prepare('SELECT * FROM task_checkpoints WHERE request_id=?').get(p.requestId);
-    if (existing) { if (existing.request_json !== request) fail(409, 'Request ID was already used with different checkpoint data'); return { created: false, detail: detail(db, record(existing)) }; }
+    if (existing) { if ((existing.user_id ?? null) !== userId) fail(404, 'Checkpoint not found'); if (existing.request_json !== request) fail(409, 'Request ID was already used with different checkpoint data'); return { created: false, detail: detail(db, record(existing)) }; }
     const s = snapshot(db, p.snapshotId);
     for (const ref of p.sourceReferenceIds) if (!reference(db, s, ref)) fail(400, 'Source reference does not belong to the saved snapshot');
     const checkpointId = randomUUID(), now = new Date().toISOString();
-    db.prepare('INSERT INTO task_checkpoints VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(checkpointId, 1, s.repositoryIdentity, p.snapshotId, s.indexedCommit, p.taskTitle, JSON.stringify(p.notes), JSON.stringify(p.localContext), JSON.stringify(p.sourceReferenceIds), now, now, p.requestId, request);
-    return { created: true, detail: detail(db, read(db, checkpointId)) };
+    db.prepare('INSERT INTO task_checkpoints (id,schema_version,repository_identity,snapshot_id,indexed_commit,task_title,notes_json,local_context_json,source_reference_ids_json,created_at,updated_at,request_id,request_json,user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(checkpointId, 1, s.repositoryIdentity, p.snapshotId, s.indexedCommit, p.taskTitle, JSON.stringify(p.notes), JSON.stringify(p.localContext), JSON.stringify(p.sourceReferenceIds), now, now, p.requestId, request, userId);
+    return { created: true, detail: detail(db, read(db, checkpointId, userId)) };
   });
 }
-export function listCheckpoints(db, query) {
+export function listCheckpoints(db, query, userId = null) {
   const { snapshotId, limit, offset } = listQuery.parse(query), s = snapshot(db, snapshotId);
-  const rows = db.prepare('SELECT id,schema_version,repository_identity,snapshot_id,indexed_commit,task_title,local_context_json,created_at,updated_at FROM task_checkpoints WHERE repository_identity=? ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?').all(s.repositoryIdentity, limit + 1, offset);
+  const rows = db.prepare('SELECT id,schema_version,repository_identity,snapshot_id,indexed_commit,task_title,local_context_json,created_at,updated_at FROM task_checkpoints WHERE repository_identity=? AND user_id IS ? ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?').all(s.repositoryIdentity, userId, limit + 1, offset);
   const items = rows.slice(0, limit).map(r => { const { notes, sourceReferenceIds, ...summary } = record({ ...r, notes_json: '{}', source_reference_ids_json: '[]' }); return summary; });
   return { repositoryIdentity: s.repositoryIdentity, items, limit, offset, hasMore: rows.length > limit };
 }
-export function getCheckpoint(db, checkpointId, snapshotId) { return detail(db, scoped(db, checkpointId, snapshotId).saved); }
-export function deleteCheckpoint(db, checkpointId, snapshotId) {
-  return transaction(db, () => { scoped(db, checkpointId, snapshotId); db.prepare('DELETE FROM task_checkpoints WHERE id=?').run(checkpointId); return { id: checkpointId, deleted: true }; });
+export function getCheckpoint(db, checkpointId, snapshotId, userId = null) { return detail(db, scoped(db, checkpointId, snapshotId, userId).saved); }
+export function deleteCheckpoint(db, checkpointId, snapshotId, userId = null) {
+  return transaction(db, () => { scoped(db, checkpointId, snapshotId, userId); db.prepare('DELETE FROM task_checkpoints WHERE id=?').run(checkpointId); return { id: checkpointId, deleted: true }; });
 }
 function existingComparison(db, saved, current) {
   if (!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='pr_comparisons'").get()) return;
@@ -115,8 +120,8 @@ function existingComparison(db, saved, current) {
     return { id: c.id, prUrl: pr.url, beforeSnapshotId: saved.snapshotId, afterSnapshotId: current.snapshotId };
   } catch { /* Invalid persisted comparison cannot authorize a Changes action. */ }
 }
-export function resumeCheckpoint(db, checkpointId, input) {
-  const p = resumeRequest.parse(input), { saved, current } = scoped(db, checkpointId, p.currentSnapshotId), original = detail(db, saved);
+export function resumeCheckpoint(db, checkpointId, input, userId = null) {
+  const p = resumeRequest.parse(input), { saved, current } = scoped(db, checkpointId, p.currentSnapshotId, userId), original = detail(db, saved);
   const byId = new Map(original.references.map(r => [r.id, r]));
   const items = saved.sourceReferenceIds.map(refId => {
     const old = byId.get(refId), item = { referenceId: refId, file: old?.file || '(unavailable)', status: 'unknown', scope: 'file', notice: 'Stored file evidence is unavailable or unmapped.' };

@@ -21,7 +21,8 @@
     "verify:handoffs": "node scripts/verify-handoffs-ui.js",
     "verify:journeys": "node scripts/verify-journeys-ui.js",
     "verify:practice": "node scripts/verify-practice-ui.js",
-    "verify:journey-runtime": "node scripts/verify-journey-runtime.js"
+    "verify:journey-runtime": "node scripts/verify-journey-runtime.js",
+    "seed:ide-demo": "node --env-file-if-exists=.env scripts/seed-ide-demo.js"
   },
   "dependencies": {
     "express": "^5.1.0",

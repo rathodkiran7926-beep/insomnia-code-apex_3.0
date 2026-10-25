@@ -48,6 +48,16 @@
     const title = make('div', 'cm-title'); title.append(make('span', 'cm-logo', '◈'), make('span', '', 'Codebase Mentor'));
     header.append(title, action('Refresh', 'check', { icon: '↻', small: true, subtle: true, title: 'Check backend connectivity' }));
     fragment.append(header);
+    if (model.team) {
+      const account = make('section', 'cm-card cm-account');
+      account.append(make('strong', '', model.team.signedIn ? model.team.name : 'Team handoffs'));
+      account.append(make('p', 'cm-muted', model.team.signedIn ? model.team.workspace || 'Choose a team workspace' : 'Handoffs connect automatically to your local backend. No sign-in needed.'));
+      const controls = make('div', 'cm-inline-actions');
+      if (!model.team.signedIn) controls.append(action('Connect handoffs', 'refreshShared', {small:true, disabled:!model.trusted}));
+      if (model.team.signedIn) controls.append(action('Workspace', 'teamWorkspace', {small:true, subtle:true}));
+      account.append(controls); fragment.append(account);
+    }
+
     const repo = model.repository;
     const connected = model.connection.status === 'connected';
     const verified = Boolean(repo?.usable && connected);
@@ -73,7 +83,7 @@
     primary.append(action(repo?.snapshot ? 'Change snapshot' : 'Connect repo', repo?.snapshot ? 'changeSnapshot' : 'connect', { icon: '⌁', disabled: !model.folderCount || !model.trusted }));
     primary.append(action('Explain code', 'explain', { icon: '✦', primary: true, disabled: !verified || !model.selection }));
     primary.append(action('Open Mentor', 'mentor', { icon: '▤', disabled: !verified }));
-    primary.append(action('Ask Senior', 'senior', { icon: '↗', disabled: !verified }));
+    primary.append(action('Share Context', model.team ? 'shareContext' : 'senior', { icon: '↗', disabled: !verified }));
     primary.append(action('Full architecture', 'webArchitecture', { icon: '◇', title: 'Explore the entire indexed repository graph inside VS Code', disabled: !verified }));
     fragment.append(primary);
 
@@ -84,6 +94,7 @@
       selectionBox.append(file, make('small', 'muted cm-ellipsis', `${model.selection.file} · line ${model.selection.line}${model.selection.dirty ? ' · unsaved edits' : ''}`));
       const row = make('div', 'cm-inline-actions');
       row.append(action('Explain', 'explain', { icon: '✦', small: true, disabled: !verified }), action('Architecture', 'related', { icon: '◇', small: true, disabled: !verified }));
+      if (model.team) row.append(action('Share Context', 'shareContext', { small: true, disabled: !verified }));
       selectionBox.append(row);
     } else selectionBox.append(make('p', 'cm-muted', 'Open a source file and select a function to explore it.'));
     fragment.append(selectionBox);
@@ -121,8 +132,26 @@
       if (state.more) buttons.append(action('Next', kind === 'tasks' ? 'nextTasks' : 'nextHandoffs', { small: true }));
       body.append(buttons); panel.append(body); return panel;
     }
-    fragment.append(renderSaved('tasks', model.tasks, 'Saved Tasks', 'No saved checkpoints yet.', 'Save task', 'saveTask', 'refreshTasks', 'resumeTask'));
-    fragment.append(renderSaved('handoffs', model.handoffs, 'Saved Handoffs', 'No saved handoffs yet.', 'New handoff', 'senior', 'refreshHandoffs', 'openHandoff'));
+    fragment.append(renderSaved('tasks', model.tasks, 'Saved Tasks', 'No saved checkpoints yet.', model.team?.signedIn ? 'Save Session' : 'Save task', 'saveTask', 'refreshTasks', 'resumeTask'));
+    if (model.team) {
+      const panel = section('Saved Handoffs', 'handoffs', model.team.signedIn ? model.team.items.length : 'Offline');
+      const body = make('div', 'cm-section-body');
+      body.append(callout(model.team.message));
+      for (const item of model.team.items) {
+        const row = make('div', 'cm-saved-row cm-shared-row'); const info = make('div', 'cm-saved-info');
+        info.append(make('strong', 'cm-ellipsis', item.title), make('small', 'muted', item.status + ' / ' + shortDate(item.createdAt)));
+        const actions = make('div', 'cm-row-actions');
+        actions.append(action('Open', 'openShared', {id:item.id,small:true}),action('Copy link','copyShared',{id:item.id,small:true}),action('Browser','browserShared',{id:item.id,small:true}));
+        row.append(info,actions); body.append(row);
+      }
+      const controls = make('div','cm-inline-actions');
+      controls.append(action('Share Context','shareContext',{small:true,disabled:!model.trusted}),action('Refresh','refreshShared',{small:true,disabled:!model.trusted}));
+      if (model.team.signedIn) controls.append(action('Browse saved handoffs','browseShared',{small:true}));
+      if (model.team.previous) controls.append(action('Previous','previousShared',{small:true}));
+      if (model.team.more) controls.append(action('Next','nextShared',{small:true}));
+      body.append(controls); panel.append(body); fragment.append(panel);
+    } else fragment.append(renderSaved('handoffs', model.handoffs, 'Saved Handoffs', 'No saved handoffs yet.', 'New handoff', 'senior', 'refreshHandoffs', 'openHandoff'));
+
 
     const details = section('Repository details & settings', 'details');
     const detail = make('div', 'cm-section-body cm-details');

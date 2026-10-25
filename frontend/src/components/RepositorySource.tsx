@@ -1,5 +1,8 @@
 import { useMemo, useRef, useState, useEffect, type CSSProperties } from 'react';
 import Prism from 'prismjs';
+import { createPortal } from 'react-dom';
+import { useDelayedHover } from './useDelayedHover';
+import { moveToIdeUri } from '../domain/moveToIde';
 import 'prismjs/components/prism-typescript';
 import 'prismjs/components/prism-jsx';
 import 'prismjs/components/prism-tsx';
@@ -71,6 +74,10 @@ export function RepositorySource({
   compact?: boolean;
 }) {
   const viewer = useRef<HTMLDivElement>(null);
+  const ideHover = useDelayedHover<number>(`${source?.url}:${source?.file}:${source?.excerpt}`);
+  const ideButton = useRef<HTMLButtonElement>(null);
+  const [ideNotice, setIdeNotice] = useState('');
+  useEffect(() => { setIdeNotice(''); }, [source?.url]);
   const expandedViewer = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState(false);
   const [find, setFind] = useState('');
@@ -404,22 +411,27 @@ export function RepositorySource({
                   : undefined
               }
             >
-              {onLineSelect ? (
                 <button
                   type="button"
                   className="repository-source-number source-select-line"
-                  aria-label={`${annotationLines.includes(source.startLine + i) ? 'Annotated line' : 'Select line'} ${source.startLine + i}`}
-                  title="Select line; Shift-click to select a range"
-                  onClick={(e) => onLineSelect(source.startLine + i, e.shiftKey)}
+                  aria-label={`${annotationLines.includes(source.startLine + i) ? 'Annotated line' : onLineSelect ? 'Select line' : 'Source line'} ${source.startLine + i}`}
+                  aria-haspopup="dialog"
+                  aria-expanded={ideHover.active?.value === source.startLine + i}
+                  onMouseEnter={(e) => ideHover.enter(source.startLine + i, e.currentTarget)}
+                  onMouseLeave={ideHover.leave}
+                  onFocus={(e) => ideHover.enter(source.startLine + i, e.currentTarget)}
+                  onBlur={(e) => { if (e.relatedTarget !== ideButton.current) ideHover.leave(); }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); ideHover.close(); }
+                    if (ideHover.active?.trigger === e.currentTarget && (e.key === 'ArrowDown' || e.key === 'Tab' && !e.shiftKey)) {
+                      e.preventDefault(); ideButton.current?.focus();
+                    }
+                  }}
+                  onClick={(e) => onLineSelect?.(source.startLine + i, e.shiftKey)}
                 >
                   {annotationLines.includes(source.startLine + i) ? '● ' : ''}
                   {source.startLine + i}
                 </button>
-              ) : (
-                <span className="repository-source-number" aria-hidden="true">
-                  {source.startLine + i}
-                </span>
-              )}
               <code>
                 {segments.length
                   ? segments.map((segment, j) => (
@@ -460,11 +472,42 @@ export function RepositorySource({
             : 'Clipboard is unavailable. Select the code and copy it manually.'}
         </div>
       )}
+      {ideNotice && <div className="repository-source-feedback" role="status">{ideNotice}</div>}
     </div>
   );
   return (
     <>
       {render(false)}
+      {ideHover.active && createPortal(
+        <div
+          className="source-ide-popover"
+          role="dialog"
+          aria-label="Source line actions"
+          style={{
+            left: Math.max(8, Math.min(ideHover.active.trigger.getBoundingClientRect().right + 6, window.innerWidth - 150)),
+            top: Math.max(8, Math.min(ideHover.active.trigger.getBoundingClientRect().top - 4, window.innerHeight - 52)),
+          }}
+          onMouseEnter={ideHover.keep}
+          onMouseLeave={ideHover.leave}
+          onFocus={ideHover.keep}
+          onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) ideHover.leave(); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault(); e.stopPropagation(); ideHover.active?.trigger.focus(); ideHover.close();
+            }
+          }}
+        >
+          <button type="button" ref={ideButton} onClick={(e) => {
+            e.stopPropagation();
+            try {
+              const uri = moveToIdeUri(source, ideHover.active!.value);
+              window.location.assign(uri);
+              setIdeNotice('VS Code requested. If it does not open, install the Codebase Mentor extension and allow your browser to open VS Code. Connect the matching repository snapshot in the extension.');
+            } catch (error) { setIdeNotice(error instanceof Error ? error.message : 'IDE navigation is unavailable.'); }
+            ideHover.close();
+          }}>Move to IDE</button>
+        </div>, ideHover.active.trigger.closest('.dialog') || document.body,
+      )}
       <Modal
         open={expanded}
         onOpenChange={setExpanded}

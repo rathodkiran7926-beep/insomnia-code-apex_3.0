@@ -20,8 +20,8 @@ export interface HealthResponse { ok: true }
 
 interface ClientOptions {
   timeoutMs?: number;
-  // Future authentication can supply headers from SecretStorage here.
-  // No authentication protocol or credential persistence is implemented.
+  // Authentication cookies are supplied by the host from SecretStorage.
+  authenticated?: () => boolean;
   headers?: () => HeadersInit;
 }
 
@@ -91,28 +91,29 @@ export class MentorApi {
   private checkpointConfiguration<T>(action: () => T): T {
     try { return action(); } catch { throw new ApiError('configuration', 'Invalid checkpoint request or repository context.'); }
   }
+  private checkpointRoot(): string { return this.options.authenticated?.() ? '/api/ide/team/checkpoints' : '/api/ide/checkpoints'; }
   async checkpointCapability(signal?: AbortSignal): Promise<CheckpointCapability> {
-    return this.parse(await this.request('GET', '/api/ide/checkpoints/capabilities', undefined, signal, this.options.timeoutMs ?? 10000, 64000, true), validateCheckpointCapability);
+    return this.parse(await this.request('GET', `${this.checkpointRoot()}/capabilities`, undefined, signal, this.options.timeoutMs ?? 10000, 64000, true), validateCheckpointCapability);
   }
   async createCheckpoint(binding: RepositoryBinding, input: CheckpointInput, signal?: AbortSignal): Promise<CheckpointDetail> {
     const approved = this.checkpointConfiguration(() => validateCheckpointInput(input, binding));
-    return this.parse(await this.request('POST', '/api/ide/checkpoints', approved, signal, this.options.timeoutMs ?? 10000, 128000, true), value => validateCheckpointDetail(value, binding, undefined, approved));
+    return this.parse(await this.request('POST', `${this.checkpointRoot()}`, approved, signal, this.options.timeoutMs ?? 10000, 128000, true), value => validateCheckpointDetail(value, binding, undefined, approved));
   }
   async listCheckpoints(binding: RepositoryBinding, limit = 10, offset = 0, signal?: AbortSignal): Promise<CheckpointPage> {
     this.checkpointConfiguration(() => { validateCheckpointBinding(binding); if (!Number.isSafeInteger(limit) || limit < 1 || limit > 25 || !Number.isSafeInteger(offset) || offset < 0 || offset > 10000) throw new Error(); });
-    return this.parse(await this.request('GET', `/api/ide/checkpoints?snapshotId=${binding.snapshotId}&limit=${limit}&offset=${offset}`, undefined, signal, this.options.timeoutMs ?? 10000, 128000, true), value => validateCheckpointPage(value, binding, limit, offset));
+    return this.parse(await this.request('GET', `${this.checkpointRoot()}?snapshotId=${binding.snapshotId}&limit=${limit}&offset=${offset}`, undefined, signal, this.options.timeoutMs ?? 10000, 128000, true), value => validateCheckpointPage(value, binding, limit, offset));
   }
   async checkpoint(binding: RepositoryBinding, id: string, signal?: AbortSignal): Promise<CheckpointDetail> {
     this.checkpointConfiguration(() => { validateCheckpointBinding(binding); if (!validSnapshotId(id)) throw new Error(); });
-    return this.parse(await this.request('GET', `/api/ide/checkpoints/${id}?snapshotId=${binding.snapshotId}`, undefined, signal, this.options.timeoutMs ?? 10000, 128000, true), value => validateCheckpointDetail(value, binding, id));
+    return this.parse(await this.request('GET', `${this.checkpointRoot()}/${id}?snapshotId=${binding.snapshotId}`, undefined, signal, this.options.timeoutMs ?? 10000, 128000, true), value => validateCheckpointDetail(value, binding, id));
   }
   async resumeCheckpoint(binding: RepositoryBinding, id: string, localContext: LocalCheckpointContext, signal?: AbortSignal): Promise<CheckpointResume> {
     const approved = this.checkpointConfiguration(() => { validateCheckpointBinding(binding); if (!validSnapshotId(id)) throw new Error(); return validateLocalCheckpointContext(localContext); });
-    return this.parse(await this.request('POST', `/api/ide/checkpoints/${id}/resume`, { currentSnapshotId: binding.snapshotId, localContext: approved }, signal, this.options.timeoutMs ?? 10000, 128000, true), value => validateCheckpointResume(value, binding, id, approved));
+    return this.parse(await this.request('POST', `${this.checkpointRoot()}/${id}/resume`, { currentSnapshotId: binding.snapshotId, localContext: approved }, signal, this.options.timeoutMs ?? 10000, 128000, true), value => validateCheckpointResume(value, binding, id, approved));
   }
   async deleteCheckpoint(binding: RepositoryBinding, id: string, signal?: AbortSignal): Promise<{ id: string; deleted: true }> {
     this.checkpointConfiguration(() => { validateCheckpointBinding(binding); if (!validSnapshotId(id)) throw new Error(); });
-    return this.parse(await this.request('DELETE', `/api/ide/checkpoints/${id}?snapshotId=${binding.snapshotId}`, undefined, signal, this.options.timeoutMs ?? 10000, 64000, true), value => validateCheckpointDeletion(value, id));
+    return this.parse(await this.request('DELETE', `${this.checkpointRoot()}/${id}?snapshotId=${binding.snapshotId}`, undefined, signal, this.options.timeoutMs ?? 10000, 64000, true), value => validateCheckpointDeletion(value, id));
   }
 
   async listPullRequests(binding: RepositoryBinding, state: PrState = 'all', page = 1, signal?: AbortSignal): Promise<PullRequestPage> {

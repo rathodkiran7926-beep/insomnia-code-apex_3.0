@@ -2,7 +2,7 @@
   "name": "codebase-mentor",
   "displayName": "Codebase Mentor",
   "description": "A lightweight IDE companion to the shared Codebase Mentor backend.",
-  "version": "0.1.1",
+  "version": "0.1.4",
   "publisher": "codebase-mentor-local",
   "private": true,
   "license": "SEE LICENSE IN LICENSE.txt",
@@ -320,6 +320,38 @@
         "command": "codebaseMentor.previousHandoffs",
         "title": "Codebase Mentor: Previous Handoffs",
         "icon": "$(export)"
+      },
+      {
+        "command": "codebaseMentor.shareContext",
+        "title": "Codebase Mentor: Share Context with Senior"
+      },
+      {
+        "command": "codebaseMentor.selectTeamWorkspace",
+        "title": "Codebase Mentor: Choose Handoff Workspace"
+      },
+      {
+        "command": "codebaseMentor.refreshSharedHandoffs",
+        "title": "Codebase Mentor: Refresh Team Handoffs"
+      },
+      {
+        "command": "codebaseMentor.browseSharedHandoffs",
+        "title": "Codebase Mentor: Browse Team Handoffs"
+      },
+      {
+        "command": "codebaseMentor.openSharedHandoff",
+        "title": "Codebase Mentor: Open Shared Handoff"
+      },
+      {
+        "command": "codebaseMentor.copySharedHandoffLink",
+        "title": "Codebase Mentor: Copy Shared Handoff Link"
+      },
+      {
+        "command": "codebaseMentor.openSharedHandoffBrowser",
+        "title": "Codebase Mentor: Open Shared Handoff in Browser"
+      },
+      {
+        "command": "codebaseMentor.prepareLocalHandoff",
+        "title": "Codebase Mentor: Prepare Local Handoff (Advanced)"
       }
     ],
     "menus": {
@@ -500,5 +532,8 @@
   },
   "overrides": {
     "@azure/msal-node": "7.1.1"
-  }
+  },
+  "activationEvents": [
+    "onUri"
+  ]
 }

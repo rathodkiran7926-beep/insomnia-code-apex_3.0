@@ -52,6 +52,7 @@ module.exports = {
     onDidChangeTextDocument: localEvents.event, onDidSaveTextDocument: localEvents.event, onDidGrantWorkspaceTrust: localEvents.event,
   },
   window: {
+    registerUriHandler(handler) { handlers.set("test:uri", handler); return {dispose:()=>handlers.delete("test:uri")}; },
     registerWebviewViewProvider(id, provider) {
       if (providers.has(id)) throw new Error('Duplicate view registration');
       providers.set(id, provider);

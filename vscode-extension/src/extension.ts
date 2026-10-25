@@ -1,4 +1,7 @@
 import * as vscode from 'vscode';
+import { registerMoveToIde } from './commands/moveToIde';
+import { TeamClient } from './teamClient';
+import { TeamController } from './teamController';
 import { HandoffController } from './handoffController';
 import { HandoffPanel } from './views/handoffPanel';
 import { registerHandoffCommands, type HandoffCommands } from './commands/handoffCommands';
@@ -31,8 +34,10 @@ import { registerCheckpointCommands, type CheckpointCommands } from './commands/
 import type { LocalCheckpointContext } from './api-client/checkpointContracts';
 
 export function activate(context: vscode.ExtensionContext) {
-  const api = new MentorApi(() => vscode.workspace.getConfiguration('codebaseMentor')
-    .get<string>('apiBaseUrl', 'http://127.0.0.1:3001'));
+  let api: MentorApi;
+  const teamClient = new TeamClient(() => api.backendIdentity, context.secrets);
+  api = new MentorApi(() => vscode.workspace.getConfiguration('codebaseMentor')
+    .get<string>('apiBaseUrl', 'http://127.0.0.1:3001'), { headers: () => teamClient.headers, authenticated: () => !!teamClient.account });
   const connection = new Connection(api);
   const git = new GitContext();
   const folders = () => (vscode.workspace.workspaceFolders ?? []).map(folder => ({ uri: folder.uri.toString(), name: folder.name }));
@@ -142,6 +147,7 @@ export function activate(context: vscode.ExtensionContext) {
   let checkpointActions: CheckpointCommands | undefined;
   const checkpointPanel = new CheckpointPanel(context.extensionUri, tasks, { binding: activeBinding, recoverableBinding, perform: async (type, value) => { await checkpointActions?.perform(type, value); } });
   const handoffs = handoffContext = new HandoffController(api, { binding: activeBinding, trusted: () => vscode.workspace.isTrusted, recoverableBinding });
+  const team = new TeamController(teamClient, api, mentor, activeBinding, editorContext, () => tasks.resetIdentity(), localCheckpointContext);
   let handoffActions: HandoffCommands | undefined;
   const handoffPanel = new HandoffPanel(context.extensionUri, handoffs, async (type,value) => { await handoffActions?.perform(type,value); }, activeBinding);
   const changesTree = new ChangesTree(pr, () => Boolean(activeBinding()));
@@ -155,6 +161,9 @@ export function activate(context: vscode.ExtensionContext) {
     await gitReady;
     if (!disposed) await repositories.restore();
   };
+  registerMoveToIde(context, api, source, () => folders().flatMap(folder => {
+    const binding = repositories.bindingFor(folder.uri); return binding ? [binding] : [];
+  }), check);
   context.subscriptions.push(connection, git, repositories, temporary, checkpointTemporary, handoffTemporary, handoffs, handoffPanel, tasks, checkpointPanel, mentor, source, mentorPanel, atlas, atlasPanel, fullRepositoryAtlas, atlasTree, pr, changesTree, changesView,
     handoffs.onChange(() => { handoffTemporary.setSession(handoffs.state.binding, handoffs.state.detail?.id); source.contextChanged(); }),
     tasks.onChange(() => { checkpointTemporary.setSession(tasks.state.binding, tasks.state.detail?.checkpoint.id); mentor.contextChanged(); atlas.contextChanged(); source.contextChanged(); }),
@@ -168,31 +177,39 @@ export function activate(context: vscode.ExtensionContext) {
     repositories.onChange(() => {
       pr.contextChanged(); tasks.contextChanged(); handoffs.contextChanged(); mentor.contextChanged(); source.contextChanged(); atlas.contextChanged(); atlasTree.refresh(); changesTree.refresh();
       const binding = activeBinding(); const anchor = binding && JSON.stringify([binding.backendUrl, binding.workspaceUri, binding.snapshotId, binding.connectedAt]);
-      if (anchor !== checkpointAnchor) { checkpointAnchor = anchor; if (anchor && focusVisible) { void tasks.refresh(); void handoffs.refresh(); } }
+      if (anchor !== checkpointAnchor) { checkpointAnchor = anchor; if (anchor && focusVisible) { void tasks.refresh(); void handoffs.refresh(); void team.refresh(); } }
     }),
     { dispose: () => { disposed = true; } });
   const focusProvider = new FocusView(context.extensionUri, {
     connection: () => connection.state, repositories, editor: editorContext,
-    mentor: () => mentor.state, tasks: () => tasks.state, handoffs: () => handoffs.state,
+    mentor: () => mentor.state, tasks: () => tasks.state, handoffs: () => handoffs.state, team: () => team.view,
     folders, trusted: () => vscode.workspace.isTrusted,
   }, visible => {
     focusVisible = visible;
-    if (visible) { void tasks.refresh(); void handoffs.refresh(); }
+    if (visible) { void tasks.refresh(); void handoffs.refresh(); void team.refresh(); }
   });
-  context.subscriptions.push(focusProvider,
+  context.subscriptions.push(team, team.onChange(() => focusProvider.refresh()), focusProvider,
     vscode.window.registerWebviewViewProvider('codebaseMentor.focus', focusProvider, { webviewOptions: { retainContextWhenHidden: true } }),
     tasks.onChange(() => focusProvider.refresh()), handoffs.onChange(() => focusProvider.refresh()),
     connection.onChange(() => focusProvider.refresh()), repositories.onChange(() => focusProvider.refresh()),
     mentor.onChange(() => focusProvider.refresh()),
     vscode.window.onDidChangeActiveTextEditor(() => focusProvider.refresh()),
     vscode.window.onDidChangeTextEditorSelection(() => focusProvider.refresh()));
+  team.register(context);
+  if (vscode.workspace.isTrusted) void team.initialize().then(() => tasks.refresh()).catch(() => focusProvider.refresh());
   registerCommands(context, connection, check);
   registerRepositoryCommands(context, repositories, git, connection);
   registerMentorCommands(context, mentor, mentorPanel, source, editorContext);
   registerAtlasCommands(context, atlas, mentor, mentorPanel, source, atlasPanel, () => fullRepositoryAtlas.show());
-  registerPrCommands(context, pr, api, temporary, atlas, mentor, mentorPanel, source, editorContext, async (resolved,origin) => { await handoffActions?.launch({binding:resolved.binding,componentId:resolved.component.id,sourceReferenceIds:[resolved.component.referenceId],origin}); });
-  checkpointActions = registerCheckpointCommands(context, tasks, checkpointPanel, checkpointTemporary, mentor, mentorPanel, atlas, pr, source, editorContext, activeBinding, localCheckpointContext, async seed => { await handoffActions?.launch(seed); });
-  handoffActions = registerHandoffCommands(context, handoffs, handoffPanel, mentor, atlas, handoffTemporary, source, editorContext, activeBinding);
+  registerPrCommands(context, pr, api, temporary, atlas, mentor, mentorPanel, source, editorContext, async (resolved,origin) => { await team.share({binding:resolved.binding,componentId:resolved.component.id,sourceReferenceIds:[resolved.component.referenceId],origin}); });
+  checkpointActions = registerCheckpointCommands(context, tasks, checkpointPanel, checkpointTemporary, mentor, mentorPanel, atlas, pr, source, editorContext, activeBinding, localCheckpointContext, async seed => { await team.share(seed); });
+  handoffActions = registerHandoffCommands(context, handoffs, handoffPanel, mentor, atlas, handoffTemporary, source, editorContext, activeBinding, seed => team.share(seed));
+  context.subscriptions.push(vscode.commands.registerCommand('codebaseMentor.prepareLocalHandoff', async () => {
+    try {
+      const selected = await mentor.resolveContext(editorContext(), new AbortController().signal);
+      if (selected?.reference) await handoffActions?.launchLocal({ binding: selected.binding, componentId: selected.component.id, sourceReferenceIds: [selected.reference.id], origin: { type: 'editor' } });
+    } catch { void vscode.window.showErrorMessage('Local handoff preparation is unavailable. Check the explicit local-mode settings and repository.'); }
+  }));
   let editorTimer: ReturnType<typeof setTimeout> | undefined;
   const refreshEditor = () => {
     pr.contextChanged(); tasks.contextChanged(); handoffs.contextChanged(); mentor.contextChanged(); source.contextChanged(); atlas.contextChanged();
@@ -205,7 +222,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.onDidChangeTextEditorSelection(refreshEditor),
     vscode.workspace.onDidChangeTextDocument(event => { if (event.document === vscode.window.activeTextEditor?.document) refreshEditor(); }),
     vscode.workspace.onDidSaveTextDocument(refreshEditor),
-    vscode.workspace.onDidGrantWorkspaceTrust(() => { void check(); }),
+    vscode.workspace.onDidGrantWorkspaceTrust(() => { void check(); void team.initialize().then(() => tasks.refresh()); }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => { repositories.synchronize(); void check(); }),
     { dispose: () => { if (editorTimer) clearTimeout(editorTimer); } },
   );

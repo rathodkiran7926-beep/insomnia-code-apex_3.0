@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import type { TeamView } from '../teamController';
 import { randomBytes } from 'node:crypto';
 import type { ConnectionState } from '../connection';
 import type { RepositoryController, FolderContext } from '../repositoryController';
@@ -11,6 +12,7 @@ import { escapeHtml } from './mentorContent';
 
 /** View-only state; all identities and mutations stay in the existing controllers. */
 export interface FocusModel {
+  team?: TeamView;
   connection: { status: ConnectionState['status']; message: string };
   workspace: string;
   folderCount: number;
@@ -27,6 +29,7 @@ export interface FocusModel {
 }
 
 export interface FocusEnvironment {
+  team?(): TeamView;
   connection(): ConnectionState;
   repositories: RepositoryController;
   editor(): EditorContext | undefined;
@@ -75,6 +78,7 @@ export function focusModel(env: FocusEnvironment): FocusModel {
     handoffs: { status: handoffScoped ? handoffState.status : 'idle', message: handoffScoped ? handoffState.message : 'Connect a validated repository to see saved handoffs.',
       items: handoffScoped ? (handoffState.page?.items ?? []).slice(0, 6).map(i => ({ id: i.id, title: i.question, createdAt: i.createdAt })) : [],
       more: Boolean(handoffScoped && handoffState.page?.hasMore), previous: Boolean(handoffScoped && handoffState.page && handoffState.page.offset > 0) },
+    ...(env.team ? { team: env.team() } : {}),
     mentorAvailable: Boolean(env.mentor()),
   };
 }
@@ -125,9 +129,17 @@ export class FocusView implements vscode.WebviewViewProvider, vscode.Disposable 
       saveTask: 'saveTaskCheckpoint', refreshTasks: 'refreshCheckpoints', nextTasks: 'nextCheckpoints', previousTasks: 'previousCheckpoints',
       refreshHandoffs: 'refreshHandoffs', nextHandoffs: 'nextHandoffs', previousHandoffs: 'previousHandoffs',
       changes: 'openChanges',
+      shareContext: 'shareContext', teamWorkspace: 'selectTeamWorkspace',
+      refreshShared: 'refreshSharedHandoffs', browseShared: 'browseSharedHandoffs', nextShared: 'nextSharedHandoffs', previousShared: 'previousSharedHandoffs',
     };
     try {
       const model = focusModel(this.env);
+      if (['openShared','copyShared','browserShared'].includes(data.action)) {
+        if (!this.env.trusted() || !model.team?.signedIn || typeof data.id !== 'string' || !model.team.items.some(item => item.id === data.id)) return;
+        const command = { openShared: 'openSharedHandoff', copyShared: 'copySharedHandoffLink', browserShared: 'openSharedHandoffBrowser' }[data.action as 'openShared'];
+        await vscode.commands.executeCommand('codebaseMentor.' + command, data.id); return;
+      }
+
       if (data.action === 'resumeTask' || data.action === 'openHandoff' || data.action === 'detailsTask' || data.action === 'seniorTask' || data.action === 'deleteTask' || data.action === 'deleteHandoff') {
         if (typeof data.id !== 'string' || data.id.length > 200) return;
         const isTask = ['resumeTask', 'detailsTask', 'seniorTask', 'deleteTask'].includes(data.action);

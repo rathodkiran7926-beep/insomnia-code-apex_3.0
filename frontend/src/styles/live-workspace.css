@@ -46,6 +46,13 @@
   border-color: #e5e0f2;
   padding: 26px;
 }
+/* The version picker and support popover extend beyond this card. */
+.panel.analysis-connect {
+  overflow: visible;
+}
+.analysis-connect:has(.repository-revision[open]) {
+  z-index: 3;
+}
 .analysis-connect-heading {
   margin-bottom: 24px;
 }
@@ -82,6 +89,7 @@
 }
 .repository-revision {
   position: relative;
+  min-width: 0;
   align-self: end;
   background: #faf9fd;
   border: 1px solid #e5e0ee;
@@ -103,6 +111,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.repository-revision > summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+  border-radius: 8px;
 }
 .repository-revision small {
   display: block;

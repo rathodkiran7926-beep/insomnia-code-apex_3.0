@@ -8,7 +8,7 @@ export interface CheckpointSummary { id: string; schemaVersion: 1; repositoryIde
 export interface Checkpoint extends CheckpointSummary { notes: CheckpointInput['notes']; sourceReferenceIds: string[] }
 export interface CheckpointDetail { checkpoint: Checkpoint; snapshotAvailable: boolean; references: SourceReference[]; components: Component[]; warnings: string[] }
 export interface CheckpointPage { repositoryIdentity: string; items: CheckpointSummary[]; limit: number; offset: number; hasMore: boolean }
-export interface CheckpointCapability { enabled: boolean; mode: 'local-single-user'; schemaVersion: 1; notice: string }
+export interface CheckpointCapability { enabled: boolean; mode: 'local-single-user' | 'authenticated-user'; schemaVersion: 1; notice: string }
 export interface CheckpointResume { detail: CheckpointDetail; currentSnapshot: SnapshotMetadata; currentLocalContext: LocalCheckpointContext; versions: { indexed: 'same' | 'different'; localHead: 'same' | 'different' | 'unknown' }; changes: { status: 'verified' | 'unavailable'; notice: string; items: { referenceId: string; file: string; status: 'changed' | 'unchanged' | 'unknown'; scope: 'file'; notice: string; currentReference?: SourceReference }[] }; comparison?: { id: string; prUrl: string; beforeSnapshotId: string; afterSnapshotId: string } }
 
 function object(value: unknown): Record<string, unknown> { if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid checkpoint structure.'); return value as Record<string, unknown>; }
@@ -37,7 +37,7 @@ function summary(value: unknown, binding: RepositoryBinding): CheckpointSummary 
   const result = { id: id(data.id), schemaVersion: 1 as const, repositoryIdentity: binding.repositoryIdentity, snapshotId: id(data.snapshotId), indexedCommit: data.indexedCommit, taskTitle: text(data.taskTitle, 200), localContext: validateLocalCheckpointContext(data.localContext), createdAt: timestamp(data.createdAt), updatedAt: timestamp(data.updatedAt) };
   if (Date.parse(result.updatedAt) < Date.parse(result.createdAt)) throw new Error('Inconsistent checkpoint dates.'); return result;
 }
-export function validateCheckpointCapability(value: unknown): CheckpointCapability { const data = object(value); if (typeof data.enabled !== 'boolean' || data.mode !== 'local-single-user' || data.schemaVersion !== 1) throw new Error('Unsupported checkpoint capability.'); return { enabled: data.enabled, mode: data.mode, schemaVersion: 1, notice: text(data.notice, 1000) }; }
+export function validateCheckpointCapability(value: unknown): CheckpointCapability { const data = object(value); if (typeof data.enabled !== 'boolean' || !['local-single-user', 'authenticated-user'].includes(String(data.mode)) || data.schemaVersion !== 1) throw new Error('Unsupported checkpoint capability.'); return { enabled: data.enabled, mode: data.mode as CheckpointCapability['mode'], schemaVersion: 1, notice: text(data.notice, 1000) }; }
 export function validateCheckpointDetail(value: unknown, binding: RepositoryBinding, expectedId?: string, approvedInput?: CheckpointInput): CheckpointDetail {
   validateCheckpointBinding(binding); const data = object(value); const saved = object(data.checkpoint); const checkpoint: Checkpoint = { ...summary(saved, binding), notes: notes(saved.notes), sourceReferenceIds: referenceIds(saved.sourceReferenceIds) };
   if ((expectedId !== undefined && checkpoint.id !== expectedId) || typeof data.snapshotAvailable !== 'boolean') throw new Error('Checkpoint identity mismatch.');

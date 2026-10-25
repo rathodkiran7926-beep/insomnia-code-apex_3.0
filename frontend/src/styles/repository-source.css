@@ -858,3 +858,24 @@
   font-size: 11px;
   line-height: 1.4;
 }
+.source-ide-popover {
+  position: fixed;
+  z-index: 10000;
+  padding: 5px;
+  border: 1px solid #ded6fa;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 6px 24px #49378d24;
+}
+.source-ide-popover > button {
+  display: block;
+  padding: 9px 13px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--primary);
+  background: #f3efff;
+  font: 600 12px var(--font, sans-serif);
+  cursor: pointer;
+}
+.source-ide-popover > button:hover { background: #eae3ff; }
+.source-ide-popover > button:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }

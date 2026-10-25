@@ -128,9 +128,10 @@ export class SourceNavigation implements vscode.TextDocumentContentProvider, vsc
    * An unverified checkout is NEVER shown with historical citation coordinates.
    * Other citation/diff actions continue using strict pinned-source navigation.
    */
-  async openWorkspaceSource(result: SourceTarget, raw: SourceReference): Promise<'local' | 'local-unverified' | 'indexed' | 'external' | undefined> {
+  async openWorkspaceSource(result: SourceTarget, raw: SourceReference, exactLine?: number): Promise<'local' | 'local-unverified' | 'indexed' | 'external' | undefined> {
     this.bound(result.binding);
     const reference = validateCitation(raw, result.snapshot);
+    if (exactLine !== undefined && (!Number.isSafeInteger(exactLine) || exactLine < 1 || exactLine > 1000000)) throw new Error('Invalid IDE source line.');
     const folder = vscode.Uri.parse(result.binding.workspaceUri);
     const gitRootUri = this.git.read(folder).rootUri;
     const root = gitRootUri ? vscode.Uri.parse(gitRootUri) : folder;
@@ -163,13 +164,18 @@ export class SourceNavigation implements vscode.TextDocumentContentProvider, vsc
           }
         }
         this.active(controller, result.binding);
+        if (exactLine !== undefined && (!verified || exactLine > document.lineCount || document.version !== localVersion))
+          throw new Error('Cannot map this line safely. Check out the saved commit and restore this file to its indexed contents, then retry Move to IDE.');
         const editor = await vscode.window.showTextDocument(document, { preview: false, viewColumn: result.sourceContext.viewColumn ?? vscode.ViewColumn.One });
         this.active(controller, result.binding);
         if (verified && !document.isDirty && document.version === localVersion && this.localMatches(result.binding, file)) {
-          editor.selection = new vscode.Selection(this.range(document, reference).start, this.range(document, reference).end);
+          editor.selection = exactLine === undefined
+            ? new vscode.Selection(this.range(document, reference).start, this.range(document, reference).end)
+            : new vscode.Selection(exactLine - 1, 0, exactLine - 1, 0);
           editor.revealRange(editor.selection, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
           return 'local';
         }
+        if (exactLine !== undefined) throw new Error('The local source changed during navigation. No indexed line was applied; retry with the saved commit.');
         // Only show the actual current workspace file; no historical line
         // highlight, no assumed correspondence, and no uploaded editor buffer.
         vscode.window.setStatusBarMessage?.('Codebase Mentor: Opened working file (not verified against indexed snapshot). Historical citation lines were not applied.', 9000);
@@ -180,6 +186,7 @@ export class SourceNavigation implements vscode.TextDocumentContentProvider, vsc
     }
     // The local file is absent/unsafe: retain the existing immutable-source
     // fallback rather than opening a guessed location or symlink target.
+    if (exactLine !== undefined) throw new Error('The source file is missing or its path cannot be mapped safely inside the connected workspace.');
     return this.openReference(result, reference);
   }
 

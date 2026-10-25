@@ -18,16 +18,18 @@ export interface HandoffSeed {
     origin: HandoffInput['origin'];
 }
 export interface HandoffCommands {
+    launchLocal(seed: HandoffSeed): Promise<void>;
     launch(seed: HandoffSeed): Promise<void>;
     perform(type: string, value: Record<string, unknown>): Promise<void>;
 }
-export function registerHandoffCommands(context: vscode.ExtensionContext, handoffs: HandoffController, panel: HandoffPanel, mentor: MentorController, atlas: AtlasController, temporary: ComparisonContexts, source: SourceNavigation, editor: () => EditorContext | undefined, binding: () => RepositoryBinding | undefined): HandoffCommands {
+export function registerHandoffCommands(context: vscode.ExtensionContext, handoffs: HandoffController, panel: HandoffPanel, mentor: MentorController, atlas: AtlasController, temporary: ComparisonContexts, source: SourceNavigation, editor: () => EditorContext | undefined, binding: () => RepositoryBinding | undefined, share?: (seed: HandoffSeed) => Promise<void>): HandoffCommands {
     const active = new Set<AbortController>();
     context.subscriptions.push({ dispose: () => { for (const c of active)
             c.abort(); active.clear(); } });
-    const launch = async (seed: HandoffSeed) => { if (panel.revealDraft(seed.binding, seed.componentId, seed.origin))
+    const launchLocal = async (seed: HandoffSeed) => { if (panel.revealDraft(seed.binding, seed.componentId, seed.origin))
         return; if (!await handoffs.prepare(seed.binding))
         return; panel.compose(seed.binding, { snapshotId: seed.binding.snapshotId, ...(seed.componentId ? { componentId: seed.componentId } : {}), sourceReferenceIds: seed.sourceReferenceIds.slice(0, 16), question: '', attemptedSteps: '', additionalContext: '', origin: seed.origin }); };
+    const launch = async (seed: HandoffSeed) => share ? share(seed) : launchLocal(seed);
     const fromTarget = async (target: ResolvedComponentContext | undefined, type: 'editor' | 'mentor' | 'map') => { if (!target)
         throw new Error('Choose a supported indexed component first'); await launch({ binding: target.binding, componentId: target.component.id, sourceReferenceIds: [target.component.referenceId], origin: { type } }); };
     const editorLaunch = async () => { const selection = editor(); if (!selection)
@@ -146,5 +148,5 @@ export function registerHandoffCommands(context: vscode.ExtensionContext, handof
         await remove(id, handoffs.state.viewId); });
     register('nextHandoffs', async () => { await perform('next', {}); });
     register('previousHandoffs', async () => { await perform('previous', {}); });
-    return { launch, perform };
+    return { launch, launchLocal, perform };
 }

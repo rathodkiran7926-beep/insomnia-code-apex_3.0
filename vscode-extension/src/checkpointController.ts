@@ -91,6 +91,11 @@ export class CheckpointController {
   current(viewId: string): CheckpointState & { binding: RepositoryBinding; detail: CheckpointDetail } {
     if (!this.value.detail || !this.value.binding || viewId !== this.value.viewId) throw new Error('This checkpoint action is stale. Resume the intended task.'); this.guard(this.value.binding); return this.value as CheckpointState & { binding: RepositoryBinding; detail: CheckpointDetail };
   }
+  resetIdentity(): void {
+    this.pending?.controller.abort(); this.pending = undefined; this.recovery = undefined;
+    this.value = { status: 'idle', message: 'Account changed. Refresh Saved Tasks.', viewId: `checkpoint-${++this.serial}` };
+    for (const listener of this.listeners) listener();
+  }
   contextChanged(): void {
     if (!this.value.binding) return; try {
       this.guard(this.value.binding);

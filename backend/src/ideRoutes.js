@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { ideTeamRoutes } from './ideTeamRoutes.js';
 import { db } from './storage.js';
 import { resolveSelection, selectionRequest } from './ideSelection.js';
 import { readNeighborhood, neighborhoodId, neighborhoodQuery } from './ideNeighborhood.js';
@@ -6,6 +7,7 @@ import { checkpointRoutes } from './checkpointRoutes.js';
 import { handoffRoutes } from './ideHandoffRoutes.js';
 
 export const ideRoutes = Router();
+ideRoutes.use('/team', ideTeamRoutes);
 ideRoutes.use('/checkpoints', checkpointRoutes);
 ideRoutes.use('/handoffs', handoffRoutes);
 ideRoutes.get('/snapshots/:snapshotId/components/:componentId/neighborhood', (req, res, next) => {
