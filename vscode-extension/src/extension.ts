@@ -163,7 +163,24 @@ export function activate(context: vscode.ExtensionContext) {
   };
   registerMoveToIde(context, api, source, () => folders().flatMap(folder => {
     const binding = repositories.bindingFor(folder.uri); return binding ? [binding] : [];
-  }), check);
+  }), check, async (target, current) => {
+    const matching = folders().filter(folder => repositories.context(folder).local.identity === target.repository);
+    if (!matching.length) throw new Error(`Open a local checkout of ${target.repository} in this VS Code window, then try Move to IDE again. No open folder has a matching Git remote.`);
+    const folder = matching.length === 1 ? matching[0] : (await vscode.window.showQuickPick(
+      matching.map(folder => ({ label: folder.name, description: vscode.Uri.parse(folder.uri).fsPath, folder })),
+      { title: 'Move to IDE: choose your repository' }))?.folder;
+    if (!folder || !current()) return false;
+    const backend = api.backendIdentity;
+    return repositories.connect(folder, target.snapshotId, async (snapshot, local, comparison) => {
+      if (!current() || backend !== api.backendIdentity || comparison.identity !== 'matched' ||
+          snapshot.snapshotId !== target.snapshotId || snapshot.repositoryIdentity !== target.repository || snapshot.indexedCommit !== target.commit) return false;
+      const choice = await vscode.window.showWarningMessage('Connect this snapshot and open source?', {
+        modal: true,
+        detail: `Repository: ${target.repository}\nWorkspace: ${folder.name}\nSnapshot: ${target.snapshotId}\nSaved commit: ${target.commit}\nLocal HEAD: ${local.head || 'Unknown'}\nSource: ${target.file}:${target.line}\nBackend: ${backend}\n\nThis uses the saved analysis. No scan or source upload is needed. Changed local files open immutable indexed source.`,
+      }, 'Connect & open source');
+      return choice === 'Connect & open source' && current() && backend === api.backendIdentity;
+    });
+  });
   context.subscriptions.push(connection, git, repositories, temporary, checkpointTemporary, handoffTemporary, handoffs, handoffPanel, tasks, checkpointPanel, mentor, source, mentorPanel, atlas, atlasPanel, fullRepositoryAtlas, atlasTree, pr, changesTree, changesView,
     handoffs.onChange(() => { handoffTemporary.setSession(handoffs.state.binding, handoffs.state.detail?.id); source.contextChanged(); }),
     tasks.onChange(() => { checkpointTemporary.setSession(tasks.state.binding, tasks.state.detail?.checkpoint.id); mentor.contextChanged(); atlas.contextChanged(); source.contextChanged(); }),

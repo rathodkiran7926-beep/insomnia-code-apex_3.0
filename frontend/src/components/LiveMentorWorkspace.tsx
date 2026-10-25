@@ -727,6 +727,7 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
                     ) : (
                       <RepositorySource
                         source={source}
+                        ideTarget={snapshot}
                         commit={snapshot.commit}
                         focusRange={handoffRange || reference}
                         onLineSelect={(line, extend) =>

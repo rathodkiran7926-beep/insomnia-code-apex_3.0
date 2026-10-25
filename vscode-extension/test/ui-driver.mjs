@@ -279,6 +279,11 @@ export async function driveWorkbench(port, stepFile, snapshots, screenshotFile, 
         await writeFile(`${stepFile}.${step.step}.complete`, 'done');
         console.log(`MENTOR_PHASE3_UI_PASS: ${step.step} (no modal)`); continue;
       }
+      if (step.type === 'move-source-connect') {
+        await waitFor(() => evaluate(`Array.from(document.querySelectorAll('.monaco-dialog-box .monaco-button')).some(button => button.textContent.includes('Connect & open source'))`), 'one-click snapshot connection');
+        await evaluate(`Array.from(document.querySelectorAll('.monaco-dialog-box .monaco-button')).find(button => button.textContent.includes('Connect & open source')).click()`);
+        console.log('MENTOR_MOVE_SOURCE_CONNECT_PASS: no snapshot input; confirmed existing evidence'); continue;
+      }
       if (step.step === 'done') {
         // Let native tree refresh complete, and collapse unused panes as a user
         // would so virtualized repository rows are visible for the UI assertion.

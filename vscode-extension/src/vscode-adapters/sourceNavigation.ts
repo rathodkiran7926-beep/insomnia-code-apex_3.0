@@ -3,7 +3,7 @@ import { realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { ApiError, type MentorApi } from '../api-client/client';
-import { validateCitation, validateSource, type PinnedSource, type SnapshotEvidence, type SourceReference } from '../api-client/mentorContracts';
+import { validateCitation, validateSource, sourcePermalink, type PinnedSource, type SnapshotEvidence, type SourceReference } from '../api-client/mentorContracts';
 import { compareRepository, type RepositoryBinding } from '../repository';
 import type { MentorResult } from '../mentorController';
 import type { EditorContext } from './editorContext';
@@ -128,6 +128,34 @@ export class SourceNavigation implements vscode.TextDocumentContentProvider, vsc
    * An unverified checkout is NEVER shown with historical citation coordinates.
    * Other citation/diff actions continue using strict pinned-source navigation.
    */
+  async openWorkspaceLine(result: SourceTarget, raw: SourceReference, line: number): Promise<'local' | 'indexed' | 'external' | undefined> {
+    this.bound(result.binding);
+    const reference = validateCitation(raw, result.snapshot);
+    if (!Number.isSafeInteger(line) || line < 1 || line > 1000000) throw new Error('Invalid IDE source line.');
+    this.cancel();
+    const controller = new AbortController();
+    this.pending = { controller, binding: result.binding };
+    let source: PinnedSource;
+    try {
+      source = validateSource(await this.api.source(result.snapshot, reference, controller.signal), result.snapshot, reference);
+      this.active(controller, result.binding);
+    } finally { if (this.pending?.controller === controller) this.pending = undefined; }
+    if (line > source.endLine) throw new Error('The requested line is outside the complete indexed source.');
+    const single = { ...reference, startLine: line, endLine: line,
+      url: sourcePermalink(result.snapshot, { file: reference.file, startLine: line, endLine: line }) };
+    try {
+      const outcome = await this.openWorkspaceSource(result, single, line);
+      return outcome === 'local' ? 'local' : undefined;
+    } catch (error) {
+      this.bound(result.binding);
+      if (error instanceof ApiError && error.kind === 'cancelled') throw error;
+      // Never apply historical coordinates to a changed/unsafe local file.
+      const outcome = await this.openReference(result, single, false);
+      if (outcome === 'indexed') vscode.window.setStatusBarMessage?.('Codebase Mentor: showing immutable indexed source; local contents could not be verified.', 9000);
+      return outcome;
+    }
+  }
+
   async openWorkspaceSource(result: SourceTarget, raw: SourceReference, exactLine?: number): Promise<'local' | 'local-unverified' | 'indexed' | 'external' | undefined> {
     this.bound(result.binding);
     const reference = validateCitation(raw, result.snapshot);
@@ -190,7 +218,7 @@ export class SourceNavigation implements vscode.TextDocumentContentProvider, vsc
     return this.openReference(result, reference);
   }
 
-  async openReference(result: SourceTarget, raw: SourceReference): Promise<'local' | 'indexed' | 'external' | undefined> {
+  async openReference(result: SourceTarget, raw: SourceReference, preview = true): Promise<'local' | 'indexed' | 'external' | undefined> {
     this.bound(result.binding);
     const reference = validateCitation(raw, result.snapshot);
     this.cancel(); const controller = new AbortController(); this.pending = { controller, binding: result.binding };
@@ -217,7 +245,7 @@ export class SourceNavigation implements vscode.TextDocumentContentProvider, vsc
             this.active(controller, result.binding);
             if (!document.isDirty && this.localMatches(result.binding, file) && normalizedText(document.getText()) === normalizedText(source.excerpt)) {
               const version = document.version;
-              const editor = await vscode.window.showTextDocument(document, { preview: true, viewColumn: result.sourceContext.viewColumn ?? vscode.ViewColumn.One });
+              const editor = await vscode.window.showTextDocument(document, { preview, viewColumn: result.sourceContext.viewColumn ?? vscode.ViewColumn.One });
               this.active(controller, result.binding);
               if (!document.isDirty && document.version === version && this.localMatches(result.binding, file)) {
                 editor.selection = new vscode.Selection(this.range(document, reference).start, this.range(document, reference).end);
@@ -232,7 +260,7 @@ export class SourceNavigation implements vscode.TextDocumentContentProvider, vsc
       const uri = this.indexedDocument(result, reference, source.excerpt);
       const document = await vscode.workspace.openTextDocument(uri);
       this.active(controller, result.binding);
-      const editor = await vscode.window.showTextDocument(document, { preview: true, viewColumn: result.sourceContext.viewColumn ?? vscode.ViewColumn.One });
+      const editor = await vscode.window.showTextDocument(document, { preview, viewColumn: result.sourceContext.viewColumn ?? vscode.ViewColumn.One });
       this.active(controller, result.binding);
       editor.selection = new vscode.Selection(this.range(document, reference).start, this.range(document, reference).end);
       editor.revealRange(editor.selection, vscode.TextEditorRevealType.InCenterIfOutsideViewport);

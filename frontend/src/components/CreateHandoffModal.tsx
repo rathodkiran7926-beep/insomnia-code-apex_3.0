@@ -254,6 +254,7 @@ function CreateForm({
       </small>
       {valid && (
         <RepositorySource
+          ideTarget={snapshot}
           source={{
             file: source.file,
             excerpt: code,

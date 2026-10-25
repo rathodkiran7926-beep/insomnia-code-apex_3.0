@@ -134,13 +134,16 @@ try {
   const rect=await evaluate('(()=>{const r=document.querySelector("button.source-select-line").getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2}})()');
   await send('Input.dispatchMouseEvent',{type:'mouseMoved',...rect});await pause(200);
   assert.equal(await evaluate('!!document.querySelector(".source-ide-popover")'),false,'No popup before 500ms');
-  await pause(380);await waitFor('!!document.querySelector(".source-ide-popover")');
+  await send('Input.dispatchMouseEvent',{type:'mouseMoved',x:1,y:1});await pause(400);
+  assert.equal(await evaluate('!!document.querySelector(".source-ide-popover")'),false,'Leaving early cancels hover');
+  await send('Input.dispatchMouseEvent',{type:'mouseMoved',...rect});await pause(550);await waitFor('!!document.querySelector(".source-ide-popover")');
   assert.equal(await evaluate('document.querySelector(".source-ide-popover").textContent'),'Move to IDE');
   const button=await evaluate('(()=>{const r=document.querySelector(".source-ide-popover button").getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2}})()');
   await send('Input.dispatchMouseEvent',{type:'mouseMoved',...button});await pause(240);
   assert(await evaluate('!!document.querySelector(".source-ide-popover")'),'Moving onto action preserves popup');
   await send('Input.dispatchMouseEvent',{type:'mouseMoved',x:1,y:1});await pause(240);
-  assert.equal(await evaluate('!!document.querySelector(".source-ide-popover")'),false);
+  assert(await evaluate('!!document.querySelector(".source-ide-popover")'),'One-second grace allows reaching the action');
+  await pause(900);assert.equal(await evaluate('!!document.querySelector(".source-ide-popover")'),false);
   await evaluate('document.querySelector("button.source-select-line").focus()');await pause(550);
   await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab'});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab'});
   assert(await evaluate('document.activeElement===document.querySelector(".source-ide-popover button")'));
@@ -157,6 +160,29 @@ try {
     const fits=await evaluate('(()=>{const r=document.querySelector(".source-ide-popover").getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight})()');assert(fits);
     await evaluate('document.activeElement.blur()');
   }
+
+  await evaluate('document.querySelector("button.source-select-line").blur();document.querySelector("button.source-select-line").scrollIntoView({block:"center"})');await pause(150);
+  await evaluate(`document.querySelectorAll('.code-workspace-toolbar button[aria-controls]').forEach(button=>{if(button.getAttribute('aria-pressed')==='true')button.click()})`);await pause(150);
+  const touch=await evaluate('(()=>{const r=document.querySelector("button.source-select-line").getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2}})()');
+  await send('Emulation.setTouchEmulationEnabled',{enabled:true});
+  await send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[touch]});await send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  await waitFor('!!document.querySelector(".source-ide-popover")');
+  assert.equal(await evaluate('document.querySelectorAll(".source-focused-line").length'),1,'Touch preserves selection');
+  await send('Emulation.setDeviceMetricsOverride',{width:1200,height:1000,deviceScaleFactor:1,mobile:false});await pause(150);
+  assert(await evaluate('!!document.querySelector(".source-ide-popover")'),'Resize repositions without dismissing');
+  await evaluate('document.querySelector(".repository-source-scroll").scrollTop += 2');await pause(100);
+  assert(await evaluate('!!document.querySelector(".source-ide-popover")'),'Scroll repositions without dismissing');
+  await evaluate('document.querySelector(".source-ide-popover button").dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}))');
+  await evaluate(`document.querySelector('button[aria-label="Expand source code"]').click()`);await waitFor('document.querySelector(".source-expanded")');
+  await evaluate('document.querySelector(".dialog.repository-source-dialog").style.transform="translate(20px,10px)";document.querySelector(".source-expanded .source-select-line").focus()');await pause(550);
+  assert(await evaluate('!!document.querySelector(".dialog .source-ide-popover")'),'Expanded reader keeps action inside accessible dialog');
+  assert(await evaluate('(()=>{const b=document.querySelector(".source-ide-popover button");const r=b.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===b})()'),'Transformed dialog does not clip or cover the action');
+  await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab'});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab'});
+  assert(await evaluate('document.activeElement===document.querySelector(".source-ide-popover button")'));
+  await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape'});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape'});
+  assert(await evaluate('!!document.querySelector(".source-expanded")'),'Escape dismisses action without closing reader');
+  await evaluate('document.querySelector(".source-expanded .source-select-line").blur();location.hash="/learn"');await pause(600);
+  assert.equal(await evaluate('!!document.querySelector(".source-ide-popover")'),false,'Unmount clears popup and timers');
   console.log('Move to IDE browser checks passed: delayed hover, persistent action, dismiss, keyboard, Escape, line/range selection and mobile viewport.');
   await send('Browser.close').catch(()=>{});
 }finally{socket?.close();chrome.kill();server.kill();}

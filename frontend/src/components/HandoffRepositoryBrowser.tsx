@@ -327,6 +327,7 @@ export function HandoffRepositoryBrowser({
                 )}
               </div>
               <RepositorySource
+                ideTarget={repo?.graph}
                 source={source?.file === file ? source : fallback}
                 commit={p.commit_sha}
                 focusRange={

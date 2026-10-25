@@ -12,10 +12,10 @@ Requires desktop VS Code1.100+ with a Node24+ shared backend and Git on its PATH
 The extension uses the built-in VS Code Git API; it never runs repository scripts.
 The verified release environment is Windows VS Code1.143.1 and Node24.15.0.
 
-1. Install `codebase-mentor-0.1.4.vsix` using **Extensions: Install from VSIX?**, or:
+1. Install `codebase-mentor-0.1.6.vsix` using **Extensions: Install from VSIX?**, or:
 
    ```powershell
-   code --install-extension .\codebase-mentor-0.1.4.vsix --force
+   code --install-extension .\codebase-mentor-0.1.6.vsix --force
    ```
 
 2. Start the existing backend from this project's `backend/` directory:
@@ -227,4 +227,4 @@ files are excluded from the VSIX. See `docs/phase-8-release.md` for final eviden
 
 ## Move to IDE from the web source viewer
 
-Hover over any source line number for 500 ms, then select **Move to IDE**. The extension opens the exact line in a regular editor tab after checking the connected repository, saved commit and complete local file contents. A changed revision or file produces an error instead of applying old line numbers. Connect the matching snapshot first and allow the browser to open VS Code. See `docs/move-to-ide.md` in the repository for details and verification commands.
+Hover over any source line number for 500 ms, then select **Move to IDE**. The extension opens the exact line in a regular editor tab after checking the connected repository, saved commit and complete local file contents. A changed revision, dirty buffer, or missing local file opens labeled immutable indexed source at the requested line. Snapshot/repository mismatches are rejected. Touch users can tap a source line to reveal the action. Connect the matching snapshot first and allow the browser to open VS Code. See `docs/move-to-ide.md` in the repository for details and verification commands.

@@ -783,6 +783,7 @@ export default function Repository() {
                               `A ${component.role} declaration found in the source. Open the code below to inspect its implementation.`}
                           </p>
                           <RepositoryFileSource
+                            repository={snapshot.repository}
                             key={component.referenceId}
                             source={source(component.referenceId)}
                             commit={snapshot.commit}

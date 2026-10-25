@@ -11,10 +11,12 @@ export function RepositoryFileSource({
   source,
   snapshotId,
   commit,
+  repository,
 }: {
   source?: Reference;
   snapshotId: string;
   commit: string;
+  repository: string;
 }) {
   const [file, setFile] = useState<CompleteSource | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,7 +62,7 @@ export function RepositoryFileSource({
           Could not load the complete file: {error} Showing the saved excerpt below.
         </p>
       )}
-      <RepositorySource source={file || source} commit={commit} focusRange={source} />
+      <RepositorySource source={file || source} commit={commit} focusRange={source} ideTarget={{ snapshotId, repository, commit }} />
     </div>
   );
 }

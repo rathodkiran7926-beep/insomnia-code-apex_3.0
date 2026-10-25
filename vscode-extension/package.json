@@ -2,7 +2,7 @@
   "name": "codebase-mentor",
   "displayName": "Codebase Mentor",
   "description": "A lightweight IDE companion to the shared Codebase Mentor backend.",
-  "version": "0.1.4",
+  "version": "0.1.6",
   "publisher": "codebase-mentor-local",
   "private": true,
   "license": "SEE LICENSE IN LICENSE.txt",

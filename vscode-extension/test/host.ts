@@ -511,7 +511,11 @@ export async function run(): Promise<void> {
       assert.equal(mentor.getEditorContext()?.binding?.snapshotId, snapshots[0]!.snapshotId);
       if (scenario === 'single' || scenario === 'move-to-ide') {
         const binding = mentor.getRepositoryContext(folders[0]!.uri.toString())!.binding!;
-        const uri = 'vscode://codebase-mentor-local.codebase-mentor/open-source?' + new URLSearchParams({ repository: binding.repositoryIdentity, commit: binding.indexedCommit, file: 'src/index.ts', line: '3' });
+        const uri = 'vscode://codebase-mentor-local.codebase-mentor/moveToSource?' + new URLSearchParams({ snapshotId: binding.snapshotId, repository: binding.repositoryIdentity, commit: binding.indexedCommit, file: 'src/index.ts', line: '3' });
+        if (scenario === 'move-to-ide') {
+          await vscode.commands.executeCommand('codebaseMentor.disconnectRepository', folders[0]!.uri.toString());
+          await step({ step: 'move-source-connect', type: 'move-source-connect' });
+        }
         await vscode.commands.executeCommand('codebaseMentor.moveToIde', uri);
         assert.equal(vscode.window.activeTextEditor?.document.uri.toString(), document.uri.toString());
         assert.equal(vscode.window.activeTextEditor?.selection.start.line, 2);
@@ -521,6 +525,16 @@ export async function run(): Promise<void> {
         assert.equal(vscode.window.tabGroups.activeTabGroup.activeTab?.isPreview, false);
         await assert.rejects(vscode.commands.executeCommand('codebaseMentor.moveToIde', uri.replace('line=3', 'line=99999')));
         assert.equal(vscode.window.activeTextEditor?.selection.start.line, 2);
+        if (scenario === 'move-to-ide') {
+          await vscode.window.activeTextEditor!.edit(builder => builder.insert(new vscode.Position(0, 0), '// local change\n'));
+          await vscode.commands.executeCommand('codebaseMentor.moveToIde', uri);
+          assert.equal(vscode.window.activeTextEditor?.document.uri.scheme, 'codebase-mentor-source');
+          assert.equal(vscode.window.activeTextEditor?.selection.start.line, 2);
+          assert.equal(vscode.window.tabGroups.activeTabGroup.activeTab?.isPreview, false);
+          assert.ok(vscode.window.activeTextEditor?.document.uri.path.includes(binding.indexedCommit.slice(0, 12)));
+          await vscode.window.showTextDocument(document, vscode.ViewColumn.One);
+          await vscode.commands.executeCommand('undo');
+        }
         console.log('MENTOR_MOVE_TO_IDE_HOST_PASS: source URI validated, real workspace editor opened at absolute line 3');
         if (scenario === 'move-to-ide') {
           await step({ step: 'done', expectedText: 'Codebase Mentor' });

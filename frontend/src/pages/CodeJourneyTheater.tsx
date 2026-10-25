@@ -392,6 +392,9 @@ function Player({
           {(journey.origin !== 'repository' ||
             (repositorySource && repositorySource.file === event.source.file)) && (
             <RepositorySource
+              ideTarget={journey.origin === 'repository' && journey.repository && journey.commit
+                ? { snapshotId: journey.snapshotId, repository: journey.repository, commit: journey.commit }
+                : undefined}
               compact
               source={{
                 ...(repositorySource || {}),
