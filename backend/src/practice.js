@@ -291,7 +291,7 @@ function relevance(component, evidence, context) {
   );
 }
 
-function readPracticeBank(cacheKey, graph, difficulty, candidates) {
+function readPracticeBank(cacheKey, graph, difficulty, candidates, references) {
   const bank = db.prepare(
     "SELECT snapshot_id,manifest FROM practice_task_banks WHERE cache_key=?",
   ).get(cacheKey);
@@ -302,7 +302,6 @@ function readPracticeBank(cacheKey, graph, difficulty, candidates) {
     }).strict()).min(3).max(5).parse(JSON.parse(bank.manifest));
     if (new Set(manifest.map((entry) => entry.id)).size !== manifest.length) return null;
     const candidateById = new Map(candidates.map((item) => [item.component.id, item]));
-    const references = new Map(candidates.map((item) => [item.evidence.referenceId, item.evidence]));
     const tasks = [];
     for (const entry of manifest) {
       const row = db.prepare("SELECT * FROM practice_tasks WHERE task_id=?").get(entry.id);
@@ -376,6 +375,19 @@ export async function listPracticeTasks(input) {
         "No captured TypeScript/JavaScript source is available for practice tasks.",
     };
 
+  const referenceById = new Map(candidates.map(({ evidence }) => [evidence.referenceId, evidence]));
+  const relatedByComponent = new Map(candidates.map(({ component }) => {
+    const edges = graph.relationships
+      .filter((edge) => edge.source === component.id || edge.target === component.id)
+      .slice(0, 6)
+      .filter((edge) => {
+        const reference = evidenceFor(graph, { referenceId: edge.referenceId });
+        if (!reference?.excerpt?.trim()) return false;
+        referenceById.set(reference.referenceId, reference);
+        return true;
+      });
+    return [component.id, edges];
+  }));
   const evidence = {
     repository: graph.repository,
     commit: graph.commit,
@@ -383,6 +395,7 @@ export async function listPracticeTasks(input) {
     frameworks: graph.report?.frameworks || [],
     difficulty: request.difficulty,
     learner: request.context,
+    references: [...referenceById.values()],
     components: candidates.map(({ component, evidence, source }) => ({
       id: component.id,
       name: component.name,
@@ -391,12 +404,7 @@ export async function listPracticeTasks(input) {
       file: evidence.file,
       startLine: evidence.startLine,
       excerpt: practiceSourceExcerpt(source, evidence),
-      relatedComponents: graph.relationships
-        .filter(
-          (edge) =>
-            edge.source === component.id || edge.target === component.id,
-        )
-        .slice(0, 6)
+      relatedComponents: relatedByComponent.get(component.id)
         .map((edge) => ({
           source: edge.source,
           target: edge.target,
@@ -419,7 +427,7 @@ export async function listPracticeTasks(input) {
     message:
       "Tasks were generated from this repository snapshot and source citations. Draft verification checks syntax only.",
   });
-  const cached = readPracticeBank(cacheKey, graph, request.difficulty, candidates);
+  const cached = readPracticeBank(cacheKey, graph, request.difficulty, candidates, referenceById);
   generationAccounting.cache("practice_tasks", cacheKey, cached ? "hit" : "miss");
   if (cached) return responseFor(cached);
   const generated = parseGenerated(
@@ -446,11 +454,6 @@ export async function listPracticeTasks(input) {
   }
   const componentById = new Map(
     candidates.map(({ component }) => [component.id, component]),
-  );
-  const referenceById = new Map(
-    candidates
-      .map(({ evidence }) => evidence)
-      .map((reference) => [reference.referenceId, reference]),
   );
   const candidateById = new Map(
     candidates.map((candidate) => [candidate.component.id, candidate]),
