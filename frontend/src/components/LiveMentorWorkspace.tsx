@@ -206,6 +206,13 @@ function CodeWorkspace({ snapshot }: { snapshot: RepositorySnapshot }) {
       return;
     }
     setImpactMapEnabled(enabled);
+    if (!enabled) {
+      setImpactActive(false);
+      setImpactTargetId(null);
+      setImpactResults(null);
+      setInspectedResultId(null);
+      setRightPanelTab('mentor');
+    }
     if (enabled) {
       setImpactActivation((value) => value + 1);
       setImpactFitToken((value) => value + 1);

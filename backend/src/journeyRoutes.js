@@ -246,7 +246,14 @@ journeyRoutes.put("/codejourneys/:id/checkpoint", authenticate, (req, res) => {
   ).run(req.collaborator.id, journey.id, JSON.stringify(data), data.updatedAt);
   res.json(data);
 });
-journeyRoutes.post("/traces/:id/questions", authenticate, async (req, res) => {
+journeyRoutes.post("/traces/:id/questions", (req, res, next) => {
+  // Explained source paths have the same public access as their explanations.
+  // Recorded runtime traces still require authentication and ownership checks.
+  authenticate(req, res, (error) => {
+    if (error?.status === 401 && req.params.id.startsWith("explained:")) return next();
+    next(error);
+  });
+}, async (req, res) => {
   const body = z
     .object({
       eventId: z.string().max(300),
@@ -261,7 +268,7 @@ journeyRoutes.post("/traces/:id/questions", authenticate, async (req, res) => {
     })
     .strict()
     .parse(req.body);
-  const trace = traceFor(req.params.id, req.collaborator.id),
+  const trace = traceFor(req.params.id, req.collaborator?.id),
     event = trace.events.find((e) => e.id === body.eventId);
   if (!event || body.snapshotId !== trace.snapshotId) throw missing();
   if (questions >= 3)
@@ -276,7 +283,7 @@ journeyRoutes.post("/traces/:id/questions", authenticate, async (req, res) => {
       body.question,
       body.level,
     );
-    db.prepare("INSERT INTO journey_questions VALUES (?,?,?,?,?,?,?,?)").run(
+    if (req.collaborator) db.prepare("INSERT INTO journey_questions VALUES (?,?,?,?,?,?,?,?)").run(
       randomUUID(),
       req.collaborator.id,
       trace.id,

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, LoaderCircle, Play } from 'lucide-react';
+import { ChevronDown, LoaderCircle, Maximize2, Play } from 'lucide-react';
+import { Modal } from './UI';
 import type { RepositorySnapshot } from '../domain/analysisTypes';
 import { analysisApi } from '../services/analysisApi';
 import {
@@ -38,6 +39,8 @@ export function ImpactPreviewPanel({
   const [baselineLoading, setBaselineLoading] = useState(false);
   const [baselineError, setBaselineError] = useState('');
   const [proposedCode, setProposedCode] = useState('');
+  const [question, setQuestion] = useState('');
+  const [editorExpanded, setEditorExpanded] = useState(false);
   const [codeAnalysis, setCodeAnalysis] = useState<ImpactCodeAnalysis | null>(null);
   const [codeAnalysisLoading, setCodeAnalysisLoading] = useState(false);
   const [codeAnalysisError, setCodeAnalysisError] = useState('');
@@ -127,15 +130,18 @@ export function ImpactPreviewPanel({
 
   useEffect(() => {
     codeAnalysisController.current?.abort();
+    setQuestion('');
+    setEditorExpanded(false);
     setCodeAnalysis(null);
     setCodeAnalysisError('');
     setCodeAnalysisLoading(false);
+    return () => codeAnalysisController.current?.abort();
   }, [active, targetId, snapshot.snapshotId]);
 
   async function analyzeProposedCode() {
     if (!targetId || !baselineCode) return;
-    if (!proposedCode.trim()) {
-      setCodeAnalysisError('Enter proposed code before analyzing the change.');
+    if (!proposedCode.trim() && !question.trim()) {
+      setCodeAnalysisError('Enter proposed code or a scenario before analyzing.');
       return;
     }
     codeAnalysisController.current?.abort();
@@ -151,6 +157,7 @@ export function ImpactPreviewPanel({
         'behavior-change',
         proposedCode,
         controller.signal,
+        question,
       );
       if (!controller.signal.aborted) setCodeAnalysis(analysis);
     } catch (cause) {
@@ -160,8 +167,74 @@ export function ImpactPreviewPanel({
     }
   }
 
+  function updateDraft(value: string, field: 'code' | 'question') {
+    codeAnalysisController.current?.abort();
+    setCodeAnalysisLoading(false);
+    setCodeAnalysis(null);
+    setCodeAnalysisError('');
+    if (field === 'code') setProposedCode(value);
+    else setQuestion(value);
+  }
+
+  function editorFields(expanded: boolean) {
+    const suffix = expanded ? '-expanded' : '';
+    return (
+      <div className="impact-code-fields">
+        <div className="impact-code-editor-heading">
+          <label htmlFor={`impact-proposed-code${suffix}`}>After · proposed code</label>
+          {!expanded && (
+            <button
+              type="button"
+              className="impact-editor-expand"
+              aria-haspopup="dialog"
+              onClick={() => setEditorExpanded(true)}
+            >
+              <Maximize2 size={13} /> Expand editor
+            </button>
+          )}
+        </div>
+        <textarea
+          id={`impact-proposed-code${suffix}`}
+          spellCheck={false}
+          maxLength={8000}
+          value={proposedCode}
+          onChange={(event) => updateDraft(event.target.value, 'code')}
+        />
+        <label htmlFor={`impact-scenario-question${suffix}`}>Scenario or question (optional)</label>
+        <textarea
+          id={`impact-scenario-question${suffix}`}
+          className="impact-code-question"
+          maxLength={2000}
+          value={question}
+          onChange={(event) => updateDraft(event.target.value, 'question')}
+          aria-describedby={`impact-scenario-help${suffix}`}
+          placeholder="What happens if GitHub returns 403, or this caller times out?"
+        />
+        <small id={`impact-scenario-help${suffix}`} className="impact-code-privacy">
+          Ask a hypothetical question without editing the code. No code is executed.
+        </small>
+      </div>
+    );
+  }
+
   return (
     <section className="impact-preview-panel" aria-label="Try a code change">
+      <Modal
+        open={editorExpanded && active && baselineCode !== null}
+        onOpenChange={setEditorExpanded}
+        title="Edit proposed code"
+        description="Explore a code change or ask about a hypothetical scenario. Your draft is kept when you close this view."
+        className="impact-editor-dialog"
+      >
+        {editorFields(true)}
+        <button
+          type="button"
+          className="impact-code-analyze"
+          onClick={() => setEditorExpanded(false)}
+        >
+          Done editing
+        </button>
+      </Modal>
       <div className="impact-preview-scroll">
         <section className="impact-code-editor" aria-label="Try a code change">
           <strong className="impact-code-editor-title">Try a code change</strong>
@@ -185,23 +258,14 @@ export function ImpactPreviewPanel({
                   <code>{baselineCode}</code>
                 </pre>
               </details>
-              <label htmlFor="impact-proposed-code">After · proposed code</label>
-              <textarea
-                id="impact-proposed-code"
-                spellCheck={false}
-                maxLength={8000}
-                value={proposedCode}
-                onChange={(event) => {
-                  codeAnalysisController.current?.abort();
-                  setCodeAnalysisLoading(false);
-                  setCodeAnalysis(null);
-                  setCodeAnalysisError('');
-                  setProposedCode(event.target.value);
-                }}
-              />
+              {editorFields(false)}
               <button
                 className="impact-code-analyze"
-                disabled={codeAnalysisLoading || baselineCode.length > 8000 || !proposedCode.trim()}
+                disabled={
+                  codeAnalysisLoading ||
+                  baselineCode.length > 8000 ||
+                  (!proposedCode.trim() && !question.trim())
+                }
                 onClick={() => void analyzeProposedCode()}
               >
                 {codeAnalysisLoading ? (
@@ -209,7 +273,11 @@ export function ImpactPreviewPanel({
                 ) : (
                   <Play size={13} />
                 )}
-                {codeAnalysisLoading ? 'Analyzing…' : 'Analyze proposed code'}
+                {codeAnalysisLoading
+                  ? 'Analyzing…'
+                  : question.trim()
+                    ? 'Analyze scenario'
+                    : 'Analyze proposed code'}
               </button>
               {baselineCode.length > 8000 && (
                 <p className="impact-preview-warning" role="status">

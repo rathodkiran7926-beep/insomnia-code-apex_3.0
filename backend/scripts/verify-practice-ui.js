@@ -206,8 +206,31 @@ try {
   assert(await evaluate(`document.querySelector('.context-output').value.includes('get_task_context')`), 'MCP export missing');
   await click('Open prepared context demo');
   await wait(`document.querySelector('[aria-label="Context snapshot"]')`, 'Original prepared context feature was lost');
+  await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+  await evaluate("location.hash='/workspace'");
+  await wait("document.querySelector('.impact-toggle input')", 'Workspace toggle missing');
+  await click('Architecture Focus');
+  await evaluate("document.querySelector('.impact-toggle input').click()");
+  await wait("document.querySelector('.workspace-impact-direct')", 'Impact highlighting missing');
+  const clickGraphNode = async (name, keyboard = false) => evaluate(`(()=>{
+    const node=[...document.querySelectorAll('.react-flow__node')].find(node=>node.querySelector('.workspace-node-name')?.textContent.includes(${JSON.stringify(name)}));
+    if(!node)throw new Error('Graph node missing');
+    node.dispatchEvent(${keyboard ? "new KeyboardEvent('keydown',{key:'Enter',bubbles:true})" : "new MouseEvent('click',{bubbles:true})"});
+  })()`);
+  await clickGraphNode('createUser');
+  assert.equal(await evaluate("document.querySelector('.mentor-selection-summary h1').textContent"),'normalizeEmail','Impact inspection must keep its target');
+  await evaluate("document.querySelector('.impact-toggle input').click()");
+  await clickGraphNode('createUser');
+  await wait("document.querySelector('.mentor-selection-summary h1')?.textContent==='createUser'", 'Turning What-If off must restore normal graph navigation');
+  assert(await evaluate("document.querySelector('.workspace-right-panel-tabs button[aria-selected=true]').textContent==='Mentor'"),'Turning What-If off must restore the mentor panel');
+  assert(await evaluate("!document.querySelector('.workspace-impact-direct,.workspace-impact-focused') && !document.querySelector('.impact-toggle input').checked"),'Impact highlighting must be cleared');
+  await evaluate("document.querySelector('.impact-toggle input').click()");
+  await wait("document.querySelector('#impact-proposed-code')?.value.includes('function createUser')", 'Reactivation must use the newly selected component');
+  await evaluate("document.querySelector('.impact-toggle input').click()");
+  await clickGraphNode('normalizeEmail', true);
+  await wait("document.querySelector('.mentor-selection-summary h1')?.textContent==='normalizeEmail'", 'Normal keyboard graph navigation must also work after repeated toggles');
   assert.equal(errors.length,0,errors.join('\n'));
-  console.log('Browser checks passed: guided sample, repository task generation through shared provider config, pinned citations, syntax-only saved attempts/history, quiz grading/completion, difficulty persistence, mobile layout, latest snapshot lookup, Agent Context Bridge retrieval/MCP export and preserved context demo. Isolated provider responses; no analyzed code executed.');
+  console.log('Browser checks passed: guided sample, repository task generation through shared provider config, pinned citations, syntax-only saved attempts/history, quiz grading/completion, difficulty persistence, mobile layout, latest snapshot lookup, Agent Context Bridge retrieval/MCP export, preserved context demo, and What-If exit/re-entry with mouse and keyboard graph navigation. Isolated provider responses; no analyzed code executed.');
 } catch (error) {
   if (evaluate)
     console.error(

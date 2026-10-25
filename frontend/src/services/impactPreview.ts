@@ -137,13 +137,14 @@ export async function analyzeImpactCodeChange(
   scenario: ImpactScenario,
   proposedCode: string,
   signal: AbortSignal,
+  question = '',
 ): Promise<ImpactCodeAnalysis> {
   const result = await analysisApi<ImpactCodeAnalysis>(
     `/api/snapshots/${encodeURIComponent(snapshotId)}/components/${encodeURIComponent(componentId)}/impact-analysis`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scenario, proposedCode }),
+      body: JSON.stringify({ scenario, proposedCode, question }),
       signal,
     },
   );
